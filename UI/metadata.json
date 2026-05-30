@@ -1,0 +1,6 @@
+{
+  "name": "POS Loyalty Customer App",
+  "description": "A high-performance POS Loyalty SaaS customer web application, featuring dynamic tenant-branded CSS variable themes, fully RTL Arabic localizations, and an integrated customer journey workflow.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

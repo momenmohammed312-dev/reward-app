@@ -1,0 +1,72 @@
+/* src/theme/tokens.css */
+:root {
+  /* ——— Brand ——— */
+  --brand-name: "أروما كافيه";
+  --brand-logo: "https://picsum.photos/seed/aromacafe/120";
+
+  /* ——— Colors ——— */
+  --color-primary: #1e40af; /* اللون الرئيسي للكافيه */
+  --color-primary-soft: rgba(30, 64, 175, 0.08); /* نسخة شفافة للخلفيات */
+  --color-accent: #f59e0b; /* لون التمييز / CTAs */
+  --color-accent-soft: rgba(245, 158, 11, 0.08);
+  --color-success: #059669;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+
+  /* ——— Neutrals ——— */
+  --color-bg: #f8fafc; /* خلفية الصفحة */
+  --color-surface: #ffffff; /* خلفية الكروت */
+  --color-border: #e2e8f0;
+  --color-text: #1e293b; /* نص رئيسي */
+  --color-text-muted: #64748b; /* نص ثانوي */
+  --color-text-light: #94a3b8; /* placeholder */
+
+  /* ——— Typography ——— */
+  --font-display: 'Playfair Display', serif; /* عناوين كبيرة */
+  --font-body: 'Cairo', sans-serif; /* كل النصوص */
+  --font-mono: 'JetBrains Mono', monospace; /* الكودات والأرقام */
+
+  /* ——— Font Sizes ——— */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 30px;
+  --text-3xl: 38px;
+
+  /* ——— Spacing ——— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ——— Radius ——— */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ——— Shadows ——— */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+  --shadow-card: 0 2px 12px rgba(0,0,0,0.07);
+
+  /* ——— Transitions ——— */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 250ms cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-slow: 400ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ——— Layout ——— */
+  --max-width: 420px; /* الموبايل PWA */
+  --nav-height: 64px;
+  --bottom-nav: 68px;
+}

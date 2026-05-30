@@ -1,0 +1,23 @@
+2026-05-28 21:15:38.628 EEST [19924] LOG:  starting PostgreSQL 18.4 on x86_64-windows, compiled by msvc-19.44.35226, 64-bit
+2026-05-28 21:15:38.639 EEST [19924] LOG:  listening on IPv6 address "::1", port 5433
+2026-05-28 21:15:38.639 EEST [19924] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-05-28 21:15:38.991 EEST [1616] LOG:  database system was shut down at 2026-05-28 21:13:48 EEST
+2026-05-28 21:15:39.068 EEST [19924] LOG:  database system is ready to accept connections
+2026-05-28 21:20:39.079 EEST [9280] LOG:  checkpoint starting: time
+2026-05-28 21:20:43.902 EEST [9280] LOG:  checkpoint complete: wrote 27 buffers (0.2%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=3.729 s, sync=0.637 s, total=4.825 s; sync files=10, longest=0.140 s, average=0.064 s; distance=192 kB, estimate=192 kB; lsn=0/1816670, redo lsn=0/1816618
+2026-05-28 21:25:39.904 EEST [9280] LOG:  checkpoint starting: time
+2026-05-28 21:27:23.396 EEST [9280] LOG:  checkpoint complete: wrote 985 buffers (6.0%), wrote 1 SLRU buffers; 1 WAL file(s) added, 0 removed, 0 recycled; write=100.657 s, sync=2.327 s, total=103.492 s; sync files=302, longest=0.041 s, average=0.008 s; distance=4675 kB, estimate=4675 kB; lsn=0/1CA73F0, redo lsn=0/1CA7360
+2026-05-28 21:30:39.485 EEST [9280] LOG:  checkpoint starting: time
+2026-05-28 21:30:58.192 EEST [9280] LOG:  checkpoint complete: wrote 161 buffers (1.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=16.592 s, sync=1.770 s, total=18.707 s; sync files=123, longest=0.064 s, average=0.015 s; distance=1076 kB, estimate=4315 kB; lsn=0/1DB4430, redo lsn=0/1DB43A0
+2026-05-28 21:35:39.227 EEST [9280] LOG:  checkpoint starting: time
+2026-05-28 21:35:40.151 EEST [9280] LOG:  checkpoint complete: wrote 6 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.622 s, sync=0.120 s, total=0.925 s; sync files=3, longest=0.060 s, average=0.040 s; distance=40 kB, estimate=3887 kB; lsn=0/1DBE420, redo lsn=0/1DBE3C8
+2026-05-28 21:38:05.785 EEST [7688] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-05-28 22:15:39.180 EEST [9280] LOG:  checkpoint starting: time
+2026-05-28 22:15:42.054 EEST [9280] LOG:  checkpoint complete: wrote 21 buffers (0.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=2.149 s, sync=0.572 s, total=2.875 s; sync files=15, longest=0.082 s, average=0.039 s; distance=20 kB, estimate=3501 kB; lsn=0/1DC35B0, redo lsn=0/1DC3558
+2026-05-28 22:18:20.183 EEST [21692] ERROR:  operator does not exist: character varying = uuid at character 46
+2026-05-28 22:18:20.183 EEST [21692] HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+2026-05-28 22:18:20.183 EEST [21692] STATEMENT:  SELECT id FROM tenants WHERE id = $1 OR slug = $1
+2026-05-28 22:22:11.876 EEST [12704] ERROR:  operator does not exist: character varying = uuid at character 46
+2026-05-28 22:22:11.876 EEST [12704] HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
+2026-05-28 22:22:11.876 EEST [12704] STATEMENT:  SELECT id FROM tenants WHERE id = $1 OR slug = $1

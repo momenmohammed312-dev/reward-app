@@ -1,0 +1,9 @@
+import { Router } from 'express';
+import { WebhookController } from '../controllers/webhookController.js';
+
+const router = Router();
+
+// Endpoint for receiving webhook calls from Foodics POS, identifying tenant via URL parameter
+router.post('/foodics/:tenant_id', WebhookController.handleFoodicsWebhook);
+
+export default router;
