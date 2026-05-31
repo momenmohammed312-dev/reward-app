@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Database files
+data/pg/
+data/redis/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Logs
+*.log
+data/ui_err.log
+data/ui_out.log
+
+# Temporary files
+temp-tenant.json
+extracted_brd*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
