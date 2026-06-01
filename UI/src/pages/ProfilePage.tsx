@@ -4,21 +4,35 @@ import React, { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Card, CardBody, CardFooter } from '../components/ui/Card';
-import { User, SignOut, Check, Phone, Calendar, Envelope, PencilSimple, Gear } from '@phosphor-icons/react';
-import { Badge } from '../components/ui/Badge';
+import { Card, CardBody } from '../components/ui/Card';
+import { User, SignOut, Phone, Calendar, Envelope, PencilSimple, Gear } from '@phosphor-icons/react';
 import { formatEgyptianPhoneForDisplay } from '../utils/validators';
 
 interface ProfilePageProps {
   onShowToast: (msg: string, type: 'success' | 'error') => void;
 }
 
+const tierStyles: Record<string, string> = {
+  bronze: 'bg-amber-100 text-amber-700',
+  Bronze: 'bg-amber-100 text-amber-700',
+  silver: 'bg-slate-200 text-slate-700',
+  Silver: 'bg-slate-200 text-slate-700',
+  gold: 'bg-yellow-100 text-yellow-700',
+  Gold: 'bg-yellow-100 text-yellow-700',
+  platinum: 'bg-cyan-100 text-cyan-700',
+  Platinum: 'bg-cyan-100 text-cyan-700',
+  'العادي': 'bg-amber-100 text-amber-700',
+  'الذهبي': 'bg-yellow-100 text-yellow-700',
+  'البلاتيني': 'bg-cyan-100 text-cyan-700',
+};
+
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
-  const { user, logout, updateProfileName, currentTenant } = useApp();
+  const { user, logout, updateProfileName } = useApp();
   const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState('ahmed.abdallah@gmail.com');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const tierStyle = tierStyles[user?.loyaltyTier || 'Bronze'] || 'bg-amber-100 text-amber-700';
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +50,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
   };
 
   return (
-    <div className="flex flex-col gap-[var(--space-5)] text-right pb-[var(--space-10)]">
+    <div className="flex flex-col gap-[var(--space-5)] text-right pb-[var(--space-10)] font-body">
+      {/* Page header */}
+      <div className="flex flex-col gap-0.5 select-none text-right">
+        <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
+          الملف الشخصي
+        </h1>
+        <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
+          بيانات حسابك في برنامج الولاء
+        </p>
+      </div>
+
       {/* Visual profile cover branding banner */}
       <div className="relative h-28 rounded-[var(--radius-lg)] overflow-hidden select-none shadow-sm flex items-end">
         <div 
@@ -53,7 +77,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
 
           <div className="flex flex-col text-right">
             <span className="text-[var(--text-md)] font-bold">{user?.name || 'أحمد عبد الله'}</span>
-            <span className="text-[10px] text-white/80">عضو بلاتيني منذ ديسمبر ٢٠٢٤</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tierStyle}`}>
+                {user?.loyaltyTier || 'العادي'}
+              </span>
+              <span className="text-[9px] text-white/80">عضو منذ {user?.joinDate || '٢٠٢٤/١٢/١٥'}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -81,22 +110,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
             {editing ? (
               <>
                 <Input
-                  label="الاسم الكامل بالعربي"
+                  label="الاسم الكامل"
                   type="text"
                   placeholder="مثال: أحمد عبد الله الهاشمي"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={saving}
                   icon={<User size={16} />}
-                />
-                <Input
-                  label="البريد الإلكتروني (اختياري)"
-                  type="email"
-                  placeholder="username@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={saving}
-                  icon={<Envelope size={16} />}
                 />
                 
                 <div className="flex gap-2 w-full pt-1.5">
@@ -143,19 +163,24 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                     <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] mt-0.5 number tracking-wide">
                       {user?.phone ? formatEgyptianPhoneForDisplay(user.phone) : '01012345678'}
                     </span>
-                  </div>
-                </div>
-
-                {/* Email row */}
-                <div className="flex items-center gap-4 text-right">
-                  <Envelope size={16} className="text-[var(--color-text-muted)] shrink-0" />
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] text-[var(--color-text-light)]">عنوان البريد</span>
-                    <span className="text-[var(--text-sm)] font-semibold text-[var(--color-text)] mt-0.5 font-mono">
-                      {email}
+                    <span className="text-[9px] text-[var(--color-text-light)] opacity-75 mt-0.5">
+                      لتغيير رقم الهاتف، تواصل مع إدارة الكافيه
                     </span>
                   </div>
                 </div>
+
+                {/* Email row (only if user.email exists) */}
+                {user?.email && (
+                  <div className="flex items-center gap-4 text-right">
+                    <Envelope size={16} className="text-[var(--color-text-muted)] shrink-0" />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-[11px] text-[var(--color-text-light)]">عنوان البريد</span>
+                      <span className="text-[var(--text-sm)] font-semibold text-[var(--color-text)] mt-0.5 font-mono">
+                        {user.email}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Join level row */}
                 <div className="flex items-center gap-4 text-right">
@@ -183,6 +208,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
         <SignOut size={16} />
         <span>تسجيل الخروج من الحساب</span>
       </Button>
+
+      {/* MO2 Footer */}
+      <div className="text-center pt-4 pb-2 select-none">
+        <span className="text-[9px] tracking-widest uppercase font-semibold text-[var(--color-text-light)] opacity-40">
+          Developed by MO2 CAPITAL © 2026
+        </span>
+      </div>
     </div>
   );
 };

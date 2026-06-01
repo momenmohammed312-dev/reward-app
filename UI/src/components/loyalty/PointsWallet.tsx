@@ -147,7 +147,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
 };
 
 interface PointsWalletProps {
-  onShowScannerCode: () => void;
+  onShowScannerCode?: () => void;
 }
 
 export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode }) => {
@@ -203,15 +203,17 @@ export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode })
         </div>
 
         {/* Access barcode CTA */}
-        <Button 
-          variant="ghost" 
-          size="md" 
-          onClick={onShowScannerCode}
-          className="w-full flex items-center justify-center gap-2 border-[var(--color-primary)] text-[var(--color-primary)] font-bold py-3 transition-colors hover:bg-[var(--color-primary-soft)]"
-        >
-          <QrCode size={18} weight="bold" />
-          <span>امسح رمز العميل للكاشير</span>
-        </Button>
+        {onShowScannerCode && (
+          <Button 
+            variant="ghost" 
+            size="md" 
+            onClick={onShowScannerCode}
+            className="w-full flex items-center justify-center gap-2 border-[var(--color-primary)] text-[var(--color-primary)] font-bold py-3 transition-colors hover:bg-[var(--color-primary-soft)]"
+          >
+            <QrCode size={18} weight="bold" />
+            <span>امسح رمز العميل للكاشير</span>
+          </Button>
+        )}
       </div>
     </Card>
   );

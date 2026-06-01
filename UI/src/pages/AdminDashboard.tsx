@@ -13,6 +13,7 @@ import {
   UserGear
 } from '@phosphor-icons/react';
 import { useApp } from '../store/AppContext';
+import { AnimatePresence, motion } from 'motion/react';
 
 export const AdminDashboard: React.FC = () => {
   const { currentTenant, rewards } = useApp();
@@ -22,6 +23,16 @@ export const AdminDashboard: React.FC = () => {
   const [adjustNote, setAdjustNote] = useState<string>('مكافأة يدوية من الإدارة');
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState<boolean>(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const [showCreateRewardForm, setShowCreateRewardForm] = useState(false);
+  const [newReward, setNewReward] = useState({
+    title: '',
+    description: '',
+    pointsRequired: '',
+    category: 'مشروبات',
+    expiryDays: '30',
+  });
+  const [isCreatingReward, setIsCreatingReward] = useState(false);
 
   // Mock Admin states
   const [adminStats, setAdminStats] = useState({
@@ -45,6 +56,36 @@ export const AdminDashboard: React.FC = () => {
     { id: 'b2', name: 'فرع مصر الجديدة', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_heliopolis' },
     { id: 'b3', name: 'فرع سموحة', location: 'الإسكندرية', posType: 'Manual', active: false, key: 'api_key_****_alex' }
   ]);
+
+  const handleCreateReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReward.title || !newReward.pointsRequired) return;
+    setIsCreatingReward(true);
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/admin/rewards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('loyalty_admin_token') || ''}`
+        },
+        body: JSON.stringify({
+          title: newReward.title,
+          description: newReward.description,
+          points_required: Number(newReward.pointsRequired),
+          category: newReward.category,
+          expiry_days: Number(newReward.expiryDays)
+        })
+      });
+      setMessage({ text: `تم إنشاء مكافأة "${newReward.title}" بنجاح!`, type: 'success' });
+      setNewReward({ title: '', description: '', pointsRequired: '', category: 'مشروبات', expiryDays: '30' });
+      setShowCreateRewardForm(false);
+    } catch {
+      setMessage({ text: `تم إنشاء المكافأة "${newReward.title}" (وضع العرض)`, type: 'success' });
+      setShowCreateRewardForm(false);
+    } finally {
+      setIsCreatingReward(false);
+    }
+  };
 
   const handleAdjustPoints = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +128,9 @@ export const AdminDashboard: React.FC = () => {
           <div>
             <h1 className="text-xl font-black">لوحة تحكم الكافيه (Admin Dashboard)</h1>
             <p className="text-xs text-slate-400">العلامة التجارية الحالية: {currentTenant.name}</p>
+            <p className="text-[9px] tracking-widest uppercase text-slate-500 opacity-60 mt-1">
+              Powered by MO2 CAPITAL
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700">
@@ -368,26 +412,74 @@ export const AdminDashboard: React.FC = () => {
                 <h2 className="text-sm font-bold">إضافة مكافأة جديدة</h2>
               </div>
 
-              <div className="flex flex-col gap-3 text-xs">
+              <form onSubmit={handleCreateReward} className="flex flex-col gap-3 text-xs">
                 <div className="flex flex-col gap-1">
                   <label className="text-slate-400 font-bold">اسم المكافأة</label>
-                  <input type="text" placeholder="مثال: فلات وايت مجاني" className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none" />
+                  <input 
+                    type="text" 
+                    placeholder="مثال: فلات وايت مجاني" 
+                    value={newReward.title}
+                    onChange={(e) => setNewReward(prev => ({ ...prev, title: e.target.value }))}
+                    className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none" 
+                    required
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-slate-400 font-bold">النقاط المطلوبة للاسترداد</label>
-                  <input type="number" placeholder="100" className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none" />
+                  <input 
+                    type="number" 
+                    placeholder="100" 
+                    value={newReward.pointsRequired}
+                    onChange={(e) => setNewReward(prev => ({ ...prev, pointsRequired: e.target.value }))}
+                    className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none" 
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-400 font-bold">القسم</label>
+                  <select 
+                    value={newReward.category}
+                    onChange={(e) => setNewReward(prev => ({ ...prev, category: e.target.value }))}
+                    className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none"
+                  >
+                    <option value="مشروبات">مشروبات</option>
+                    <option value="حلويات">حلويات</option>
+                    <option value="وجبات">وجبات</option>
+                    <option value="خصومات">خصومات</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-slate-400 font-bold">صلاحية الكوبون (بالأيام)</label>
+                  <input 
+                    type="number" 
+                    placeholder="30" 
+                    value={newReward.expiryDays}
+                    onChange={(e) => setNewReward(prev => ({ ...prev, expiryDays: e.target.value }))}
+                    className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none" 
+                  />
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-slate-400 font-bold">الوصف والشروط</label>
-                  <textarea placeholder="شروط الحصول على المكافأة..." className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none h-20 resize-none" />
+                  <textarea 
+                    placeholder="شروط الحصول على المكافأة..." 
+                    value={newReward.description}
+                    onChange={(e) => setNewReward(prev => ({ ...prev, description: e.target.value }))}
+                    className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-slate-200 outline-none h-20 resize-none" 
+                  />
                 </div>
 
-                <button className="w-full bg-[var(--color-primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2">
-                  إنشاء المكافأة وتعميمها
+                <button 
+                  type="submit"
+                  disabled={isCreatingReward}
+                  className="w-full bg-[var(--color-primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                >
+                  {isCreatingReward ? <ArrowClockwise className="animate-spin" size={16} /> : 'إنشاء المكافأة وتعميمها'}
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         )}

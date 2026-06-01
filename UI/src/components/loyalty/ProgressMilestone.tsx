@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { useApp } from '../../store/AppContext';
-import { ProgressBar } from '../ui/ProgressBar';
 import { Card, CardBody } from '../ui/Card';
 import { Trophy, Flame } from '@phosphor-icons/react';
+import { motion } from 'motion/react';
 
 export const ProgressMilestone: React.FC = () => {
   const { points, rewards, setSelectedReward, setCurrentSubPage } = useApp();
@@ -25,6 +25,9 @@ export const ProgressMilestone: React.FC = () => {
   const isCompleted = points >= activeTarget.pointsRequired;
   const pointsRemaining = activeTarget.pointsRequired - points;
   
+  const progress = Math.min(points / activeTarget.pointsRequired, 1);
+  const percentage = Math.round(progress * 100);
+
   const handleRewardClick = () => {
     setSelectedReward(activeTarget);
     setCurrentSubPage('redeem-detail');
@@ -58,13 +61,16 @@ export const ProgressMilestone: React.FC = () => {
           </button>
         </div>
 
-        {/* Progress track */}
+        {/* Progress track using motion */}
         <div className="flex flex-col gap-1 w-full mt-1">
-          <ProgressBar 
-            value={points} 
-            max={activeTarget.pointsRequired} 
-            variant={isCompleted ? 'primary' : 'accent'}
-          />
+          <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden relative">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${percentage}%` }}
+              transition={{ duration: 0.8, ease: 'easeOut' }}
+              className={`h-full rounded-full ${isCompleted ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-accent)]'}`}
+            />
+          </div>
           <div className="flex justify-between text-[11px] font-sans text-[var(--color-text-light)] select-none">
             <span className="number font-bold points-value">{points}</span>
             <span className="number font-bold points-value">{activeTarget.pointsRequired}</span>
@@ -72,9 +78,14 @@ export const ProgressMilestone: React.FC = () => {
         </div>
 
         {/* Short footer callout */}
-        <div className="flex items-center gap-1.5 text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mt-1">
-          <Flame size={14} className="text-[var(--color-accent)]" />
-          <span>المكافأة المستهدفة: <strong>{activeTarget.title}</strong></span>
+        <div className="flex items-center justify-between mt-1 text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium">
+          <div className="flex items-center gap-1.5">
+            <Flame size={14} className="text-[var(--color-accent)]" />
+            <span>المكافأة المستهدفة: <strong>{activeTarget.title}</strong></span>
+          </div>
+          <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+            {percentage}%
+          </span>
         </div>
       </CardBody>
     </Card>

@@ -92,6 +92,67 @@ class ApiService {
 
     return response.json();
   }
+
+  // --- REWARDS CATALOG ---
+  async getRewards(tenantId: string) {
+    const response = await fetch(`${API_BASE_URL}/rewards?tenant_id=${tenantId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'فشل تحميل المكافآت');
+    }
+    return response.json();
+  }
+
+  // --- ADMIN ---
+  private getAdminHeaders() {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('loyalty_admin_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+
+  async getAdminStats() {
+    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch admin stats');
+    return response.json();
+  }
+
+  async getAdminCustomers() {
+    const response = await fetch(`${API_BASE_URL}/admin/customers`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch customers');
+    return response.json();
+  }
+
+  async createReward(data: { title: string; description?: string; points_required: number; category?: string; expiry_days?: number }) {
+    const response = await fetch(`${API_BASE_URL}/admin/rewards`, {
+      method: 'POST',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'فشل إنشاء المكافأة');
+    }
+    return response.json();
+  }
+
+  async getAdminBranches() {
+    const response = await fetch(`${API_BASE_URL}/admin/branches`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch branches');
+    return response.json();
+  }
 }
 
 export const api = new ApiService();

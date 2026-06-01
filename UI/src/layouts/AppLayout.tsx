@@ -60,20 +60,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           {/* Quick Dynamic Brand Switcher for the SaaS Sandbox */}
-          <div className="flex items-center gap-1">
-            <label htmlFor="tenant-select" className="sr-only">اختر العلامة التجارية</label>
-            <select
-              id="tenant-select"
-              value={currentTenant.id}
-              onChange={(e) => selectTenant(e.target.value)}
-              disabled={loadingTenant}
-              className="bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] py-1 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-semibold outline-none focus:border-[var(--color-primary)] cursor-pointer"
-            >
-              {tenants.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="flex items-center gap-1">
+              <label htmlFor="tenant-select" className="sr-only">اختر العلامة التجارية</label>
+              <select
+                id="tenant-select"
+                value={currentTenant.id}
+                onChange={(e) => selectTenant(e.target.value)}
+                disabled={loadingTenant}
+                className="bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] py-1 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-semibold outline-none focus:border-[var(--color-primary)] cursor-pointer"
+              >
+                {tenants.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </header>
 
         {/* Content canvas */}
@@ -119,6 +121,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </button>
             );
           })}
+          
+          {/* MO2 branding */}
+          <div className="absolute bottom-0 left-0 right-0 text-center pb-0.5 pointer-events-none">
+            <span className="text-[8px] tracking-widest uppercase font-semibold text-[var(--color-text-light)] opacity-30">
+              MO2 CAPITAL
+            </span>
+          </div>
         </nav>
       </div>
     </div>

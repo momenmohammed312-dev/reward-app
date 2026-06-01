@@ -95,21 +95,26 @@ class AuthController {
             if (!tenant_id || !phone) {
                 return res.status(400).json({ error: 'Missing fields', message: 'tenant_id and phone are required' });
             }
-            // Check if tenant exists
-            const tenantCheck = await db_js_1.default.query('SELECT id FROM tenants WHERE id = $1', [tenant_id]);
+            // Check if tenant exists by ID or Slug
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
+            const queryStr = isUuid
+                ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
+                : 'SELECT id FROM tenants WHERE slug = $1';
+            const tenantCheck = await db_js_1.default.query(queryStr, [tenant_id]);
             if (tenantCheck.rows.length === 0) {
                 return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
             }
+            const resolvedTenantId = tenantCheck.rows[0].id;
             // Find or create customer
-            let customerResult = await db_js_1.default.query('SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2', [tenant_id, phone]);
+            let customerResult = await db_js_1.default.query('SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2', [resolvedTenantId, phone]);
             if (customerResult.rows.length === 0) {
                 // Create new customer
                 customerResult = await db_js_1.default.query(`INSERT INTO customers (tenant_id, phone)
            VALUES ($1, $2)
-           RETURNING id`, [tenant_id, phone]);
+           RETURNING id`, [resolvedTenantId, phone]);
             }
             // Generate and store OTP
-            await otp_js_1.OTPService.generateOTP(tenant_id, phone);
+            await otp_js_1.OTPService.generateOTP(resolvedTenantId, phone);
             res.json({ message: 'OTP sent successfully' });
         }
         catch (error) {
@@ -126,8 +131,18 @@ class AuthController {
             if (!tenant_id || !phone || !code) {
                 return res.status(400).json({ error: 'Missing fields', message: 'tenant_id, phone, and code are required' });
             }
+            // Check if tenant exists by ID or Slug
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
+            const queryStr = isUuid
+                ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
+                : 'SELECT id FROM tenants WHERE slug = $1';
+            const tenantCheck = await db_js_1.default.query(queryStr, [tenant_id]);
+            if (tenantCheck.rows.length === 0) {
+                return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+            }
+            const resolvedTenantId = tenantCheck.rows[0].id;
             // Verify OTP
-            const isValid = await otp_js_1.OTPService.verifyOTP(tenant_id, phone, code);
+            const isValid = await otp_js_1.OTPService.verifyOTP(resolvedTenantId, phone, code);
             if (!isValid) {
                 return res.status(400).json({ error: 'Invalid OTP', message: 'The OTP code is invalid, expired, or has exceeded attempts' });
             }
@@ -135,7 +150,7 @@ class AuthController {
             const customerResult = await db_js_1.default.query(`UPDATE customers
          SET is_verified = true, last_visit = NOW()
          WHERE tenant_id = $1 AND phone = $2
-         RETURNING id, name, phone, tier`, [tenant_id, phone]);
+         RETURNING id, name, phone, tier`, [resolvedTenantId, phone]);
             if (customerResult.rows.length === 0) {
                 return res.status(404).json({ error: 'Not Found', message: 'Customer not found' });
             }

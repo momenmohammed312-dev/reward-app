@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { RewardCard } from '../components/loyalty/RewardCard';
-import { Flame, ShieldWarning, Info } from '@phosphor-icons/react';
-import { Badge } from '../components/ui/Badge';
+import { Coins, ShieldWarning, Info } from '@phosphor-icons/react';
 import { Reward } from '../types';
 import { motion } from 'motion/react';
 
@@ -37,7 +36,7 @@ const itemVariants = {
 };
 
 export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger }) => {
-  const { rewards, points, currentTenant, refetchData } = useApp();
+  const { rewards, points, currentTenant } = useApp();
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
@@ -82,18 +81,36 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
       className="flex flex-col gap-[var(--space-5)] text-right"
     >
       {/* Page Title */}
-      <motion.div variants={itemVariants} className="flex justify-between items-center select-none">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[var(--text-xs)] text-[var(--color-text-light)]">كتالوج النقاط والاستبدال</span>
-          <span className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-display tracking-tight">
-            المكافآت الحصرية المتاحة
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-1 bg-amber-50 rounded-full px-2.5 py-1 text-[var(--color-accent)] font-semibold text-[var(--text-xs)] shrink-0 shadow-sm border border-amber-100">
-          <Flame size={13} className="animate-pulse" />
-          <span className="points-value text-[11px] font-bold">{points}</span>
-          <span>نقطة</span>
+      <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none">
+        <h1 className="text-[var(--text-xl)] font-black text-[var(--color-text)] font-display tracking-tight">
+          كتالوج المكافآت
+        </h1>
+        <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
+          استبدل نقاطك بمكافآت وخصومات حصرية
+        </p>
+      </motion.div>
+
+      {/* Points Balance Card */}
+      <motion.div
+        variants={itemVariants}
+        className="relative overflow-hidden rounded-[var(--radius-lg)] p-4 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white shadow-lg select-none"
+      >
+        <div className="absolute -top-4 -left-4 w-20 h-20 rounded-full bg-white/10" />
+        <div className="absolute -bottom-6 -right-2 w-28 h-28 rounded-full bg-white/5" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[10px] font-semibold opacity-80 uppercase tracking-widest">رصيدك الحالي</p>
+            <motion.p 
+              key={points} 
+              initial={{ opacity: 0, y: -6 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="text-3xl font-black tracking-tight leading-none"
+            >
+              {points.toLocaleString('ar-EG')}
+            </motion.p>
+            <p className="text-[11px] opacity-70 font-medium">نقطة متاحة للاستبدال</p>
+          </div>
+          <Coins size={48} className="opacity-20" weight="duotone" />
         </div>
       </motion.div>
 

@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
-import { PointsWallet, ScannerModal } from '../components/loyalty/PointsWallet';
+import { PointsWallet } from '../components/loyalty/PointsWallet';
 import { ProgressMilestone } from '../components/loyalty/ProgressMilestone';
 import { TransactionRow } from '../components/loyalty/TransactionRow';
-import { ArrowClockwise, ShieldWarning, Smiley, HandWaving } from '@phosphor-icons/react';
+import { ShieldWarning, Smiley, HandWaving } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
-import { BottomSheet } from '../components/ui/BottomSheet';
-import { Card, CardBody } from '../components/ui/Card';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -49,7 +47,6 @@ export const HomePage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [errorSimulated, setErrorSimulated] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
 
   // Load screen with simulation skeleton as mandated in Design Tokens Page 9
   useEffect(() => {
@@ -144,7 +141,7 @@ export const HomePage: React.FC = () => {
 
       {/* 2. Main Points Wallet */}
       <motion.div variants={itemVariants}>
-        <PointsWallet onShowScannerCode={() => setShowScanner(true)} />
+        <PointsWallet />
       </motion.div>
 
       {/* 3. Progress Milestones towards next closest discount coupon */}
@@ -153,23 +150,28 @@ export const HomePage: React.FC = () => {
       </motion.div>
 
       {/* 4. Transactions summary logs */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-[var(--space-3)] text-right mt-1">
-        <div className="flex justify-between items-center select-none">
-          <span className="text-[var(--text-md)] font-bold text-[var(--color-text)]">
-            آخر العمليات والحركات
-          </span>
+      <motion.div variants={itemVariants} className="flex flex-col gap-[var(--space-3)] text-right mt-0">
+        <div className="flex justify-between items-start select-none">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="text-[var(--text-lg)] font-black text-[var(--color-text)] tracking-tight">
+              آخر العمليات
+            </h2>
+            <p className="text-[10px] text-[var(--color-text-muted)] opacity-70">
+              أحدث {topTransactions.length} حركات على حسابك
+            </p>
+          </div>
           <button
             onClick={() => setActiveTab('history')}
-            className="text-[var(--text-xs)] font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer transition-all"
+            className="text-[10px] font-bold text-[var(--color-primary)] hover:opacity-80 cursor-pointer transition-opacity mt-0.5"
           >
-            عرض السجل كاملاً
+            عرض الكل ←
           </button>
         </div>
 
         <div className="flex flex-col gap-[var(--space-4)]">
           {topTransactions.length > 0 ? (
-            topTransactions.map((tx) => (
-              <TransactionRow key={tx.id} transaction={tx} />
+            topTransactions.map((tx, i) => (
+              <TransactionRow key={tx.id} transaction={tx} index={i} />
             ))
           ) : (
             <div className="py-8 px-4 text-center text-[var(--color-text-light)] text-[var(--text-xs)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-md)] flex flex-col items-center gap-2">
@@ -179,9 +181,6 @@ export const HomePage: React.FC = () => {
           )}
         </div>
       </motion.div>
-
-      {/* Checkout Scanner barcode sheet */}
-      <ScannerModal isOpen={showScanner} onClose={() => setShowScanner(false)} />
     </motion.div>
   );
 };

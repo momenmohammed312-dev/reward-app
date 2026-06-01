@@ -52,38 +52,40 @@ const MainAppContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-body">
       {/* Global Simulator Hub Bar */}
-      <div className="w-full bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap gap-4 items-center justify-between z-50">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping"></span>
-          <span className="text-xs font-black text-slate-300">محاكي منصة الولاء (SaaS Sandbox Hub)</span>
-        </div>
-        
-        <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-          <button
-            onClick={() => setRole('customer')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'customer' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <User size={14} />
-            تطبيق العميل PWA
-          </button>
+      {import.meta.env.DEV && (
+        <div className="w-full bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap gap-4 items-center justify-between z-50">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping"></span>
+            <span className="text-xs font-black text-slate-300">محاكي منصة الولاء (SaaS Sandbox Hub)</span>
+          </div>
           
-          <button
-            onClick={() => setRole('admin')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'admin' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <UserGear size={14} />
-            لوحة تحكم الكافيه
-          </button>
-          
-          <button
-            onClick={() => setRole('superadmin')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'superadmin' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <Gear size={14} />
-            لوحة تحكم النظام
-          </button>
+          <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setRole('customer')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'customer' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <User size={14} />
+              تطبيق العميل PWA
+            </button>
+            
+            <button
+              onClick={() => setRole('admin')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'admin' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <UserGear size={14} />
+              لوحة تحكم الكافيه
+            </button>
+            
+            <button
+              onClick={() => setRole('superadmin')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'superadmin' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <Gear size={14} />
+              لوحة تحكم النظام
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Panel Canvas */}
       <div className="flex-1 w-full flex justify-center items-start">

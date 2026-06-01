@@ -6,11 +6,22 @@ import {
   TerminalWindow, 
   ArrowClockwise, 
   CheckCircle, 
-  Warning, 
   Gear, 
-  Coins, 
-  UserGear 
+  Coins 
 } from '@phosphor-icons/react';
+
+const statusConfig: Record<string, { label: string; bg: string }> = {
+  active:   { label: 'نشط',      bg: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700' },
+  past_due: { label: 'متأخر',    bg: 'bg-amber-900/50 text-amber-400 border border-amber-700' },
+  canceled: { label: 'ملغي',     bg: 'bg-red-900/50 text-red-400 border border-red-700' },
+  trialing: { label: 'تجريبي',   bg: 'bg-blue-900/50 text-blue-400 border border-blue-700' },
+};
+
+const webhookStatusConfig: Record<string, { dot: string; text: string; bg: string; label: string }> = {
+  success: { dot: 'bg-emerald-400', text: 'text-emerald-400', bg: 'bg-emerald-950/50 border border-emerald-800/40', label: 'تمت بنجاح' },
+  failed:  { dot: 'bg-red-400',     text: 'text-red-400',     bg: 'bg-red-950/50 border border-red-800/40',       label: 'فشلت' },
+  pending: { dot: 'bg-amber-400',   text: 'text-amber-400',   bg: 'bg-amber-950/50 border border-amber-800/40',   label: 'معلق' },
+};
 
 export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tenants' | 'subscriptions' | 'logs'>('tenants');
@@ -27,7 +38,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [tenants, setTenants] = useState([
     { id: 't1', name: 'أروما كافيه', slug: 'aroma', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
     { id: 't2', name: 'برو أند كو', slug: 'brew-co', plan: 'Premium', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/١٢' },
-    { id: 't3', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠١' },
+    { id: 't3', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠1' },
     { id: 't4', name: 'سينابون زون', slug: 'cinnabon-zone', plan: 'Starter', status: 'past_due', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠٤/١٥' },
     { id: 't5', name: 'كافيين هاب', slug: 'caffeine-hub', plan: 'Premium', status: 'canceled', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠١/٠٥' }
   ]);
@@ -59,6 +70,9 @@ export const SuperAdminDashboard: React.FC = () => {
           <div>
             <h1 className="text-xl font-black">لوحة التحكم الفائقة (Super Admin)</h1>
             <p className="text-xs text-slate-400">إدارة البنية التحتية، الفواتير، ومراقبة الكافيهات المشتركة</p>
+            <p className="text-[9px] tracking-widest uppercase text-slate-500 opacity-60 mt-1">
+              MO2 CAPITAL — Platform Infrastructure
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700">
@@ -156,40 +170,39 @@ export const SuperAdminDashboard: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/40 text-slate-200">
-                  {tenants.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-750/30 transition-all">
-                      <td className="p-4 font-bold">{t.name}</td>
-                      <td className="p-4 font-mono text-slate-400">/{t.slug}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          t.plan === 'Enterprise' ? 'bg-purple-950 text-purple-300 border border-purple-800' :
-                          t.plan === 'Premium' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' :
-                          'bg-slate-950 text-slate-300 border border-slate-850'
-                        }`}>
-                          {t.plan}
-                        </span>
-                      </td>
-                      <td className="p-4 font-bold">{t.monthlyFee} EGP</td>
-                      <td className="p-4 text-slate-400">{t.joinedDate}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          t.status === 'active' ? 'bg-emerald-950 text-emerald-400' :
-                          t.status === 'past_due' ? 'bg-amber-950 text-amber-400' :
-                          'bg-rose-950 text-rose-400'
-                        }`}>
-                          {t.status === 'active' ? 'نشط' : t.status === 'past_due' ? 'مستحق الدفع' : 'ملغي'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <button 
-                          onClick={() => handleToggleTenantStatus(t.id)}
-                          className="bg-slate-800 hover:bg-slate-700 text-[10px] font-bold py-1 px-2.5 rounded border border-slate-750 cursor-pointer"
-                        >
-                          تعديل الحالة
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {tenants.map(t => {
+                    const statusVal = statusConfig[t.status] || { label: t.status, bg: 'bg-slate-900 text-slate-400 border border-slate-700' };
+                    return (
+                      <tr key={t.id} className="hover:bg-slate-750/30 transition-all">
+                        <td className="p-4 font-bold">{t.name}</td>
+                        <td className="p-4 font-mono text-slate-400">/{t.slug}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            t.plan === 'Enterprise' ? 'bg-purple-950 text-purple-300 border border-purple-800' :
+                            t.plan === 'Premium' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' :
+                            'bg-slate-950 text-slate-300 border border-slate-850'
+                          }`}>
+                            {t.plan}
+                          </span>
+                        </td>
+                        <td className="p-4 font-bold">{t.monthlyFee} EGP</td>
+                        <td className="p-4 text-slate-400">{t.joinedDate}</td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${statusVal.bg}`}>
+                            {statusVal.label}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <button 
+                            onClick={() => handleToggleTenantStatus(t.id)}
+                            className="bg-slate-800 hover:bg-slate-700 text-[10px] font-bold py-1 px-2.5 rounded border border-slate-750 cursor-pointer"
+                          >
+                            تعديل الحالة
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -252,23 +265,27 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {webhooks.map((log) => (
-                <div key={log.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-200">{log.tenant}</span>
-                      <span className="text-[10px] bg-slate-800 text-indigo-400 px-2 py-0.5 rounded font-mono font-bold">{log.event}</span>
+              {webhooks.map((log) => {
+                const whStatus = webhookStatusConfig[log.status] || { dot: 'bg-slate-400', text: 'text-slate-400', bg: 'bg-slate-950/50 border border-slate-800/40', label: log.status };
+                return (
+                  <div key={log.id} className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-slate-200">{log.tenant}</span>
+                        <span className="text-[10px] bg-slate-800 text-indigo-400 px-2 py-0.5 rounded font-mono font-bold">{log.event}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono">{log.time}</span>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-mono">{log.time}</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400">{log.message}</span>
+                      <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1.5 ${whStatus.bg} ${whStatus.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${whStatus.dot}`} />
+                        <span>{whStatus.label}</span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400">{log.message}</span>
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${log.status === 'success' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40' : 'bg-rose-950 text-rose-400 border border-rose-800/40'}`}>
-                      {log.status === 'success' ? 'تمت بنجاح' : 'خطأ/تحذير'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { TransactionRow } from '../components/loyalty/TransactionRow';
-import { Receipt, ClipboardText, Clock, CheckCircle } from '@phosphor-icons/react';
+import { Receipt, ClipboardText } from '@phosphor-icons/react';
 import { Badge } from '../components/ui/Badge';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -73,10 +73,12 @@ export const HistoryPage: React.FC = () => {
     >
       {/* Page header */}
       <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none text-right">
-        <span className="text-[var(--text-xs)] text-[var(--color-text-light)]">مراجعة حركات الحساب والولاية</span>
-        <span className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
-          سجل الأنشطة والكوبونات
-        </span>
+        <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
+          سجل الحركات
+        </h1>
+        <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
+          تاريخ جميع عمليات الشراء والاستبدال
+        </p>
       </motion.div>
 
       {/* Segment switcher */}
@@ -117,9 +119,9 @@ export const HistoryPage: React.FC = () => {
             className="flex flex-col gap-[var(--space-3)]"
           >
             {transactions.length > 0 ? (
-              transactions.map((tx) => (
+              transactions.map((tx, i) => (
                 <motion.div key={tx.id} variants={itemVariants}>
-                  <TransactionRow transaction={tx} />
+                  <TransactionRow transaction={tx} index={i} />
                 </motion.div>
               ))
             ) : (

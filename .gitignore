@@ -9,9 +9,7 @@ data/redis/
 # Build outputs
 dist/
 build/
-.next/
-out/
-
+.next
 # Logs
 *.log
 data/ui_err.log
