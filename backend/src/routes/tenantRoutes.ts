@@ -1,32 +1,15 @@
 import { Router } from 'express';
 import { TenantController } from '../controllers/tenantController.js';
-import { authenticateJWT, requireRole } from '../middlewares/auth.js';
+import { authenticateJWT } from '../middlewares/auth.js';
+import { validate, schemas } from '../middlewares/validate.js';
 
 const router = Router();
 
-// Create tenant (Public signup / Super Admin)
-router.post('/', TenantController.createTenant);
-
-// Get current tenant configuration
+router.get('/public/:slug', TenantController.getTenantBySlug);
+router.post('/', authenticateJWT, TenantController.createTenant);
 router.get('/me', authenticateJWT, TenantController.getTenant);
-
-// Create branch
-router.post(
-  '/branches',
-  authenticateJWT,
-  requireRole(['owner', 'manager']),
-  TenantController.createBranch
-);
-
-// Get all branches of tenant
+router.post('/branches', authenticateJWT, validate(schemas.createBranch), TenantController.createBranch);
 router.get('/branches', authenticateJWT, TenantController.getBranches);
-
-// Regenerate API Key for branch integration
-router.post(
-  '/branches/:branch_id/regenerate-key',
-  authenticateJWT,
-  requireRole(['owner']),
-  TenantController.regenerateBranchApiKey
-);
+router.post('/branches/:branch_id/regenerate-key', authenticateJWT, TenantController.regenerateBranchApiKey);
 
 export default router;

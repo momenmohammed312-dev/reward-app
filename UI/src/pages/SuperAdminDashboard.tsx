@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, 
   CreditCard, 
@@ -25,15 +25,16 @@ const webhookStatusConfig: Record<string, { dot: string; text: string; bg: strin
 
 export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tenants' | 'subscriptions' | 'logs'>('tenants');
+  const [loading, setLoading] = useState(true);
 
-  // Mock SaaS Global Stats
-  const globalStats = {
+  // Global stats from API with mock fallback
+  const [globalStats, setGlobalStats] = useState({
     totalTenants: 48,
     activeSubscriptions: 42,
     mrrEgp: 68500,
     apiRequestsToday: 142300,
     systemUptime: '99.98%'
-  };
+  });
 
   const [tenants, setTenants] = useState([
     { id: 't1', name: 'أروما كافيه', slug: 'aroma', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
@@ -51,14 +52,64 @@ export const SuperAdminDashboard: React.FC = () => {
     { id: 'w5', tenant: 'أروما كافيه', event: 'customer.created', status: 'success', time: '13:40:22', message: 'New customer account created' }
   ]);
 
-  const handleToggleTenantStatus = (tenantId: string) => {
-    setTenants(prev => prev.map(t => {
-      if (t.id === tenantId) {
-        const nextStatus = t.status === 'active' ? 'past_due' : 'active';
-        return { ...t, status: nextStatus };
-      }
-      return t;
-    }));
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      api.getSuperAdminStats().then((data: any) => {
+        setGlobalStats(prev => ({
+          ...prev,
+          totalTenants: Number(data.total_tenants || prev.totalTenants),
+          activeSubscriptions: Number(data.active_tenants || prev.activeSubscriptions),
+        }));
+      }).catch(() => {}),
+
+      api.getSuperAdminTenants().then((data: any[]) => {
+        if (data.length > 0) {
+          setTenants(data.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            slug: t.slug,
+            plan: t.plan || 'Starter',
+            status: t.is_active ? 'active' : 'past_due',
+            monthlyFee: 0,
+            joinedDate: t.created_at ? new Date(t.created_at).toLocaleDateString('ar-EG') : '-',
+          })));
+        }
+      }).catch(() => {}),
+
+      api.getSuperAdminWebhookLogs().then((data: any[]) => {
+        if (data.length > 0) {
+          setWebhooks(data.map((log: any) => ({
+            id: log.id,
+            tenant: log.tenant_name || '-',
+            event: log.event_type,
+            status: log.status === 'processed' ? 'success' : log.status,
+            time: log.created_at ? new Date(log.created_at).toLocaleTimeString('ar-EG') : '-',
+            message: log.error_message || 'Points processed successfully',
+          })));
+        }
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false));
+  }, []);
+
+  const handleToggleTenantStatus = async (tenantId: string) => {
+    try {
+      const result = await api.toggleTenantStatus(tenantId);
+      setTenants(prev => prev.map(t => {
+        if (t.id === tenantId) {
+          return { ...t, status: result.is_active ? 'active' : 'past_due' };
+        }
+        return t;
+      }));
+    } catch {
+      setTenants(prev => prev.map(t => {
+        if (t.id === tenantId) {
+          const nextStatus = t.status === 'active' ? 'past_due' : 'active';
+          return { ...t, status: nextStatus };
+        }
+        return t;
+      }));
+    }
   };
 
   return (
@@ -83,6 +134,17 @@ export const SuperAdminDashboard: React.FC = () => {
 
       {/* SaaS Statistics */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {loading ? (
+          <>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-2 animate-pulse">
+                <div className="h-3 w-20 bg-slate-700 rounded" />
+                <div className="h-7 w-12 bg-slate-700 rounded mt-1" />
+              </div>
+            ))}
+          </>
+        ) : (
+        <>
         <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             إجمالي المشتركين
@@ -122,6 +184,8 @@ export const SuperAdminDashboard: React.FC = () => {
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.systemUptime}</span>
         </div>
+        </>
+        )}
       </div>
 
       {/* Tabs */}

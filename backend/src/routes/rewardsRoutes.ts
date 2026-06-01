@@ -11,7 +11,14 @@ router.get('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'tenant_id query parameter is required' });
     }
     const result = await db.query(`
-      SELECT id, name, reward_type, required_points, description, category, image_url, expiry_days
+      SELECT id,
+             name AS title,
+             reward_type,
+             required_points AS "pointsRequired",
+             description,
+             category,
+             image_url AS "imageUrl",
+             expiry_days AS "expiryDays"
       FROM rewards
       WHERE tenant_id = $1 AND is_active = true
       ORDER BY required_points ASC

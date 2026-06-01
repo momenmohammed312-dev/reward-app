@@ -5,6 +5,27 @@ import { AuthenticatedRequest } from '../middlewares/auth.js';
 
 export class TenantController {
   /**
+   * Public endpoint: get tenant by slug (for customer app discovery).
+   */
+  static async getTenantBySlug(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { slug } = req.params;
+      const result = await db.query(
+        `SELECT id, name, slug, logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline, points_per_egp, min_purchase_egp
+         FROM tenants WHERE slug = $1 AND is_active = true`,
+        [slug]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+      }
+      res.json(result.rows[0]);
+    } catch (err: any) {
+      console.error('Public tenant error:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
    * Creates a new Tenant (SaaS customer registration).
    * Usually called by Super Admin or public landing page signup.
    */

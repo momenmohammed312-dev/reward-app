@@ -1,6 +1,29 @@
 import db from '../config/db.js';
+import axios from 'axios';
 
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10);
+
+const SMS_PROVIDER = process.env.SMS_PROVIDER || 'victorylink';
+
+const sendSMS = async (phone: string, code: string) => {
+  try {
+    if (SMS_PROVIDER === 'victorylink') {
+      await axios.post('https://smsvas.victorylink.com/sendsms', {
+        username: process.env.SMS_USERNAME,
+        password: process.env.SMS_PASSWORD,
+        SMSSender: process.env.SMS_SENDER_NAME || 'MO2Loyalty',
+        SMSText: `كود التحقق الخاص بك هو: ${code}`,
+        SMSReceiver: phone,
+      });
+    } else {
+      console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone}`);
+    }
+    console.log(`[SMS] OTP sent to ${phone} via ${SMS_PROVIDER}`);
+  } catch (err: any) {
+    console.warn(`[SMS] Failed to send via ${SMS_PROVIDER}, falling back to console log:`, err.message);
+    console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone}`);
+  }
+};
 
 export class OTPService {
   /**
@@ -19,8 +42,7 @@ export class OTPService {
       [tenantId, phone, code, expiresAt]
     );
 
-    // In a real application, you would send this OTP via SMS/WhatsApp API (e.g. Twilio, VictoryLink)
-    console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone} for tenant ${tenantId}`);
+    await sendSMS(phone, code);
 
     return code;
   }

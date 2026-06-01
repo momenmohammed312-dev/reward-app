@@ -106,6 +106,41 @@ export class AuthController {
   }
 
   /**
+   * Check if a customer phone exists for a tenant (before sending OTP).
+   */
+  static async checkCustomerPhone(req: Request, res: Response) {
+    try {
+      const { tenant_id, phone } = req.body;
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
+      const queryStr = isUuid
+        ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
+        : 'SELECT id FROM tenants WHERE slug = $1';
+      const tenantCheck = await db.query(queryStr, [tenant_id]);
+      if (tenantCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+      }
+      const resolvedTenantId = tenantCheck.rows[0].id;
+
+      const customer = await db.query(
+        'SELECT id, name, tier FROM customers WHERE tenant_id = $1 AND phone = $2',
+        [resolvedTenantId, phone]
+      );
+
+      res.json({
+        exists: customer.rows.length > 0,
+        customer: customer.rows.length > 0 ? {
+          name: customer.rows[0].name,
+          tier: customer.rows[0].tier,
+        } : null,
+      });
+    } catch (error) {
+      console.error('Check phone error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
    * Request OTP code for customer authentication.
    */
   static async requestCustomerOTP(req: Request, res: Response) {

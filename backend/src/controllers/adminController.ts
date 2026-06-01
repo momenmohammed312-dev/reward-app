@@ -47,7 +47,17 @@ export class AdminController {
     try {
       const tenantId = req.user!.tenant_id;
       const result = await db.query(`
-        SELECT id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active, created_at
+        SELECT id,
+               name AS title,
+               reward_type,
+               required_points AS "pointsRequired",
+               description,
+               category,
+               image_url AS "imageUrl",
+               terms,
+               expiry_days AS "expiryDays",
+               is_active,
+               created_at
         FROM rewards
         WHERE tenant_id = $1
         ORDER BY created_at DESC

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: loyalty-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: loyalty
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./DB/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./DB/migrations/001_add_tier_tables.sql:/docker-entrypoint-initdb.d/02-migration-001.sql
+      - ./DB/migrations/002_add_rewards_table.sql:/docker-entrypoint-initdb.d/03-migration-002.sql
+      - ./DB/migrations/003_add_tenant_branding.sql:/docker-entrypoint-initdb.d/04-migration-003.sql
+      - ./DB/migrations/004_add_superadmin_role.sql:/docker-entrypoint-initdb.d/05-migration-004.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: loyalty-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: loyalty-api
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/loyalty
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-m02_l0y4lty_s3cr3t_k3y_2026_#Secure!}
+      OTP_EXPIRY_MINUTES: 5
+      SMS_PROVIDER: console
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pg_data:

@@ -22,6 +22,40 @@ export class LoyaltyController {
   }
 
   /**
+   * Updates the authenticated customer's profile (name).
+   * PATCH /api/loyalty/profile
+   */
+  static async updateCustomerProfile(req: AuthenticatedRequest, res: Response) {
+    try {
+      const customerId = req.user?.id;
+      const tenantId = req.user?.tenant_id;
+      const { name } = req.body;
+
+      if (!customerId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Name is required' });
+      }
+
+      const result = await db.query(
+        `UPDATE customers SET name = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3 RETURNING id, phone, name`,
+        [name.trim(), customerId, tenantId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Customer not found' });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ error: 'Internal Server Error', message: error.message });
+    }
+  }
+
+  /**
    * Retrieves points ledger history for the authenticated customer.
    */
   static async getLedgerHistory(req: AuthenticatedRequest, res: Response) {

@@ -67,6 +67,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Loyalty Stats
   const [points, setPoints] = useState<number>(320); // Static demo starter points
+  const [rewards, setRewards] = useState<Reward[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [redeemedRewards, setRedeemedRewards] = useState<RedeemedReward[]>([]);
   const [loadingWallet, setLoadingWallet] = useState<boolean>(false);
@@ -282,8 +283,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setOtpSentPhone(null);
   };
 
-  const updateProfileName = (newName: string) => {
+  const updateProfileName = async (newName: string) => {
     if (user) {
+      try {
+        await api.updateProfileName(newName);
+      } catch {
+        console.warn('Backend updateProfile failed, saving locally only');
+      }
       const updatedUser = { ...user, name: newName };
       setUser(updatedUser);
       localStorage.setItem('loyalty_user_name', newName);
@@ -384,8 +390,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Rewards list computed based on current tenant
-  const tenantRewards = mockRewards[currentTenant.id] || [];
+  // Load rewards from API when authenticated
+  useEffect(() => {
+    if (isAuthenticated && currentTenant) {
+      api.getRewards(currentTenant.id)
+        .then(setRewards)
+        .catch(() => {
+          setRewards(mockRewards[currentTenant.id] || []);
+        });
+    } else {
+      setRewards(mockRewards[currentTenant.id] || []);
+    }
+  }, [isAuthenticated, currentTenant]);
 
   return (
     <AppContext.Provider value={{
@@ -406,7 +422,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       updateProfileName,
 
       points,
-      rewards: tenantRewards,
+      rewards,
       transactions,
       redeemedRewards,
       loadingWallet,

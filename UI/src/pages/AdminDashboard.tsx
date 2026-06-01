@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrendUp, 
   Users, 
@@ -13,6 +13,7 @@ import {
   UserGear
 } from '@phosphor-icons/react';
 import { useApp } from '../store/AppContext';
+import { api } from '../services/api';
 import { AnimatePresence, motion } from 'motion/react';
 
 export const AdminDashboard: React.FC = () => {
@@ -34,14 +35,33 @@ export const AdminDashboard: React.FC = () => {
   });
   const [isCreatingReward, setIsCreatingReward] = useState(false);
 
-  // Mock Admin states
-  const [adminStats, setAdminStats] = useState({
+  // Admin states (loaded from API with mock fallback)
+  const mockAdminStats = {
     totalCustomers: 1240,
     activeLoyalists: 843,
     pointsIssuedThisMonth: 45200,
     redemptionsToday: 18,
     conversionRate: '87.4%'
-  });
+  };
+  const [adminStats, setAdminStats] = useState(mockAdminStats);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    api.getAdminStats()
+      .then((data: any) => {
+        setAdminStats({
+          totalCustomers: Number(data.total_customers || 0),
+          activeLoyalists: Number(data.active_customers || 0),
+          pointsIssuedThisMonth: Number(data.points_this_month || 0),
+          redemptionsToday: Number(data.redemptions_today || 0),
+          conversionRate: '87.4%',
+        });
+      })
+      .catch(() => {
+        console.warn('Failed to fetch admin stats, using mock data');
+      })
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   const [cafeCustomers, setCafeCustomers] = useState([
     { id: 'c1', name: 'أحمد محمود', phone: '+201000000001', tier: 'الذهبي', balance: 1450, totalEarned: 3500, status: 'نشط' },
@@ -173,41 +193,55 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex flex-col gap-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
-                <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                  <span>إجمالي المشتركين</span>
-                  <Users size={20} className="text-cyan-400" />
-                </div>
-                <span className="text-2xl font-black text-slate-100">{adminStats.totalCustomers}</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">+12% من الأسبوع الماضي</span>
-              </div>
+              {statsLoading ? (
+                <>
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-2 animate-pulse">
+                      <div className="h-3 w-20 bg-slate-700 rounded" />
+                      <div className="h-8 w-16 bg-slate-700 rounded mt-1" />
+                      <div className="h-3 w-24 bg-slate-700 rounded" />
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                      <span>إجمالي المشتركين</span>
+                      <Users size={20} className="text-cyan-400" />
+                    </div>
+                    <span className="text-2xl font-black text-slate-100">{adminStats.totalCustomers}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">+12% من الأسبوع الماضي</span>
+                  </div>
 
-              <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
-                <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                  <span>النشطين حالياً</span>
-                  <Sliders size={20} className="text-indigo-400" />
-                </div>
-                <span className="text-2xl font-black text-slate-100">{adminStats.activeLoyalists}</span>
-                <span className="text-[10px] text-slate-400">زيارة واحدة على الأقل شهرياً</span>
-              </div>
+                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                      <span>النشطين حالياً</span>
+                      <Sliders size={20} className="text-indigo-400" />
+                    </div>
+                    <span className="text-2xl font-black text-slate-100">{adminStats.activeLoyalists}</span>
+                    <span className="text-[10px] text-slate-400">زيارة واحدة على الأقل شهرياً</span>
+                  </div>
 
-              <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
-                <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                  <span>النقاط المصدرة</span>
-                  <Coins size={20} className="text-amber-400" />
-                </div>
-                <span className="text-2xl font-black text-slate-100">{adminStats.pointsIssuedThisMonth.toLocaleString()}</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">+18.5% هذا الشهر</span>
-              </div>
+                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                      <span>النقاط المصدرة</span>
+                      <Coins size={20} className="text-amber-400" />
+                    </div>
+                    <span className="text-2xl font-black text-slate-100">{adminStats.pointsIssuedThisMonth.toLocaleString()}</span>
+                    <span className="text-[10px] text-emerald-400 font-semibold">+18.5% هذا الشهر</span>
+                  </div>
 
-              <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
-                <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-                  <span>عمليات الاسترداد (اليوم)</span>
-                  <Gift size={20} className="text-rose-400" />
-                </div>
-                <span className="text-2xl font-black text-slate-100">{adminStats.redemptionsToday}</span>
-                <span className="text-[10px] text-rose-400 font-semibold">-2 عملية عن أمس</span>
-              </div>
+                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
+                      <span>عمليات الاسترداد (اليوم)</span>
+                      <Gift size={20} className="text-rose-400" />
+                    </div>
+                    <span className="text-2xl font-black text-slate-100">{adminStats.redemptionsToday}</span>
+                    <span className="text-[10px] text-rose-400 font-semibold">-2 عملية عن أمس</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Quick manual adjust & Live activity */}

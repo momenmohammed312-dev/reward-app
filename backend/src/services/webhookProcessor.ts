@@ -41,7 +41,8 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
       // Handle the event based on Foodics specs
       if (eventType === 'order.paid' || eventType === 'order.closed') {
         const order = payload.order || payload;
-        const customerPhone = order.customer?.phone;
+        const rawPhone = order.customer?.phone || '';
+        const customerPhone = rawPhone.replace(/^\+?2?0?/, '0').replace(/\s+/g, '').slice(-11);
         const totalAmount = Number(order.total_price || order.total || 0);
         const invoiceId = order.id || order.number;
         const branchLocationId = order.branch?.id || order.branch_id;

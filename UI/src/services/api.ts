@@ -46,6 +46,19 @@ class ApiService {
     return data;
   }
 
+  async updateProfileName(name: string) {
+    const response = await fetch(`${API_BASE_URL}/loyalty/profile`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ name }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'فشل تحديث الاسم');
+    }
+    return response.json();
+  }
+
   // --- LOYALTY PROFILE AND HISTORY ---
 
   async getProfile() {
@@ -151,6 +164,50 @@ class ApiService {
       headers: this.getAdminHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch branches');
+    return response.json();
+  }
+
+  // --- SUPER ADMIN ---
+  private getSuperAdminHeaders() {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem('loyalty_admin_token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  }
+
+  async getSuperAdminTenants() {
+    const response = await fetch(`${API_BASE_URL}/superadmin/tenants`, {
+      method: 'GET',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch tenants');
+    return response.json();
+  }
+
+  async toggleTenantStatus(tenantId: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/tenants/${tenantId}`, {
+      method: 'PATCH',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to toggle tenant status');
+    return response.json();
+  }
+
+  async getSuperAdminWebhookLogs() {
+    const response = await fetch(`${API_BASE_URL}/superadmin/webhook-logs`, {
+      method: 'GET',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch webhook logs');
+    return response.json();
+  }
+
+  async getSuperAdminStats() {
+    const response = await fetch(`${API_BASE_URL}/superadmin/stats`, {
+      method: 'GET',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch superadmin stats');
     return response.json();
   }
 }

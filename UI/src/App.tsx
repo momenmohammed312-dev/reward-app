@@ -12,9 +12,10 @@ import { HistoryPage } from './pages/HistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { CashierDashboard } from './pages/CashierDashboard';
 import { Toast } from './components/ui/Toast';
 import { AnimatePresence, motion } from 'motion/react';
-import { UserGear, Gear, User } from '@phosphor-icons/react';
+import { UserGear, Gear, User, CashRegister } from '@phosphor-icons/react';
 
 // Wrapper core to leverage state context hooks
 const MainAppContent: React.FC = () => {
@@ -30,8 +31,8 @@ const MainAppContent: React.FC = () => {
     setSelectedReward
   } = useApp();
 
-  // Simulated platform role: customer, admin, superadmin
-  const [role, setRole] = useState<'customer' | 'admin' | 'superadmin'>('customer');
+  // Simulated platform role: customer, admin, superadmin, cashier
+  const [role, setRole] = useState<'customer' | 'admin' | 'superadmin' | 'cashier'>('customer');
 
   // Floating toast notifier state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -76,6 +77,14 @@ const MainAppContent: React.FC = () => {
               لوحة تحكم الكافيه
             </button>
             
+            <button
+              onClick={() => setRole('cashier')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'cashier' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              <CashRegister size={14} />
+              الكاشير
+            </button>
+
             <button
               onClick={() => setRole('superadmin')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${role === 'superadmin' ? 'bg-[var(--color-primary)] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
@@ -175,6 +184,17 @@ const MainAppContent: React.FC = () => {
                   transition={{ duration: 0.25 }}
                 >
                   <SuperAdminDashboard />
+                </motion.div>
+              )}
+              {role === 'cashier' && (
+                <motion.div
+                  key="cashier-dashboard-view"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <CashierDashboard />
                 </motion.div>
               )}
             </AnimatePresence>

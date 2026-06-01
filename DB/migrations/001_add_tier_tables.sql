@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS customer_tier_history (
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     old_tier    tier_type,
     new_tier    tier_type NOT NULL,
-    changed_by  UUID REFERENCES employees(id),
+    changed_by  UUID,
     reason      TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
