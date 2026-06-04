@@ -167,6 +167,19 @@ class ApiService {
     return response.json();
   }
 
+  async adminEarnPoints(data: { customer_id: string; amount: number; note?: string }) {
+    const response = await fetch(`${API_BASE_URL}/loyalty/manual-earn`, {
+      method: 'POST',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'فشل منح النقاط');
+    }
+    return response.json();
+  }
+
   // --- SUPER ADMIN ---
   private getSuperAdminHeaders() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

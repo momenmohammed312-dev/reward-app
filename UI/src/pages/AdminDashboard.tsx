@@ -21,7 +21,7 @@ export const AdminDashboard: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'customers' | 'rewards' | 'branches'>('overview');
   const [pointsAmount, setPointsAmount] = useState<string>('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [adjustNote, setAdjustNote] = useState<string>('مكافأة يدوية من الإدارة');
+  const [adjustmentNote, setAdjustmentNote] = useState<string>('مكافأة يدوية من الإدارة');
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState<boolean>(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -47,20 +47,44 @@ export const AdminDashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
-    api.getAdminStats()
-      .then((data: any) => {
+    const loadAdminData = async () => {
+      try {
+        const [customers, branchesData, stats] = await Promise.all([
+          api.getAdminCustomers(),
+          api.getAdminBranches(),
+          api.getAdminStats(),
+        ]);
+        setCafeCustomers(customers.map((c: any) => ({
+          id: c.id,
+          name: c.name || 'عميل',
+          phone: c.phone,
+          balance: c.balance || 0,
+          totalEarned: c.total_earned || 0,
+          tier: c.tier || 'bronze',
+          joinDate: c.created_at?.split('T')[0] || '',
+        })));
+        setBranches(branchesData.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          location: b.pos_location_id || 'القاهرة',
+          posType: b.pos_type,
+          active: b.is_active,
+          key: b.api_key ? `api_key_****_${b.api_key.substring(0, 4)}` : 'N/A'
+        })));
         setAdminStats({
-          totalCustomers: Number(data.total_customers || 0),
-          activeLoyalists: Number(data.active_customers || 0),
-          pointsIssuedThisMonth: Number(data.points_this_month || 0),
-          redemptionsToday: Number(data.redemptions_today || 0),
+          totalCustomers: Number(stats.totalCustomers || 0),
+          activeLoyalists: Number(stats.totalCustomers || 0),
+          pointsIssuedThisMonth: Number(stats.totalPointsIssued || 0),
+          redemptionsToday: Number(stats.totalRedemptions || 0),
           conversionRate: '87.4%',
         });
-      })
-      .catch(() => {
-        console.warn('Failed to fetch admin stats, using mock data');
-      })
-      .finally(() => setStatsLoading(false));
+      } catch (err) {
+        console.warn('Admin API not reachable, using mock data');
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    loadAdminData();
   }, []);
 
   const [cafeCustomers, setCafeCustomers] = useState([
@@ -82,19 +106,12 @@ export const AdminDashboard: React.FC = () => {
     if (!newReward.title || !newReward.pointsRequired) return;
     setIsCreatingReward(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/admin/rewards`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('loyalty_admin_token') || ''}`
-        },
-        body: JSON.stringify({
-          title: newReward.title,
-          description: newReward.description,
-          points_required: Number(newReward.pointsRequired),
-          category: newReward.category,
-          expiry_days: Number(newReward.expiryDays)
-        })
+      await api.createReward({
+        title: newReward.title,
+        description: newReward.description,
+        points_required: Number(newReward.pointsRequired),
+        category: newReward.category,
+        expiry_days: Number(newReward.expiryDays)
       });
       setMessage({ text: `تم إنشاء مكافأة "${newReward.title}" بنجاح!`, type: 'success' });
       setNewReward({ title: '', description: '', pointsRequired: '', category: 'مشروبات', expiryDays: '30' });
@@ -118,22 +135,28 @@ export const AdminDashboard: React.FC = () => {
     setMessage(null);
 
     try {
-      // Simulate backend manual earn API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCafeCustomers(prev => prev.map(c => {
-        if (c.id === selectedCustomerId) {
-          const newBalance = c.balance + Number(pointsAmount);
-          return { ...c, balance: newBalance, totalEarned: c.totalEarned + Number(pointsAmount) };
-        }
-        return c;
-      }));
+      await api.adminEarnPoints({
+        customer_id: selectedCustomerId,
+        amount: Number(pointsAmount),
+        note: adjustmentNote || 'تعديل يدوي من الإدارة',
+      });
 
-      setMessage({ text: `تمت إضافة ${pointsAmount} نقطة بنجاح للعميل!`, type: 'success' });
+      setCafeCustomers(prev =>
+        prev.map(c => {
+          if (c.id === selectedCustomerId) {
+            const newBalance = c.balance + Number(pointsAmount);
+            return { ...c, balance: newBalance, totalEarned: c.totalEarned + Number(pointsAmount) };
+          }
+          return c;
+        })
+      );
+
+      setMessage({ text: `تمت إضافة ${pointsAmount} نقطة بنجاح!`, type: 'success' });
       setPointsAmount('');
       setSelectedCustomerId('');
-    } catch (err) {
-      setMessage({ text: 'فشلت العملية، يرجى المحاولة لاحقاً', type: 'error' });
+      setAdjustmentNote('');
+    } catch (err: any) {
+      setMessage({ text: err.message || 'فشلت العملية، يرجى المحاولة لاحقاً', type: 'error' });
     } finally {
       setIsSubmittingAdjustment(false);
     }
@@ -285,8 +308,8 @@ export const AdminDashboard: React.FC = () => {
                       <input 
                         type="text" 
                         placeholder="بونص كاشير، هدايا..."
-                        value={adjustNote}
-                        onChange={(e) => setAdjustNote(e.target.value)}
+                        value={adjustmentNote}
+                        onChange={(e) => setAdjustmentNote(e.target.value)}
                         className="bg-slate-900 border border-slate-700 p-2.5 rounded-xl text-xs text-slate-200 outline-none focus:border-[var(--color-primary)]"
                       />
                     </div>

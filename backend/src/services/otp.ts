@@ -1,26 +1,57 @@
 import db from '../config/db.js';
-import axios from 'axios';
 
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10);
 
 const SMS_PROVIDER = process.env.SMS_PROVIDER || 'victorylink';
 
+async function sendVictoryLinkSMS(phone: string, message: string) {
+  const username = process.env.VICTORYLINK_USERNAME;
+  const password = process.env.VICTORYLINK_PASSWORD;
+  const sender = process.env.VICTORYLINK_SENDER || 'LoyaltyApp';
+
+  if (!username || !password) {
+    console.warn('[SMS] VictoryLink credentials missing — skipping SMS in development');
+    return;
+  }
+
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+<SMS>
+  <AccountInfo>
+    <Username>${username}</Username>
+    <Password>${password}</Password>
+  </AccountInfo>
+  <MessageData>
+    <Message>
+      <SenderName>${sender}</SenderName>
+      <MessageText>${message}</MessageText>
+      <RecipientList>
+        <Recipient>${phone}</Recipient>
+      </RecipientList>
+    </Message>
+  </MessageData>
+</SMS>`;
+
+  const response = await fetch('http://www.victorylink.com/VictoryLink_WebService/SmsSend.asmx/XML_SendSMS', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `xml_request=${encodeURIComponent(xmlBody)}`,
+  });
+
+  const responseText = await response.text();
+  console.log('[VictoryLink Response]', responseText);
+
+  if (!responseText.includes('<Result>0</Result>')) {
+    throw new Error(`VictoryLink SMS failed: ${responseText}`);
+  }
+}
+
 const sendSMS = async (phone: string, code: string) => {
   try {
-    if (SMS_PROVIDER === 'victorylink') {
-      await axios.post('https://smsvas.victorylink.com/sendsms', {
-        username: process.env.SMS_USERNAME,
-        password: process.env.SMS_PASSWORD,
-        SMSSender: process.env.SMS_SENDER_NAME || 'MO2Loyalty',
-        SMSText: `كود التحقق الخاص بك هو: ${code}`,
-        SMSReceiver: phone,
-      });
-    } else {
-      console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone}`);
-    }
-    console.log(`[SMS] OTP sent to ${phone} via ${SMS_PROVIDER}`);
+    const message = `كود التحقق الخاص بك هو: ${code}\nصالح لمدة ${OTP_EXPIRY_MINUTES} دقائق.`;
+    await sendVictoryLinkSMS(phone, message);
+    console.log(`[SMS] OTP sent to ${phone} via VictoryLink`);
   } catch (err: any) {
-    console.warn(`[SMS] Failed to send via ${SMS_PROVIDER}, falling back to console log:`, err.message);
+    console.warn(`[SMS] Failed to send via VictoryLink, falling back to console log:`, err.message);
     console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone}`);
   }
 };

@@ -18,7 +18,7 @@ export class AdminController {
       res.json(statsQuery.rows[0]);
     } catch (err: any) {
       console.error('Admin stats error:', err);
-      res.status(500).json({ error: 'Failed to fetch stats', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch stats' });
     }
   }
 
@@ -38,7 +38,7 @@ export class AdminController {
       res.json(result.rows);
     } catch (err: any) {
       console.error('Admin customers error:', err);
-      res.status(500).json({ error: 'Failed to fetch customers', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch customers' });
     }
   }
 
@@ -65,7 +65,7 @@ export class AdminController {
       res.json(result.rows);
     } catch (err: any) {
       console.error('Admin rewards error:', err);
-      res.status(500).json({ error: 'Failed to fetch rewards', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch rewards' });
     }
   }
 
@@ -88,7 +88,7 @@ export class AdminController {
       res.status(201).json(result.rows[0]);
     } catch (err: any) {
       console.error('Create reward error:', err);
-      res.status(500).json({ error: 'Failed to create reward', message: err.message });
+      res.status(500).json({ error: 'Failed to create reward' });
     }
   }
 
@@ -105,7 +105,7 @@ export class AdminController {
       res.json(result.rows);
     } catch (err: any) {
       console.error('Admin branches error:', err);
-      res.status(500).json({ error: 'Failed to fetch branches', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch branches' });
     }
   }
 }

@@ -17,5 +17,8 @@ module.exports = {
     watch: false,
     max_restarts: 10,
     restart_delay: 4000,
+    kill_timeout: 5000,
+    listen_timeout: 3000,
+    shutdown_with_message: true,
   }],
 };

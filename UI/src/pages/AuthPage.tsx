@@ -54,7 +54,7 @@ export const AuthPage: React.FC = () => {
 
     const success = await verifyOtp(otp);
     if (!success) {
-      setOtpError(authError || 'كود التحقق غير صحيح. تذكر كتابة أي 6 أرقام للمحاكاة.');
+      setOtpError(authError || 'كود التحقق غير صحيح');
     }
   };
 
@@ -143,12 +143,6 @@ export const AuthPage: React.FC = () => {
                   <p className="text-[var(--text-xs)] text(--color-text-muted) leading-relaxed">
                     أرسلنا كوداً قصيراً لرقمك المحمول <strong className="number tracking-wider">{formatEgyptianPhoneForDisplay(phone)}</strong>. يرجى إدخال الرمز المكون من 6 أرقام لتأكيد الهوية.
                   </p>
-                  <div className="mt-2 bg-amber-50 rounded-md p-2.5 text-[11px] text-[var(--color-warning)] font-medium leading-relaxed flex items-start gap-1.5">
-                    <Lightbulb size={16} className="shrink-0 text-amber-500 mt-0.5" weight="fill" />
-                    <div>
-                      <strong>لأغراض العرض والتجربة:</strong> يمكنك إدخال أي ٦ أرقام عشوائية (مثل <strong>112233</strong>) وسيتم تسجيل الدخول فوراً!
-                    </div>
-                  </div>
                 </div>
 
                 <form onSubmit={handleOtpSubmit} className="flex flex-col gap-[var(--space-5)]">
@@ -178,7 +172,7 @@ export const AuthPage: React.FC = () => {
                       disabled={loadingAuth}
                       className="text-[var(--text-xs)] font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-primary)] py-1 mt-1 transition-colors outline-none cursor-pointer"
                     >
-                      لم يصلك الكود الكود؟ إرسال مرة أخرى
+                      لم يصلك الكود؟ إرسال مرة أخرى
                     </button>
                   </div>
                 </form>

@@ -26,7 +26,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('Public rewards error:', err);
-    res.status(500).json({ error: 'Failed to fetch rewards', message: err.message });
+    res.status(500).json({ error: 'Failed to fetch rewards' });
   }
 });
 

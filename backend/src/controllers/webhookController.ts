@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import db from '../config/db.js';
 import { webhookQueue } from '../services/webhookProcessor.js';
 
+import crypto from 'crypto';
+
 export class WebhookController {
   /**
    * Handle incoming Webhook from Foodics POS
@@ -9,17 +11,33 @@ export class WebhookController {
    */
   static async handleFoodicsWebhook(req: Request, res: Response) {
     try {
-      // Foodics sends client-id or authorization header for verification.
-      // For multi-tenant, we resolve tenant via branch api-key or request header.
-      // Let's assume tenant-id is passed as a URL parameter /api/webhooks/foodics/:tenant_id
-      // Or parsed from specialized custom headers.
       const { tenant_id } = req.params;
-      const eventType = req.headers['x-foodics-event'] as string || req.body.event || 'order.paid';
-      const payload = req.body;
-
       if (!tenant_id) {
         return res.status(400).json({ error: 'Missing tenant identifier' });
       }
+
+      // Verify signature
+      const webhookSecret = process.env.FOODICS_WEBHOOK_SECRET;
+      const rawBody = req.body instanceof Buffer ? req.body.toString('utf8') : JSON.stringify(req.body);
+      
+      if (webhookSecret) {
+        const signatureHeader = req.headers['x-foodics-signature'] || '';
+        const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+        const expectedSig = crypto
+          .createHmac('sha256', webhookSecret)
+          .update(rawBody)
+          .digest('hex');
+
+        if (signature !== expectedSig) {
+          console.warn('[Webhook] Invalid Foodics signature. Rejecting request.');
+          return res.status(401).json({ error: 'Invalid signature' });
+        }
+      } else {
+        console.warn('[Webhook] FOODICS_WEBHOOK_SECRET not set — skipping signature check');
+      }
+
+      const payload = typeof req.body === 'string' || req.body instanceof Buffer ? JSON.parse(rawBody) : req.body;
+      const eventType = (req.headers['x-foodics-event'] as string) || payload.event || 'order.paid';
 
       // 1. Audit/Log the incoming raw webhook request immediately in PG
       const logRes = await db.query(

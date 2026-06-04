@@ -1,6 +1,9 @@
 import db from './config/db.js';
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('seed() should not be run in production — it will delete all data');
+  }
   console.log('🌱 Seeding database...');
 
   // 1. Clean existing data

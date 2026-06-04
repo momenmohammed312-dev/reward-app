@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 import { OTPService } from '../services/otp.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_change_me_in_production';
+const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
 
 export class AuthController {
   /**
@@ -83,6 +83,7 @@ export class AuthController {
           tenant_id: user.tenant_id,
           email: user.email,
           role: user.role,
+          branch_id: user.branch_id || null,
         },
         JWT_SECRET,
         { expiresIn: '24h' }

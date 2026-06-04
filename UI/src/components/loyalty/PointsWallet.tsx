@@ -8,61 +8,25 @@ import { Card, CardBody } from '../ui/Card';
 import { Trophy, QrCode, X } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Real QR Canvas Renderer
-const QRCanvas: React.FC<{ value: string; size?: number; fgColor?: string }> = ({ 
-  value, 
-  size = 180, 
-  fgColor = 'var(--color-primary)' 
+import QRCodeLib from 'qrcode';
+
+const QRCanvas: React.FC<{ value: string; size?: number; fgColor?: string }> = ({
+  value,
+  size = 160,
+  fgColor = '#000000',
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    try {
-      const qr = (window as any).qrcode;
-      if (!qr) return;
-      
-      const q = qr(0, 'M');
-      q.addData(value);
-      q.make();
-
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const moduleCount = q.getModuleCount();
-      const cellSize = size / moduleCount;
-      
-      canvas.width = size;
-      canvas.height = size;
-      
-      ctx.clearRect(0, 0, size, size);
-      
-      let strokeColor = fgColor;
-      if (fgColor.startsWith('var(')) {
-        strokeColor = getComputedStyle(canvas).getPropertyValue(fgColor.slice(4, -1)).trim() || '#000000';
-      }
-      
-      ctx.fillStyle = strokeColor;
-      
-      for (let r = 0; r < moduleCount; r++) {
-        for (let c = 0; c < moduleCount; c++) {
-          if (q.isDark(r, c)) {
-            ctx.fillRect(
-              Math.floor(c * cellSize), 
-              Math.floor(r * cellSize), 
-              Math.ceil(cellSize), 
-              Math.ceil(cellSize)
-            );
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to render QR Code', err);
-    }
+  React.useEffect(() => {
+    if (!canvasRef.current || !value) return;
+    QRCodeLib.toCanvas(canvasRef.current, value, {
+      width: size,
+      color: { dark: fgColor, light: '#ffffff' },
+      margin: 1,
+    }).catch(console.error);
   }, [value, size, fgColor]);
 
-  return <canvas ref={canvasRef} className="mx-auto block" style={{ width: size, height: size }} />;
+  return <canvas ref={canvasRef} width={size} height={size} className="mx-auto block" />;
 };
 
 interface ScannerModalProps {

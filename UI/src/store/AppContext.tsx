@@ -137,6 +137,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Load from local storage / API
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tenantSlug = params.get('tenant');
+
+    if (tenantSlug) {
+      const found = mockTenants.find(t => t.id === tenantSlug || t.name.toLowerCase() === tenantSlug.toLowerCase());
+      if (found) {
+        setCurrentTenant(found);
+        applyTenantTheme(found);
+        localStorage.setItem('loyalty_tenant_slug', tenantSlug);
+      }
+    } else {
+      const savedSlug = localStorage.getItem('loyalty_tenant_slug');
+      if (savedSlug) {
+        const found = mockTenants.find(t => t.id === savedSlug);
+        if (found) {
+          setCurrentTenant(found);
+          applyTenantTheme(found);
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const savedPhone = localStorage.getItem('loyalty_user_phone');
     const savedRedeemed = localStorage.getItem(`loyalty_redeemed_${currentTenant.id}`);
     
@@ -251,24 +274,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadWalletData(otpSentPhone);
       return true;
     } catch (e: any) {
-      console.warn('Backend verifyOtp failed, falling back to mock mode:', e.message);
-      // Fallback mock check
-      if (otpSentPhone) {
-        localStorage.setItem('loyalty_user_phone', otpSentPhone);
-        const nameCandidate = localStorage.getItem('loyalty_user_name') || 'أحمد عبد الله';
-        localStorage.setItem('loyalty_user_name', nameCandidate);
-        
-        setUser({
-          phone: otpSentPhone,
-          name: nameCandidate,
-          joinDate: '٢٠٢٤/١٢/١٥',
-          loyaltyTier: 'الذهبي',
-          totalPoints: points,
-        });
+      if (import.meta.env.DEV && code === '000000') {
+        console.warn('[DEV MODE] Using test bypass code 000000');
+        setUser({ phone: otpSentPhone, name: 'مستخدم تجريبي', joinDate: '2026/01/01', loyaltyTier: 'الذهبي', totalPoints: 320 });
         setIsAuthenticated(true);
+        localStorage.setItem('loyalty_user_phone', otpSentPhone);
         return true;
       }
-      setAuthError(e.message || 'فشلت عملية التحقق');
+      setAuthError('كود التحقق غير صحيح أو انتهت صلاحيته');
       return false;
     } finally {
       setLoadingAuth(false);
@@ -381,12 +394,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const refetchData = async () => {
-    setLoadingWallet(true);
     setGlobalError(null);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1200));
-    } finally {
-      setLoadingWallet(false);
+    if (isAuthenticated) {
+      await loadWalletData();
+      try {
+        const freshRewards = await api.getRewards(currentTenant.id);
+        setRewards(freshRewards);
+      } catch {
+        setRewards(mockRewards[currentTenant.id] || []);
+      }
     }
   };
 

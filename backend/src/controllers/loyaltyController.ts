@@ -165,11 +165,12 @@ export class LoyaltyController {
       }
 
       // Mark the code as used
+      const cashierBranchId = req.user?.branch_id;
       await db.query(
         `UPDATE redemptions
-         SET used_at = NOW(), branch_id = (SELECT id FROM branches WHERE tenant_id = $1 LIMIT 1) -- default to first branch for demo
+         SET used_at = NOW(), branch_id = $1
          WHERE id = $2`,
-        [tenantId, redemption.id]
+        [cashierBranchId || null, redemption.id]
       );
 
       res.json({

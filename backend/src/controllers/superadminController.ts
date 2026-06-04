@@ -17,7 +17,7 @@ export class SuperAdminController {
       res.json(result.rows);
     } catch (err: any) {
       console.error('SuperAdmin tenants error:', err);
-      res.status(500).json({ error: 'Failed to fetch tenants', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch tenants' });
     }
   }
 
@@ -40,7 +40,7 @@ export class SuperAdminController {
       res.json({ id, is_active: newStatus });
     } catch (err: any) {
       console.error('SuperAdmin toggle tenant error:', err);
-      res.status(500).json({ error: 'Failed to update tenant', message: err.message });
+      res.status(500).json({ error: 'Failed to update tenant' });
     }
   }
 
@@ -57,7 +57,7 @@ export class SuperAdminController {
       res.json(result.rows);
     } catch (err: any) {
       console.error('SuperAdmin webhook logs error:', err);
-      res.status(500).json({ error: 'Failed to fetch webhook logs', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch webhook logs' });
     }
   }
 
@@ -74,7 +74,7 @@ export class SuperAdminController {
       res.json(result.rows[0]);
     } catch (err: any) {
       console.error('SuperAdmin stats error:', err);
-      res.status(500).json({ error: 'Failed to fetch global stats', message: err.message });
+      res.status(500).json({ error: 'Failed to fetch global stats' });
     }
   }
 }

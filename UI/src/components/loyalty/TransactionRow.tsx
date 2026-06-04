@@ -48,9 +48,10 @@ const txConfig: Record<TxType, {
 interface TransactionRowProps {
   transaction: Transaction;
   index?: number;
+  onClick?: (tx: Transaction) => void;
 }
 
-export const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, index = 0 }) => {
+export const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, index = 0, onClick }) => {
   const config = txConfig[transaction.type] || txConfig.earn;
   const Icon = config.icon;
 
@@ -60,12 +61,18 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, ind
     year: 'numeric',
   });
 
+  const formattedTime = new Date(transaction.date).toLocaleTimeString('ar-EG', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05, type: 'spring', stiffness: 280, damping: 28 }}
-      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:shadow-sm transition-all duration-200"
+      onClick={() => onClick?.(transaction)}
+      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:shadow-sm transition-all duration-200 cursor-pointer"
     >
       <div className={`w-9 h-9 rounded-xl ${config.iconBg} ${config.iconColor} flex items-center justify-center shrink-0`}>
         <Icon size={18} weight="duotone" />
