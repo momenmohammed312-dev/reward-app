@@ -28,6 +28,7 @@ const webhookStatusConfig: Record<string, { dot: string; text: string; bg: strin
 export const SuperAdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'tenants' | 'subscriptions' | 'logs'>('tenants');
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   // Global stats from API with mock fallback
   const [globalStats, setGlobalStats] = useState({
@@ -56,6 +57,8 @@ export const SuperAdminDashboard: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
+    setApiError(null);
+    let hasError = false;
     Promise.all([
       api.getSuperAdminStats().then((data: any) => {
         setGlobalStats(prev => ({
@@ -63,7 +66,7 @@ export const SuperAdminDashboard: React.FC = () => {
           totalTenants: Number(data.total_tenants || prev.totalTenants),
           activeSubscriptions: Number(data.active_tenants || prev.activeSubscriptions),
         }));
-      }).catch(() => {}),
+      }).catch((err: any) => { hasError = true; }),
 
       api.getSuperAdminTenants().then((data: any[]) => {
         if (data.length > 0) {
@@ -77,7 +80,7 @@ export const SuperAdminDashboard: React.FC = () => {
             joinedDate: t.created_at ? new Date(t.created_at).toLocaleDateString('ar-EG') : '-',
           })));
         }
-      }).catch(() => {}),
+      }).catch((err: any) => { hasError = true; }),
 
       api.getSuperAdminWebhookLogs().then((data: any[]) => {
         if (data.length > 0) {
@@ -90,8 +93,11 @@ export const SuperAdminDashboard: React.FC = () => {
             message: log.error_message || 'Points processed successfully',
           })));
         }
-      }).catch(() => {}),
-    ]).finally(() => setLoading(false));
+      }).catch((err: any) => { hasError = true; }),
+    ]).finally(() => {
+      if (hasError) setApiError('تعذر الاتصال بالخادم — يتم عرض بيانات تجريبية');
+      setLoading(false);
+    });
   }, []);
 
   const handleToggleTenantStatus = async (tenantId: string) => {
@@ -133,6 +139,18 @@ export const SuperAdminDashboard: React.FC = () => {
           <span className="text-[11px] font-bold text-emerald-400">جميع الخدمات تعمل بكفاءة 100%</span>
         </div>
       </div>
+
+      {/* API Error Banner */}
+      {apiError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-950/60 border border-amber-800/40 p-3 rounded-xl flex items-center gap-2"
+        >
+          <Pulse size={16} className="text-amber-400 shrink-0" />
+          <span className="text-xs font-medium text-amber-300">{apiError}</span>
+        </motion.div>
+      )}
 
       {/* SaaS Statistics */}
       <motion.div

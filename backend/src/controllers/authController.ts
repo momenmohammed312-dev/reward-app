@@ -14,14 +14,23 @@ export class AuthController {
     try {
       const { tenant_id, email, password, name, role } = req.body;
 
-      if (!tenant_id || !email || !password) {
-        return res.status(400).json({ error: 'Missing fields', message: 'tenant_id, email, and password are required' });
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Missing fields', message: 'Email and password are required' });
       }
 
-      // Check if tenant exists
-      const tenantCheck = await db.query('SELECT id FROM tenants WHERE id = $1::uuid', [tenant_id]);
-      if (tenantCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+      // Superadmin doesn't need tenant_id
+      const isSuperAdmin = role === 'superadmin';
+
+      if (!isSuperAdmin && !tenant_id) {
+        return res.status(400).json({ error: 'Missing fields', message: 'tenant_id is required for non-superadmin users' });
+      }
+
+      // Check if tenant exists (skip for superadmin)
+      if (tenant_id) {
+        const tenantCheck = await db.query('SELECT id FROM tenants WHERE id = $1::uuid', [tenant_id]);
+        if (tenantCheck.rows.length === 0) {
+          return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+        }
       }
 
       // Hash password
@@ -32,7 +41,7 @@ export class AuthController {
         `INSERT INTO users (tenant_id, email, password_hash, name, role)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, name, role`,
-        [tenant_id, email, passwordHash, name || null, role || 'manager']
+        [tenant_id || null, email, passwordHash, name || null, role || 'manager']
       );
 
       res.status(201).json({ message: 'User registered successfully', user: result.rows[0] });
@@ -59,7 +68,7 @@ export class AuthController {
       // Find user
       const result = await db.query(
         `SELECT u.*, t.name as tenant_name FROM users u
-         JOIN tenants t ON u.tenant_id = t.id
+         LEFT JOIN tenants t ON u.tenant_id = t.id
          WHERE u.email = $1 AND u.is_active = true`,
         [email]
       );

@@ -183,7 +183,7 @@ class ApiService {
   // --- SUPER ADMIN ---
   private getSuperAdminHeaders() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem('loyalty_admin_token');
+    const token = localStorage.getItem('loyalty_superadmin_token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
   }

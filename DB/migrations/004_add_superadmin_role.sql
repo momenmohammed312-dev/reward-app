@@ -5,6 +5,7 @@ BEGIN;
 ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'superadmin';
 
 -- Allow superadmin users (tenant_id can reference a system tenant or be nullable)
--- We'll allow superadmin login by using LEFT JOIN in the auth controller
+ALTER TABLE users ALTER COLUMN tenant_id DROP NOT NULL;
+ALTER TABLE users ADD CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE SET NULL;
 
 COMMIT;
