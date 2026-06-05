@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { useApp } from '../store/AppContext';
-import { House, Gift, Receipt, User, ArrowClockwise } from '@phosphor-icons/react';
-import { motion } from 'motion/react';
+import { House, Gift, Receipt, User, ArrowClockwise, Storefront, CaretDown } from '@phosphor-icons/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -45,35 +45,41 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         style={{ direction: 'rtl' }}
       >
         {/* Top Header toolbar element */}
-        <header className="sticky top-0 z-30 bg-[var(--color-surface)] border-b border-[var(--color-border)] height-[var(--nav-height)] px-[var(--space-4)] py-[var(--space-3)] flex items-center justify-between shadow-[var(--shadow-sm)]">
-          <div className="flex items-center gap-[var(--space-2)]">
+        <header className="sticky top-0 z-30 bg-[var(--color-surface)] border-b border-[var(--color-border)] px-[var(--space-5)] py-[var(--space-4)] flex items-center justify-between shadow-[var(--shadow-sm)]" style={{ height: 'calc(var(--nav-height) + 8px)' }}>
+          <div className="flex items-center gap-[var(--space-3)]">
             <div 
-              className="w-8 h-8 rounded-full bg-cover bg-center shrink-0 border border-[var(--color-border)]"
+              className="w-10 h-10 rounded-xl bg-cover bg-center shrink-0 border border-[var(--color-border)] shadow-sm"
               style={{ backgroundImage: `url(${currentTenant.logo})` }}
             />
             <div className="flex flex-col text-right">
-              <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] leading-tight">
+              <span className="text-[var(--text-md)] font-black text-[var(--color-text)] leading-tight tracking-tight">
                 {currentTenant.name}
               </span>
-              <span className="text-[10px] text-[var(--color-text-muted)]">برنامج الولاء الرقمي</span>
+              <span className="text-[9px] tracking-widest font-bold text-[var(--color-text-light)] uppercase">
+                Loyalty Program
+              </span>
             </div>
           </div>
 
           {/* Quick Dynamic Brand Switcher for the SaaS Sandbox */}
           {import.meta.env.DEV && (
             <div className="flex items-center gap-1">
-              <label htmlFor="tenant-select" className="sr-only">اختر العلامة التجارية</label>
-              <select
-                id="tenant-select"
-                value={currentTenant.id}
-                onChange={(e) => selectTenant(e.target.value)}
-                disabled={loadingTenant}
-                className="bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] py-1 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-semibold outline-none focus:border-[var(--color-primary)] cursor-pointer"
-              >
-                {tenants.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+              <label htmlFor="tenant-select" className="sr-only">Switch brand</label>
+              <div className="relative">
+                <select
+                  id="tenant-select"
+                  value={currentTenant.id}
+                  onChange={(e) => selectTenant(e.target.value)}
+                  disabled={loadingTenant}
+                  className="appearance-none bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] py-1.5 pr-3 pl-7 rounded-[var(--radius-sm)] text-[11px] font-bold outline-none focus:border-[var(--color-primary)] cursor-pointer"
+                >
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                <CaretDown size={12} weight="bold" className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
+              </div>
+              <Storefront size={14} className="text-[var(--color-text-muted)]" weight="duotone" />
             </div>
           )}
         </header>

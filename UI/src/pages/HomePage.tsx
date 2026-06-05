@@ -116,27 +116,16 @@ export const HomePage: React.FC = () => {
       className="flex flex-col gap-[var(--space-6)]"
     >
       {/* 1. Welcoming Hero Bar */}
-      <motion.div variants={itemVariants} className="flex justify-between items-center select-none text-right">
-        <div className="flex flex-col gap-1">
-          <span className="text-[var(--text-xs)] text-[var(--color-text-light)] font-medium flex items-center gap-1.5 justify-start">
-            <span>أهلاً بك يوماً سعيداً</span>
-            <HandWaving size={15} className="text-amber-500 animate-[pulse_2.5s_infinite]" weight="fill" />
+      <motion.div variants={itemVariants} className="flex items-center select-none text-right">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[var(--text-xs)] text-[var(--color-text-light)] font-medium flex items-center gap-1.5">
+            <span>مرحباً بعودتك</span>
+            <HandWaving size={14} className="text-amber-500" weight="fill" />
           </span>
-          <h1 className="text-2xl font-bold text-[var(--color-text)] font-display tracking-tight">
-            كابتن {user?.name || 'أحمد عبد الله'}
+          <h1 className="text-xl font-black text-[var(--color-text)] tracking-tight leading-none">
+            {user?.name || 'أحمد عبد الله'}
           </h1>
         </div>
-        
-        {/* Playful Simulation Tool in margin */}
-        <button 
-          onClick={() => {
-            setErrorSimulated('هذه محاكاة لرسالة خطأ مرنة مخصصة للتحقق من امتثال سيناريو فحص الأنظمة واسترجاع البيانات.');
-          }}
-          className="p-1.5 px-2.5 rounded-full text-[10px] font-semibold bg-[rgba(220,38,38,0.08)] text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white transition-all cursor-pointer"
-          title="محاكاة خطأ"
-        >
-          🚨 خطأ
-        </button>
       </motion.div>
 
       {/* 2. Main Points Wallet */}
