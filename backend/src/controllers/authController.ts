@@ -19,7 +19,7 @@ export class AuthController {
       }
 
       // Check if tenant exists
-      const tenantCheck = await db.query('SELECT id FROM tenants WHERE id = $1', [tenant_id]);
+      const tenantCheck = await db.query('SELECT id FROM tenants WHERE id = $1::uuid', [tenant_id]);
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
@@ -114,17 +114,19 @@ export class AuthController {
       const { tenant_id, phone } = req.body;
 
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const queryStr = isUuid
-        ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
-        : 'SELECT id FROM tenants WHERE slug = $1';
-      const tenantCheck = await db.query(queryStr, [tenant_id]);
+      const tenantCheck = await db.query(
+        isUuid
+          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
+          : 'SELECT id FROM tenants WHERE slug = $1',
+        isUuid ? [tenant_id, tenant_id] : [tenant_id]
+      );
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id;
+      const resolvedTenantId = String(tenantCheck.rows[0].id);
 
       const customer = await db.query(
-        'SELECT id, name, tier FROM customers WHERE tenant_id = $1 AND phone = $2',
+        'SELECT id, name, tier FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
         [resolvedTenantId, phone]
       );
 
@@ -154,18 +156,20 @@ export class AuthController {
 
       // Check if tenant exists by ID or Slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const queryStr = isUuid
-        ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
-        : 'SELECT id FROM tenants WHERE slug = $1';
-      const tenantCheck = await db.query(queryStr, [tenant_id]);
+      const tenantCheck = await db.query(
+        isUuid
+          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
+          : 'SELECT id FROM tenants WHERE slug = $1',
+        isUuid ? [tenant_id, tenant_id] : [tenant_id]
+      );
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id;
+      const resolvedTenantId = String(tenantCheck.rows[0].id);
 
       // Find or create customer
       let customerResult = await db.query(
-        'SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2',
+        'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
         [resolvedTenantId, phone]
       );
 
@@ -173,7 +177,7 @@ export class AuthController {
         // Create new customer
         customerResult = await db.query(
           `INSERT INTO customers (tenant_id, phone)
-           VALUES ($1, $2)
+           VALUES ($1::uuid, $2)
            RETURNING id`,
           [resolvedTenantId, phone]
         );
@@ -202,14 +206,16 @@ export class AuthController {
 
       // Check if tenant exists by ID or Slug
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const queryStr = isUuid
-        ? 'SELECT id FROM tenants WHERE id = $1 OR slug = $1'
-        : 'SELECT id FROM tenants WHERE slug = $1';
-      const tenantCheck = await db.query(queryStr, [tenant_id]);
+      const tenantCheck = await db.query(
+        isUuid
+          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
+          : 'SELECT id FROM tenants WHERE slug = $1',
+        isUuid ? [tenant_id, tenant_id] : [tenant_id]
+      );
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id;
+      const resolvedTenantId = String(tenantCheck.rows[0].id);
 
       // Verify OTP
       const isValid = await OTPService.verifyOTP(resolvedTenantId, phone, code);
@@ -221,7 +227,7 @@ export class AuthController {
       const customerResult = await db.query(
         `UPDATE customers
          SET is_verified = true, last_visit = NOW()
-         WHERE tenant_id = $1 AND phone = $2
+         WHERE tenant_id = $1::uuid AND phone = $2
          RETURNING id, name, phone, tier`,
         [resolvedTenantId, phone]
       );

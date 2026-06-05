@@ -63,10 +63,11 @@ export const schemas = {
   }),
 
   manualEarn: z.object({
-    customer_id: z.string().min(1, 'customer_id is required'),
+    customer_id: z.string().optional(),
+    customer_phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
     amount: z.number().int().positive('Amount must be positive'),
     note: z.string().optional(),
-  }),
+  }).refine(d => d.customer_id || d.customer_phone, { message: 'Either customer_id or customer_phone is required' }),
 
   createBranch: z.object({
     name: z.string().min(1, 'Name is required'),

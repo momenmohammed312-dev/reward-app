@@ -26,7 +26,7 @@ export class SuperAdminController {
     try {
       const { id } = req.params;
       const tenant = await db.query(
-        'SELECT is_active FROM tenants WHERE id = $1',
+        'SELECT is_active FROM tenants WHERE id = $1::uuid',
         [id]
       );
       if (tenant.rows.length === 0) {
@@ -34,7 +34,7 @@ export class SuperAdminController {
       }
       const newStatus = !tenant.rows[0].is_active;
       await db.query(
-        'UPDATE tenants SET is_active = $1, updated_at = NOW() WHERE id = $2',
+        'UPDATE tenants SET is_active = $1, updated_at = NOW() WHERE id = $2::uuid',
         [newStatus, id]
       );
       res.json({ id, is_active: newStatus });

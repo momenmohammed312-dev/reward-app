@@ -76,7 +76,7 @@ export class TenantController {
         `SELECT t.*, s.status as subscription_status, s.current_period_end
          FROM tenants t
          LEFT JOIN subscriptions s ON t.id = s.tenant_id
-         WHERE t.id = $1`,
+          WHERE t.id = $1::uuid`,
         [tenantId]
       );
 
@@ -130,7 +130,7 @@ export class TenantController {
       const result = await db.query(
         `SELECT id, name, city, pos_type, pos_location_id, is_active, created_at
          FROM branches
-         WHERE tenant_id = $1`,
+         WHERE tenant_id = $1::uuid`,
         [tenantId]
       );
 
@@ -158,7 +158,7 @@ export class TenantController {
       const result = await db.query(
         `UPDATE branches
          SET api_key = $1
-         WHERE id = $2 AND tenant_id = $3
+         WHERE id = $2::uuid AND tenant_id = $3::uuid
          RETURNING id, name, api_key`,
         [apiKey, branch_id, tenantId]
       );

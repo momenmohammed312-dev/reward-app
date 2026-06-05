@@ -70,7 +70,7 @@ export class LoyaltyController {
       const result = await db.query(
         `SELECT type, points, reference_type, note, created_at
          FROM wallet_ledger
-         WHERE tenant_id = $1 AND customer_id = $2
+         WHERE tenant_id = $1::uuid AND customer_id = $2
          ORDER BY created_at DESC`,
         [tenantId, customerId]
       );
@@ -88,17 +88,30 @@ export class LoyaltyController {
   static async adminEarnPointsManual(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user?.tenant_id;
-      const { customer_id, amount, note } = req.body;
+      const { customer_id, customer_phone, amount, note } = req.body;
 
-      if (!customer_id || !amount) {
-        return res.status(400).json({ error: 'Missing fields', message: 'customer_id and amount are required' });
+      if ((!customer_id && !customer_phone) || !amount) {
+        return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) and amount are required' });
+      }
+
+      let resolvedCustomerId = customer_id;
+
+      if (!resolvedCustomerId && customer_phone) {
+        const custRes = await db.query(
+          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
+          [tenantId, customer_phone]
+        );
+        if (custRes.rows.length === 0) {
+          return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone' });
+        }
+        resolvedCustomerId = custRes.rows[0].id;
       }
 
       // Record a manual bonus ledger record
       await db.query(
         `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, note, created_by)
-         VALUES ($1, $2, 'bonus', $3, $4, $5)`,
-        [tenantId, customer_id, amount, note || 'Manual points adjustment', req.user?.email || 'admin']
+         VALUES ($1::uuid, $2::uuid, 'bonus', $3, $4, $5)`,
+        [tenantId, resolvedCustomerId, amount, note || 'Manual points adjustment', req.user?.email || 'admin']
       );
 
       res.json({ message: 'Points awarded successfully' });

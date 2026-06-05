@@ -10,10 +10,10 @@ export class AdminController {
       const tenantId = req.user!.tenant_id;
       const statsQuery = await db.query(`
         SELECT 
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1) AS total_customers,
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1 AND last_visit > NOW() - INTERVAL '30 days') AS active_customers,
-          (SELECT COALESCE(SUM(points), 0) FROM wallet_ledger WHERE tenant_id = $1 AND type = 'earned' AND created_at > date_trunc('month', NOW())) AS points_this_month,
-          (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1 AND created_at::date = CURRENT_DATE) AS redemptions_today
+          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid) AS total_customers,
+          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND last_visit > NOW() - INTERVAL '30 days') AS active_customers,
+          (SELECT COALESCE(SUM(points), 0) FROM wallet_ledger WHERE tenant_id = $1::uuid AND type = 'earned' AND created_at > date_trunc('month', NOW())) AS points_this_month,
+          (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1::uuid AND created_at::date = CURRENT_DATE) AS redemptions_today
       `, [tenantId]);
       res.json(statsQuery.rows[0]);
     } catch (err: any) {
@@ -31,7 +31,7 @@ export class AdminController {
                COALESCE((SELECT SUM(CASE WHEN type IN ('earned','bonus','refund') THEN points WHEN type IN ('redeemed','expired') THEN -points ELSE 0 END) FROM wallet_ledger WHERE customer_id = c.id), 0) AS balance,
                total_earned, is_verified, last_visit, created_at
         FROM customers c
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1::uuid
         ORDER BY created_at DESC
         LIMIT 100
       `, [tenantId]);
@@ -59,7 +59,7 @@ export class AdminController {
                is_active,
                created_at
         FROM rewards
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1::uuid
         ORDER BY created_at DESC
       `, [tenantId]);
       res.json(result.rows);
@@ -81,7 +81,7 @@ export class AdminController {
 
       const result = await db.query(`
         INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, expiry_days)
-        VALUES ($1, $2, 'free_item', $3, $4, $5, $6)
+        VALUES ($1::uuid, $2, 'free_item', $3, $4, $5, $6)
         RETURNING *
       `, [tenantId, title, points_required, description || null, category || 'مشروبات', expiry_days || 30]);
 
@@ -99,7 +99,7 @@ export class AdminController {
       const result = await db.query(`
         SELECT id, name, city, pos_type, is_active, created_at
         FROM branches
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1::uuid
         ORDER BY created_at DESC
       `, [tenantId]);
       res.json(result.rows);

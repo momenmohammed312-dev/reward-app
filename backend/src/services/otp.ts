@@ -69,7 +69,7 @@ export class OTPService {
     // Save to database
     await db.query(
       `INSERT INTO otp_codes (tenant_id, phone, code, expires_at)
-       VALUES ($1, $2, $3, $4)`,
+       VALUES ($1::uuid, $2, $3, $4)`,
       [tenantId, phone, code, expiresAt]
     );
 
@@ -86,7 +86,7 @@ export class OTPService {
     // Get the latest unused OTP code for this phone and tenant
     const result = await db.query(
       `SELECT * FROM otp_codes
-       WHERE tenant_id = $1 AND phone = $2 AND used_at IS NULL
+       WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
        ORDER BY created_at DESC
        LIMIT 1`,
       [tenantId, phone]
