@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useApp } from '../store/AppContext';
-import { House, Gift, Receipt, User, ArrowClockwise, Storefront, CaretDown } from '@phosphor-icons/react';
+import { House, Gift, Receipt, User, ArrowClockwise, Storefront, CaretDown, List } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AppLayoutProps {
@@ -25,12 +25,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const navItems = [
     { id: 'home' as const, label: 'الرئيسية', icon: House },
+    { id: 'menu' as const, label: 'القائمة', icon: List },
     { id: 'rewards' as const, label: 'مكافآتي', icon: Gift },
     { id: 'history' as const, label: 'سجل حركاتي', icon: Receipt },
     { id: 'profile' as const, label: 'حسابي', icon: User },
   ];
 
-  const handleTabChange = (tabId: 'home' | 'rewards' | 'history' | 'profile') => {
+  const handleTabChange = (tabId: 'home' | 'menu' | 'rewards' | 'history' | 'profile') => {
     setActiveTab(tabId);
     setCurrentSubPage('main');
     setSelectedReward(null);

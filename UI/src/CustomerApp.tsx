@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage';
 import { RewardsPage } from './pages/RewardsPage';
 import { RedeemPage } from './pages/RedeemPage';
 import { RedemptionCode } from './components/loyalty/RedemptionCode';
+import { MenuPage } from './pages/MenuPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { Toast } from './components/ui/Toast';
@@ -54,6 +55,7 @@ const CustomerApp: React.FC = () => {
                 transition={{ duration: 0.2 }}
               >
                 {activeTab === 'home' && <HomePage />}
+                {activeTab === 'menu' && <MenuPage />}
                 {activeTab === 'rewards' && <RewardsPage onRedeemRewardTrigger={handleRewardSelected} />}
                 {activeTab === 'history' && <HistoryPage />}
                 {activeTab === 'profile' && <ProfilePage onShowToast={triggerToast} />}

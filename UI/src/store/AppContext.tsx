@@ -34,8 +34,8 @@ interface AppContextType {
   markCodeAsUsed: (code: string) => void;
 
   // Routing and layouts
-  activeTab: 'home' | 'rewards' | 'history' | 'profile';
-  setActiveTab: (tab: 'home' | 'rewards' | 'history' | 'profile') => void;
+  activeTab: 'home' | 'menu' | 'rewards' | 'history' | 'profile';
+  setActiveTab: (tab: 'home' | 'menu' | 'rewards' | 'history' | 'profile') => void;
   currentSubPage: 'main' | 'redeem-detail' | 'code-display';
   setCurrentSubPage: (page: 'main' | 'redeem-detail' | 'code-display') => void;
   selectedReward: Reward | null;
@@ -74,7 +74,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [walletError, setWalletError] = useState<string | null>(null);
 
   // Sub-routes & Navigation
-  const [activeTab, setActiveTab] = useState<'home' | 'rewards' | 'history' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'rewards' | 'history' | 'profile'>('home');
   const [currentSubPage, setCurrentSubPage] = useState<'main' | 'redeem-detail' | 'code-display'>('main');
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [activeRedemption, setActiveRedemption] = useState<RedeemedReward | null>(null);
