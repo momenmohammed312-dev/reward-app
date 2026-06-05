@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Building, 
   CreditCard, 
@@ -134,7 +135,12 @@ export const SuperAdminDashboard: React.FC = () => {
       </div>
 
       {/* SaaS Statistics */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <motion.div
+        variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-2 lg:grid-cols-5 gap-4"
+      >
         {loading ? (
           <>
             {[1,2,3,4,5].map(i => (
@@ -146,48 +152,63 @@ export const SuperAdminDashboard: React.FC = () => {
           </>
         ) : (
         <>
-        <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+          className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1 hover:border-slate-600 transition-all"
+        >
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             إجمالي المشتركين
             <Building size={16} className="text-cyan-400" />
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.totalTenants}</span>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+          className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1 hover:border-slate-600 transition-all"
+        >
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             الاشتراكات النشطة
             <CreditCard size={16} className="text-indigo-400" />
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.activeSubscriptions}</span>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+          className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1 hover:border-slate-600 transition-all"
+        >
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             الدخل الشهري (MRR)
             <Coins size={16} className="text-emerald-400" />
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.mrrEgp.toLocaleString()} EGP</span>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+          className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1 hover:border-slate-600 transition-all"
+        >
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             طلبات الـ API اليوم
             <Pulse size={16} className="text-amber-400" />
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.apiRequestsToday.toLocaleString()}</span>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1">
+        <motion.div
+          variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+          className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1 hover:border-slate-600 transition-all"
+        >
           <span className="text-slate-400 text-xs font-bold flex justify-between items-center">
             استقرار النظام
             <CheckCircle size={16} className="text-rose-400" />
           </span>
           <span className="text-xl font-black text-slate-100">{globalStats.systemUptime}</span>
-        </div>
+        </motion.div>
         </>
         )}
-      </div>
+      </motion.div>
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-700 pb-2">
@@ -212,7 +233,15 @@ export const SuperAdminDashboard: React.FC = () => {
       </div>
 
       {/* Content Area */}
-      <div className="min-h-[400px]">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          className="min-h-[400px]"
+        >
         {activeTab === 'tenants' && (
           <div className="bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl overflow-hidden">
             <div className="p-5 border-b border-slate-700 flex justify-between items-center">
@@ -354,7 +383,8 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };

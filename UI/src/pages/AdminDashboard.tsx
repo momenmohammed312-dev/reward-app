@@ -211,11 +211,24 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Content Container */}
-      <div className="min-h-[400px]">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeSubTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+          className="min-h-[400px]"
+        >
         {activeSubTab === 'overview' && (
           <div className="flex flex-col gap-6">
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div
+              variants={{ visible: { transition: { staggerChildren: 0.07 } } }}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            >
               {statsLoading ? (
                 <>
                   {[1,2,3,4].map(i => (
@@ -228,44 +241,56 @@ export const AdminDashboard: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+                    className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all"
+                  >
                     <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
                       <span>إجمالي المشتركين</span>
                       <Users size={20} className="text-cyan-400" />
                     </div>
                     <span className="text-2xl font-black text-slate-100">{adminStats.totalCustomers}</span>
                     <span className="text-[10px] text-emerald-400 font-semibold">+12% من الأسبوع الماضي</span>
-                  </div>
+                  </motion.div>
 
-                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+                    className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all"
+                  >
                     <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
                       <span>النشطين حالياً</span>
                       <Sliders size={20} className="text-indigo-400" />
                     </div>
                     <span className="text-2xl font-black text-slate-100">{adminStats.activeLoyalists}</span>
                     <span className="text-[10px] text-slate-400">زيارة واحدة على الأقل شهرياً</span>
-                  </div>
+                  </motion.div>
 
-                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+                    className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all"
+                  >
                     <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
                       <span>النقاط المصدرة</span>
                       <Coins size={20} className="text-amber-400" />
                     </div>
                     <span className="text-2xl font-black text-slate-100">{adminStats.pointsIssuedThisMonth.toLocaleString()}</span>
                     <span className="text-[10px] text-emerald-400 font-semibold">+18.5% هذا الشهر</span>
-                  </div>
+                  </motion.div>
 
-                  <div className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all">
+                  <motion.div
+                    variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 150, damping: 20 } } }}
+                    className="bg-slate-800/40 border border-slate-700/40 p-5 rounded-2xl flex flex-col gap-1.5 hover:border-slate-600 transition-all"
+                  >
                     <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
                       <span>عمليات الاسترداد (اليوم)</span>
                       <Gift size={20} className="text-rose-400" />
                     </div>
                     <span className="text-2xl font-black text-slate-100">{adminStats.redemptionsToday}</span>
                     <span className="text-[10px] text-rose-400 font-semibold">-2 عملية عن أمس</span>
-                  </div>
+                  </motion.div>
                 </>
               )}
-            </div>
+            </motion.div>
 
             {/* Quick manual adjust & Live activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -582,7 +607,8 @@ export const AdminDashboard: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };
