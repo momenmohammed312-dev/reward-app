@@ -22,23 +22,23 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
   onRedeemedSuccess,
   onShowToast
 }) => {
-  const { redeemReward, points } = useApp();
+  const { redeemReward, points, t } = useApp();
   const [redeeming, setRedeeming] = useState(false);
   const canAfford = points >= reward.pointsRequired;
 
   const handleConfirmRedeem = async () => {
     if (!canAfford) {
-      onShowToast('رصيد نقاطك غير كافٍ لاستعادة هذه المكافأة', 'error');
+      onShowToast(t('redeem.insufficientTitle'), 'error');
       return;
     }
 
     setRedeeming(true);
     try {
       const redemption = await redeemReward(reward);
-      onShowToast(`تم استرداد "${reward.title}" بنجاح!`, 'success');
+      onShowToast(t('redeem.success', { title: reward.title }), 'success');
       onRedeemedSuccess(redemption);
     } catch (e: any) {
-      onShowToast(e.message || 'فشلت عملية الاستبدال. يرجى المحاولة لاحقاً.', 'error');
+      onShowToast(e.message || t('redeem.failed'), 'error');
     } finally {
       setRedeeming(false);
     }
@@ -55,7 +55,7 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
           <ArrowRight size={18} />
         </button>
         <div className="flex flex-col">
-          <span className="text-[11px] text-[var(--color-text-light)]">تفاصيل المكافأة</span>
+          <span className="text-[11px] text-[var(--color-text-light)]">{t('redeem.detail')}</span>
           <span className="text-[var(--text-lg)] font-bold text-[var(--color-text)]">{reward.title}</span>
         </div>
       </div>
@@ -72,7 +72,7 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
           />
           <div className="absolute top-4 right-4">
             <Badge variant="accent">
-              مكافأة مميزة
+              {t('redeem.badge')}
             </Badge>
           </div>
         </div>
@@ -81,26 +81,26 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
         <CardBody className="p-[var(--space-5)] flex flex-col gap-[var(--space-4)]">
           <div className="flex justify-between items-center pb-3 border-b border-[var(--color-border)]">
             <div className="flex flex-col">
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mb-0.5">النقاط المطلوبة</span>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mb-0.5">{t('redeem.pointsRequired')}</span>
               <div className="flex items-baseline gap-1 justify-start">
                 <span className="points-value text-[var(--text-xl)] font-bold text-[var(--color-primary)] font-sans">
                   {reward.pointsRequired}
                 </span>
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-bold">نقطة</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-bold">{t('pointsLabel')}</span>
               </div>
             </div>
 
             <div className="flex flex-col items-end text-left">
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mb-0.5">تاريخ الصلاحية</span>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mb-0.5">{t('redeem.expiry')}</span>
               <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)]">
-                {reward.expiryDays} أيام من الطلب
+                {reward.expiryDays} {t('redeem.expiryDays')}
               </span>
             </div>
           </div>
 
           {/* Description Block */}
           <div className="flex flex-col gap-1 text-right">
-            <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)]">عن هذه المكافأة</span>
+            <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)]">{t('redeem.about')}</span>
             <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] leading-relaxed text-slate-600 mt-1">
               {reward.description}
             </p>
@@ -110,7 +110,7 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
           <div className="flex flex-col gap-2 rounded-[var(--radius-md)] bg-[var(--color-bg)] p-[var(--space-4)] border border-[var(--color-border)] mt-1">
             <div className="flex items-center gap-1.5 text-[var(--text-sm)] font-bold text-[var(--color-text)]">
               <Info size={15} className="text-[var(--color-primary)] shrink-0" />
-              <span>تعليمات وبنود الاستخدام</span>
+              <span>{t('redeem.terms')}</span>
             </div>
             
             <ul className="flex flex-col gap-1.5 text-[11px] text-[var(--color-text-muted)] leading-normal pr-5 list-disc mt-1 select-none">
@@ -125,12 +125,12 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
         {/* Interactive CTA bar */}
         <CardFooter className="bg-[var(--color-bg)] p-[var(--space-5)] border-t border-[var(--color-border)] flex flex-col gap-3">
           <div className="flex justify-between items-center w-full select-none">
-            <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">حالة رصيد نقاطك المتاحة</span>
+            <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{t('redeem.balanceStatus')}</span>
             <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">
               {points >= reward.pointsRequired ? (
-                <span className="text-[var(--color-success)]">كافٍ للاستبدال ({points} نقطة)</span>
+                <span className="text-[var(--color-success)]">{t('redeem.sufficient', { points })}</span>
               ) : (
-                <span className="text-[var(--color-danger)]">غير كافٍ يتبقى {reward.pointsRequired - points} نقطة</span>
+                <span className="text-[var(--color-danger)]">{t('redeem.insufficient', { points: reward.pointsRequired - points })}</span>
               )}
             </span>
           </div>
@@ -143,7 +143,7 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
             onClick={handleConfirmRedeem}
             className="w-full text-[var(--text-sm)] font-bold py-3.5 shadow-sm"
           >
-            {canAfford ? 'تأكيد حجز واسترداد الكوبون بقيمة النقاط' : 'رصيد نقاطك غير كافٍ للاسترداد'}
+            {canAfford ? t('redeem.confirm') : t('redeem.insufficientTitle')}
           </Button>
         </CardFooter>
       </Card>

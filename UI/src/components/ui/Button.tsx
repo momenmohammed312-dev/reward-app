@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Spinner } from './Spinner';
+import { useApp } from '../../store/AppContext';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'accent' | 'ghost' | 'danger';
@@ -20,6 +21,7 @@ export const Button: React.FC<ButtonProps> = ({
   onClick,
   ...props
 }) => {
+  const { t } = useApp();
   // Styles resolved cleanly to use exclusively CSS variables
   const getVariantStyles = () => {
     switch (variant) {
@@ -63,12 +65,12 @@ export const Button: React.FC<ButtonProps> = ({
         ${getSizeStyles()}
         ${className}
       `}
-      {...props}
+      {...props as any}
     >
       {loading ? (
         <div className="flex items-center justify-center gap-[var(--space-2)]">
           <Spinner size="sm" className="text-current" />
-          <span className="opacity-80">جاري التحميل...</span>
+          <span className="opacity-80">{t('common.loading')}</span>
         </div>
       ) : (
         children

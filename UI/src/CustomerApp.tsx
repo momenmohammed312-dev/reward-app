@@ -23,7 +23,8 @@ const CustomerApp: React.FC = () => {
     activeRedemption,
     setActiveTab,
     setActiveRedemption,
-    setSelectedReward
+    setSelectedReward,
+    t
   } = useApp();
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -42,7 +43,7 @@ const CustomerApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col font-body w-full">
+    <div className="min-h-screen bg-[var(--color-bg)] flex flex-col font-body w-full">
       <div className="flex-1 w-full flex justify-center items-start">
         <AppLayout>
           <AnimatePresence mode="wait">
@@ -68,7 +69,7 @@ const CustomerApp: React.FC = () => {
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 30 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                transition={{ type: 'spring' as const, damping: 25, stiffness: 200 }}
               >
                 <RedeemPage 
                   reward={selectedReward} 
@@ -91,7 +92,7 @@ const CustomerApp: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 180 }}
+                transition={{ type: 'spring' as const, damping: 20, stiffness: 180 }}
               >
                 <RedemptionCode 
                   redemption={activeRedemption}
@@ -101,7 +102,7 @@ const CustomerApp: React.FC = () => {
                     setActiveRedemption(null);
                     setSelectedReward(null);
                   }}
-                  onCopySuccess={() => triggerToast('تم نسخ كود المكافأة بنجاح!', 'success')}
+                  onCopySuccess={() => triggerToast(t('customerApp.copied'), 'success')}
                 />
               </motion.div>
             )}

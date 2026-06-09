@@ -1,11 +1,11 @@
 // src/pages/ProfilePage.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardBody } from '../components/ui/Card';
-import { User, SignOut, Phone, Calendar, Envelope, PencilSimple, Gear } from '@phosphor-icons/react';
+import { User, SignOut, Phone, Calendar, Envelope, PencilSimple, Gear, Translate } from '@phosphor-icons/react';
 import { formatEgyptianPhoneForDisplay } from '../utils/validators';
 
 interface ProfilePageProps {
@@ -27,17 +27,33 @@ const tierStyles: Record<string, string> = {
 };
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
-  const { user, logout, updateProfileName } = useApp();
+  const { user, logout, updateProfileName, language, setLanguage, t } = useApp();
   const [name, setName] = useState(user?.name || '');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const tierStyle = tierStyles[user?.loyaltyTier || 'Bronze'] || 'bg-amber-100 text-amber-700';
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-[var(--space-5)] animate-pulse">
+        <div className="h-3 w-24 bg-[var(--color-border)] rounded" />
+        <div className="h-28 bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
+        <div className="h-64 bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
+      </div>
+    );
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      onShowToast('الاسم الكامل مطلوب لتأكيد الهوية الرقمية', 'error');
+      onShowToast(t('profile.nameRequired'), 'error');
       return;
     }
     
@@ -46,7 +62,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
     updateProfileName(name.trim());
     setEditing(false);
     setSaving(false);
-    onShowToast('تم تحديث بيانات ملفك الشخصي بنجاح!', 'success');
+    onShowToast(t('profile.saveSuccess'), 'success');
   };
 
   return (
@@ -54,10 +70,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
       {/* Page header */}
       <div className="flex flex-col gap-0.5 select-none text-right">
         <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
-          الملف الشخصي
+          {t('profile.title')}
         </h1>
         <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
-          بيانات حسابك في برنامج الولاء
+          {t('profile.subtitle')}
         </p>
       </div>
 
@@ -81,7 +97,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${tierStyle}`}>
                 {user?.loyaltyTier || 'العادي'}
               </span>
-              <span className="text-[9px] text-white/80">عضو منذ {user?.joinDate || '٢٠٢٤/١٢/١٥'}</span>
+              <span className="text-[9px] text-white/80">{t('profile.memberSince')} {user?.joinDate || '٢٠٢٤/١٢/١٥'}</span>
             </div>
           </div>
         </div>
@@ -93,7 +109,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
           <div className="flex justify-between items-center pb-2 border-b border-[var(--color-border)]">
             <div className="flex items-center gap-1.5 text-[var(--text-sm)] font-bold text-[var(--color-text)]">
               <Gear size={15} className="text-[var(--color-primary)] shrink-0" />
-              <span>إعدادات وتعديل الملف الشخصي</span>
+              <span>{t('profile.settings')}</span>
             </div>
             {!editing && (
               <button
@@ -101,7 +117,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                 className="text-[var(--text-xs)] font-bold text-[var(--color-primary)] flex items-center gap-1 cursor-pointer"
               >
                 <PencilSimple size={12} />
-                <span>تعديل</span>
+                <span>{t('profile.edit')}</span>
               </button>
             )}
           </div>
@@ -110,23 +126,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
             {editing ? (
               <>
                 <Input
-                  label="الاسم الكامل"
+                  label={t('profile.nameLabel')}
                   type="text"
-                  placeholder="مثال: أحمد عبد الله الهاشمي"
+                  placeholder={t('profile.namePlaceholder')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={saving}
                   icon={<User size={16} />}
                 />
                 
-                <div className="flex gap-2 w-full pt-1.5">
+                <div className="flex flex-col gap-2 w-full pt-1.5">
                   <Button
                     type="submit"
                     variant="primary"
                     loading={saving}
-                    className="w-2/3 text-[var(--text-xs)] font-bold"
+                    className="w-full py-2.5 text-[var(--text-sm)] font-bold"
                   >
-                    حفظ التغييرات
+                    {t('profile.save')}
                   </Button>
                   <Button
                     type="button"
@@ -136,9 +152,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                       setEditing(false);
                     }}
                     disabled={saving}
-                    className="w-1/3 text-[var(--text-xs)] font-bold border-[var(--color-border)]"
+                    className="w-full py-2 text-[var(--text-xs)] font-bold border-[var(--color-border)] text-[var(--color-text-muted)]"
                   >
-                    إلغاء
+                    {t('profile.cancel')}
                   </Button>
                 </div>
               </>
@@ -148,7 +164,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                 <div className="flex items-center gap-4 text-right">
                   <User size={16} className="text-[var(--color-text-muted)] shrink-0" />
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] text-[var(--color-text-light)]">الاسم المعتمد</span>
+                    <span className="text-[11px] text-[var(--color-text-light)]">{t('profile.nameLabel')}</span>
                     <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] mt-0.5">
                       {user?.name || 'أحمد عبد الله'}
                     </span>
@@ -159,12 +175,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                 <div className="flex items-center gap-4 text-right">
                   <Phone size={16} className="text-[var(--color-text-muted)] shrink-0" />
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] text-[var(--color-text-light)]">مربوط برقم موبايل</span>
+                    <span className="text-[11px] text-[var(--color-text-light)]">{t('profile.phoneLabel')}</span>
                     <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] mt-0.5 number tracking-wide">
                       {user?.phone ? formatEgyptianPhoneForDisplay(user.phone) : '01012345678'}
                     </span>
                     <span className="text-[9px] text-[var(--color-text-light)] opacity-75 mt-0.5">
-                      لتغيير رقم الهاتف، تواصل مع إدارة الكافيه
+                      {t('profile.phoneHint')}
                     </span>
                   </div>
                 </div>
@@ -174,7 +190,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                   <div className="flex items-center gap-4 text-right">
                     <Envelope size={16} className="text-[var(--color-text-muted)] shrink-0" />
                     <div className="flex flex-col leading-tight">
-                      <span className="text-[11px] text-[var(--color-text-light)]">عنوان البريد</span>
+                      <span className="text-[11px] text-[var(--color-text-light)]">{t('profile.email')}</span>
                       <span className="text-[var(--text-sm)] font-semibold text-[var(--color-text)] mt-0.5 font-mono">
                         {user.email}
                       </span>
@@ -186,7 +202,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
                 <div className="flex items-center gap-4 text-right">
                   <Calendar size={16} className="text-[var(--color-text-muted)] shrink-0" />
                   <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] text-[var(--color-text-light)]">تاريخ الانضمام للبرنامج</span>
+                    <span className="text-[11px] text-[var(--color-text-light)]">{t('profile.joinDate')}</span>
                     <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] mt-0.5">
                       {user?.joinDate || '٢٠٢٤/١٢/١٥'}
                     </span>
@@ -198,7 +214,16 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
         </CardBody>
       </Card>
 
-      {/* Logout button layout */}
+      {/* Language Toggle */}
+      <button
+        onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] font-bold text-xs hover:bg-[var(--color-bg)] transition-all cursor-pointer"
+      >
+        <Translate size={16} />
+        <span>{t('profile.switchLang')}</span>
+      </button>
+
+      {/* Logout button */}
       <Button 
         variant="ghost" 
         size="md" 
@@ -206,13 +231,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
         className="text-[var(--color-danger)] border-[rgba(220,38,38,0.2)] hover:bg-red-50 text-[var(--text-xs)] font-bold py-3 text-center flex items-center justify-center gap-2 cursor-pointer mt-2"
       >
         <SignOut size={16} />
-        <span>تسجيل الخروج من الحساب</span>
+        <span>{t('profile.logout')}</span>
       </Button>
 
       {/* MO2 Footer */}
       <div className="text-center pt-4 pb-2 select-none">
         <span className="text-[9px] tracking-widest uppercase font-semibold text-[var(--color-text-light)] opacity-40">
-          Developed by MO2 CAPITAL © 2026
+          Developed by MO2 © 2026
         </span>
       </div>
     </div>

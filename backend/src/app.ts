@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { logger } from './services/logger.js';
 import authRoutes from './routes/authRoutes.js';
 import tenantRoutes from './routes/tenantRoutes.js';
 import loyaltyRoutes from './routes/loyaltyRoutes.js';
@@ -17,6 +18,8 @@ dotenv.config();
 
 const app = express();
 
+app.use(helmet());
+
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
   .map(o => o.trim());
@@ -26,27 +29,14 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, false);
+      callback(new Error('Origin not allowed by CORS'), false);
     }
   },
   credentials: true,
 }));
 
-import { rateLimit } from 'express-rate-limit';
-const otpLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too Many Requests', message: 'حاولت كثيراً. انتظر 10 دقائق وأعد المحاولة.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use('/api/auth/customer/otp', otpLimiter);
-
-app.use(helmet());
-
-app.use('/api/webhooks', express.raw({ type: 'application/json' }));
-app.use(express.json());
+app.use('/api/webhooks', express.raw({ type: 'application/json', limit: '1mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(generalLimiter);
 
 app.use('/api/auth', authRoutes);
@@ -67,8 +57,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
 
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+app.use((_req: express.Request, res: express.Response) => {
+  res.status(404).json({ error: 'Not Found', message: 'The requested route does not exist' });
+});
+
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error('Unhandled error', { error: err.message, stack: err.stack, method: req.method, path: req.path });
   const isDev = process.env.NODE_ENV !== 'production';
   res.status(err.status || 500).json({
     error: 'Internal Server Error',

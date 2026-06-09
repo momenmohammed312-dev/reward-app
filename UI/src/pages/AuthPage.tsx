@@ -12,7 +12,7 @@ import { Phone, ArrowRight, WarningCircle, Lightbulb } from '@phosphor-icons/rea
 import { motion, AnimatePresence } from 'motion/react';
 
 export const AuthPage: React.FC = () => {
-  const { sendOtp, verifyOtp, loadingAuth, authError } = useApp();
+  const { sendOtp, verifyOtp, loadingAuth, authError, t } = useApp();
   
   // Auth navigation step: 'phone' or 'otp'
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -28,12 +28,12 @@ export const AuthPage: React.FC = () => {
     setPhoneError(null);
     
     if (!phone.trim()) {
-      setPhoneError('يرجى كتابة رقم الهاتف للتسجيل');
+      setPhoneError(t('auth.phoneRequired'));
       return;
     }
 
     if (!validateEgyptianPhone(phone)) {
-      setPhoneError('يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678)');
+      setPhoneError(t('auth.phoneInvalid'));
       return;
     }
 
@@ -48,13 +48,13 @@ export const AuthPage: React.FC = () => {
     setOtpError(null);
 
     if (otp.length < 6) {
-      setOtpError('يرجى كتابة الرمز المكون من 6 أرقام كاملاً');
+      setOtpError(t('auth.otpRequired'));
       return;
     }
 
     const success = await verifyOtp(otp);
     if (!success) {
-      setOtpError(authError || 'كود التحقق غير صحيح');
+      setOtpError(authError || t('auth.otpInvalid'));
     }
   };
 
@@ -79,19 +79,19 @@ export const AuthPage: React.FC = () => {
               <CardBody className="flex flex-col gap-[var(--space-4)]">
                 <div className="text-right">
                   <h2 className="text-[var(--text-lg)] font-bold text-[var(--color-text)] mb-1">
-                    أهلاً بك في عالم المكافآت!
+                    {t('auth.phoneTitle')}
                   </h2>
                   <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] leading-relaxed">
-                    سجل دخولك برقم الهاتف لتجميع النقاط الفورية واستعراض كوبونات الخصم الفاخرة المتاحة لك طوال الشهر.
+                    {t('auth.phoneDesc')}
                   </p>
                 </div>
 
                 <form onSubmit={handlePhoneSubmit} className="flex flex-col gap-[var(--space-4)]">
                   <Input
-                    label="رقم الهاتف المحمول"
+                    label={t('auth.phoneLabel')}
                     type="tel"
                     inputMode="tel"
-                    placeholder="01XXXXXXXXX"
+                    placeholder={t('auth.phonePlaceholder')}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/[^0-9+]/g, ''))}
                     error={phoneError}
@@ -111,7 +111,7 @@ export const AuthPage: React.FC = () => {
                     variant="primary" 
                     loading={loadingAuth}
                   >
-                    أرسل كود التحقق OTP
+                    {t('auth.sendOtp')}
                   </Button>
                 </form>
               </CardBody>
@@ -133,15 +133,15 @@ export const AuthPage: React.FC = () => {
                   className="flex items-center gap-1 text-[var(--text-xs)] font-bold text-[var(--color-primary)] hover:opacity-85 outline-none mb-1 self-start cursor-pointer transition-opacity"
                 >
                   <ArrowRight size={14} />
-                  <span>تعديل رقم الهاتف</span>
+                  <span>{t('auth.backToPhone')}</span>
                 </button>
 
                 <div className="text-right">
                   <h2 className="text-[var(--text-lg)] font-bold text-[var(--color-text)] mb-1">
-                    أدخل كود التحقق
+                    {t('auth.otpTitle')}
                   </h2>
                   <p className="text-[var(--text-xs)] text(--color-text-muted) leading-relaxed">
-                    أرسلنا كوداً قصيراً لرقمك المحمول <strong className="number tracking-wider">{formatEgyptianPhoneForDisplay(phone)}</strong>. يرجى إدخال الرمز المكون من 6 أرقام لتأكيد الهوية.
+                    {t('auth.otpDesc').split('{phone}')[0]}<strong className="number tracking-wider">{formatEgyptianPhoneForDisplay(phone)}</strong>{t('auth.otpDesc').split('{phone}')[1]}
                   </p>
                 </div>
 
@@ -163,7 +163,7 @@ export const AuthPage: React.FC = () => {
                       loading={loadingAuth}
                       disabled={otp.length < 6}
                     >
-                      تأكيد كود الـ OTP والدخول
+                      {t('auth.confirmOtp')}
                     </Button>
                     
                     <button
@@ -172,7 +172,7 @@ export const AuthPage: React.FC = () => {
                       disabled={loadingAuth}
                       className="text-[var(--text-xs)] font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-primary)] py-1 mt-1 transition-colors outline-none cursor-pointer"
                     >
-                      لم يصلك الكود؟ إرسال مرة أخرى
+                      {t('auth.resendOtp')}
                     </button>
                   </div>
                 </form>

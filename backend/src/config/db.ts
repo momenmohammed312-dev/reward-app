@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { logger } from '../services/logger.js';
 
 dotenv.config();
 
@@ -8,7 +9,7 @@ const pool = new pg.Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle PostgreSQL client', err);
+  logger.error('Unexpected error on idle PostgreSQL client', { error: err.message });
 });
 
 export default {

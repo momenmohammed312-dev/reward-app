@@ -35,11 +35,11 @@ export const schemas = {
   }),
 
   register: z.object({
-    tenant_id: z.string().uuid('Invalid tenant ID'),
+    tenant_id: z.string().uuid('Invalid tenant ID').optional(),
     email: z.string().email('Invalid email'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     name: z.string().optional(),
-    role: z.enum(['owner', 'manager', 'cashier']).optional(),
+    role: z.enum(['owner', 'manager', 'cashier', 'superadmin']).optional(),
   }),
 
   createReward: z.object({

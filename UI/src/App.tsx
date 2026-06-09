@@ -7,6 +7,8 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { CashierDashboard } from './pages/CashierDashboard';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import CustomerApp from './CustomerApp';
+import { AdminLayout } from './layouts/AdminLayout';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   return (
@@ -24,27 +26,29 @@ const App: React.FC = () => {
         <Route path="/cashier/login" element={<AdminAuthPage role="cashier" />} />
         <Route path="/superadmin/login" element={<AdminAuthPage role="superadmin" />} />
 
-        {/* Protected Admin Routes */}
+        {/* Protected Admin Routes with Layout */}
         <Route path="/admin" element={
           <ProtectedRoute requiredRole="admin">
-            <div className="min-h-screen bg-slate-950 flex flex-col font-body p-6">
+            <AdminLayout>
               <AdminDashboard />
-            </div>
+            </AdminLayout>
           </ProtectedRoute>
         } />
         <Route path="/cashier" element={
           <ProtectedRoute requiredRole="cashier">
-            <div className="min-h-screen bg-slate-950 flex flex-col font-body p-6">
+            <div className="min-h-screen bg-[var(--color-admin-bg)] flex flex-col font-body p-6">
               <CashierDashboard />
             </div>
           </ProtectedRoute>
         } />
         <Route path="/superadmin" element={
+          <ErrorBoundary>
           <ProtectedRoute requiredRole="superadmin">
-            <div className="min-h-screen bg-slate-950 flex flex-col font-body p-6">
+            <div className="min-h-screen bg-[var(--color-admin-bg)] flex flex-col font-body p-6">
               <SuperAdminDashboard />
             </div>
           </ProtectedRoute>
+          </ErrorBoundary>
         } />
       </Routes>
     </BrowserRouter>

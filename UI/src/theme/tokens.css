@@ -1,30 +1,29 @@
-/* src/theme/tokens.css */
 :root {
   /* ——— Brand ——— */
   --brand-name: "أروما كافيه";
   --brand-logo: "https://picsum.photos/seed/aromacafe/120";
 
   /* ——— Colors ——— */
-  --color-primary: #1e40af; /* اللون الرئيسي للكافيه */
-  --color-primary-soft: rgba(30, 64, 175, 0.08); /* نسخة شفافة للخلفيات */
-  --color-accent: #f59e0b; /* لون التمييز / CTAs */
+  --color-primary: #1e40af;
+  --color-primary-soft: rgba(30, 64, 175, 0.08);
+  --color-accent: #f59e0b;
   --color-accent-soft: rgba(245, 158, 11, 0.08);
   --color-success: #059669;
   --color-danger: #dc2626;
   --color-warning: #d97706;
 
   /* ——— Neutrals ——— */
-  --color-bg: #f8fafc; /* خلفية الصفحة */
-  --color-surface: #ffffff; /* خلفية الكروت */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
   --color-border: #e2e8f0;
-  --color-text: #1e293b; /* نص رئيسي */
-  --color-text-muted: #64748b; /* نص ثانوي */
-  --color-text-light: #94a3b8; /* placeholder */
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-text-light: #94a3b8;
 
   /* ——— Typography ——— */
-  --font-display: 'Playfair Display', serif; /* عناوين كبيرة */
-  --font-body: 'Cairo', sans-serif; /* كل النصوص */
-  --font-mono: 'JetBrains Mono', monospace; /* الكودات والأرقام */
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Geist Variable', 'Geist', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
 
   /* ——— Font Sizes ——— */
   --text-xs: 11px;
@@ -66,7 +65,22 @@
   --transition-slow: 400ms cubic-bezier(0.32, 0.72, 0, 1);
 
   /* ——— Layout ——— */
-  --max-width: 420px; /* الموبايل PWA */
+  --max-width: 420px;
   --nav-height: 64px;
   --bottom-nav: 68px;
+
+  /* ——— Admin Theme (dark dashboard palette) ——— */
+  --color-admin-bg: #0f172a;
+  --color-admin-surface: #1e293b;
+  --color-admin-border: #334155;
+  --color-admin-text: #f1f5f9;
+  --color-admin-text-muted: #94a3b8;
+  --color-admin-text-light: #64748b;
+  --color-admin-primary: var(--color-primary);
+  --color-admin-primary-soft: var(--color-primary-soft);
+  --color-admin-accent: var(--color-accent);
+  --color-admin-accent-soft: var(--color-accent-soft);
+  --color-admin-success: var(--color-success);
+  --color-admin-danger: var(--color-danger);
+  --color-admin-warning: var(--color-warning);
 }

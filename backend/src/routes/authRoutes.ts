@@ -13,5 +13,6 @@ router.post('/login', authLimiter, validate(schemas.login), AuthController.login
 router.post('/customer/check', validate(schemas.checkPhone), AuthController.checkCustomerPhone);
 router.post('/customer/otp', authLimiter, validate(schemas.sendOtp), AuthController.requestCustomerOTP);
 router.post('/customer/verify', authLimiter, validate(schemas.verifyOtp), AuthController.verifyCustomerOTP);
+router.post('/customer/refresh', AuthController.refreshCustomerToken);
 
 export default router;

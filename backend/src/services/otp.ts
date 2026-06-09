@@ -1,4 +1,5 @@
 import db from '../config/db.js';
+import { logger } from './logger.js';
 
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10);
 
@@ -10,7 +11,7 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   const sender = process.env.VICTORYLINK_SENDER || 'LoyaltyApp';
 
   if (!username || !password) {
-    console.warn('[SMS] VictoryLink credentials missing — skipping SMS in development');
+    logger.warn('VictoryLink credentials missing — skipping SMS in development');
     return;
   }
 
@@ -38,7 +39,7 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   });
 
   const responseText = await response.text();
-  console.log('[VictoryLink Response]', responseText);
+  logger.debug('VictoryLink response', { responseText });
 
   if (!responseText.includes('<Result>0</Result>')) {
     throw new Error(`VictoryLink SMS failed: ${responseText}`);
@@ -49,10 +50,10 @@ const sendSMS = async (phone: string, code: string) => {
   try {
     const message = `كود التحقق الخاص بك هو: ${code}\nصالح لمدة ${OTP_EXPIRY_MINUTES} دقائق.`;
     await sendVictoryLinkSMS(phone, message);
-    console.log(`[SMS] OTP sent to ${phone} via VictoryLink`);
+    logger.info(`OTP sent to ${phone} via VictoryLink`);
   } catch (err: any) {
-    console.warn(`[SMS] Failed to send via VictoryLink, falling back to console log:`, err.message);
-    console.log(`[SMS SENDER Mock] Sent OTP code ${code} to ${phone}`);
+    logger.warn('Failed to send via VictoryLink, falling back to mock', { error: (err as Error).message });
+    logger.info(`Mock OTP sent to ${phone}`, { code });
   }
 };
 

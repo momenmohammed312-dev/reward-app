@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import db from '../config/db.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+import { logger } from '../services/logger.js';
 
 export class SuperAdminController {
 
@@ -16,7 +17,7 @@ export class SuperAdminController {
       `);
       res.json(result.rows);
     } catch (err: any) {
-      console.error('SuperAdmin tenants error:', err);
+      logger.error('SuperAdmin tenants error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch tenants' });
     }
   }
@@ -39,7 +40,7 @@ export class SuperAdminController {
       );
       res.json({ id, is_active: newStatus });
     } catch (err: any) {
-      console.error('SuperAdmin toggle tenant error:', err);
+      logger.error('SuperAdmin toggle tenant error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to update tenant' });
     }
   }
@@ -56,7 +57,7 @@ export class SuperAdminController {
       `);
       res.json(result.rows);
     } catch (err: any) {
-      console.error('SuperAdmin webhook logs error:', err);
+      logger.error('SuperAdmin webhook logs error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch webhook logs' });
     }
   }
@@ -73,7 +74,7 @@ export class SuperAdminController {
       `);
       res.json(result.rows[0]);
     } catch (err: any) {
-      console.error('SuperAdmin stats error:', err);
+      logger.error('SuperAdmin stats error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch global stats' });
     }
   }

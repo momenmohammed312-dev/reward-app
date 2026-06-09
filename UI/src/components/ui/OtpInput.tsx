@@ -55,36 +55,43 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
   };
 
   return (
-    <div className="flex flex-col gap-[var(--space-2)] items-center w-full">
-      {/* Container is rendered in LTR, elements placed reverse order because of Arabic user flow */}
-      <div className="flex flex-row justify-center gap-[var(--space-2)] w-full" style={{ direction: 'ltr' }}>
+    <div className="flex flex-col gap-[var(--space-3)] items-center w-full">
+      <div className="flex flex-row justify-center gap-3 w-full" style={{ direction: 'ltr' }}>
         {Array(length)
           .fill(0)
-          .map((_, index) => (
-            <input
-              key={index}
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              ref={(el) => {
-                inputsRef.current[index] = el;
-              }}
-              value={digits[index]}
-              onChange={(e) => handleChange(index, e.target.value)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
-              className={`
-                w-10 h-12 text-center text-[var(--text-xl)] font-bold
-                number rounded-[var(--radius-md)] border border-[var(--color-border)]
-                bg-[var(--color-surface)] shadow-[var(--shadow-sm)]
-                focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]
-                outline-none transition-all duration-[var(--transition-fast)]
-                ${error ? 'border-[var(--color-danger)]' : ''}
-              `}
-            />
-          ))}
+          .map((_, index) => {
+            const isFilled = !!digits[index];
+            return (
+              <input
+                key={index}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                ref={(el) => {
+                  inputsRef.current[index] = el;
+                }}
+                value={digits[index]}
+                onChange={(e) => handleChange(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(index, e)}
+                className={`
+                  w-12 h-14 text-center text-[var(--text-xl)] font-black
+                  number rounded-[var(--radius-md)] border-2 outline-none
+                  transition-all duration-[var(--transition-fast)]
+                  ${error
+                    ? 'border-red-400 bg-red-50 text-red-700'
+                    : isFilled
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)]'
+                      : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-primary)]/50'
+                  }
+                  focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:scale-105
+                  shadow-[var(--shadow-sm)]
+                `}
+              />
+            );
+          })}
       </div>
       {error && (
-        <span className="text-[var(--text-xs)] text-[var(--color-danger)] mt-[var(--space-1)] text-center font-sans">
+        <span className="text-[var(--text-xs)] text-[var(--color-danger)] text-center font-sans">
           {error}
         </span>
       )}

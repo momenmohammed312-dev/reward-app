@@ -2,8 +2,15 @@
 
 import React from 'react';
 import { useApp } from '../store/AppContext';
-import { House, Gift, Receipt, User, ArrowClockwise, Storefront, CaretDown, List } from '@phosphor-icons/react';
+import { House, Gift, Receipt, User, List } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
+
+const PulseDot: React.FC = () => (
+  <span className="relative inline-flex h-2 w-2 ml-1">
+    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+  </span>
+);
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -12,23 +19,21 @@ interface AppLayoutProps {
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { 
     currentTenant, 
-    tenants, 
-    selectTenant, 
-    loadingTenant, 
     activeTab, 
     setActiveTab,
     setCurrentSubPage,
     setSelectedReward,
     setActiveRedemption,
-    logout
+    logout,
+    t
   } = useApp();
 
   const navItems = [
-    { id: 'home' as const, label: 'الرئيسية', icon: House },
-    { id: 'menu' as const, label: 'القائمة', icon: List },
-    { id: 'rewards' as const, label: 'مكافآتي', icon: Gift },
-    { id: 'history' as const, label: 'سجل حركاتي', icon: Receipt },
-    { id: 'profile' as const, label: 'حسابي', icon: User },
+    { id: 'home' as const, label: t('nav.home'), icon: House },
+    { id: 'menu' as const, label: t('nav.menu'), icon: List },
+    { id: 'rewards' as const, label: t('nav.rewards'), icon: Gift },
+    { id: 'history' as const, label: t('nav.history'), icon: Receipt },
+    { id: 'profile' as const, label: t('nav.profile'), icon: User },
   ];
 
   const handleTabChange = (tabId: 'home' | 'menu' | 'rewards' | 'history' | 'profile') => {
@@ -39,10 +44,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-900 flex justify-center items-center py-0 sm:py-6 overflow-x-hidden font-body">
+    <div className="min-h-[100dvh] bg-[var(--color-bg)] flex justify-center items-center py-0 sm:py-6 overflow-x-hidden font-body">
       {/* PWA Phone Frame Simulator Wrapper constraint */}
       <div 
-        className="w-full bg-[var(--color-bg)] min-h-[100dvh] sm:min-h-[820px] max-w-[var(--max-width)] sm:rounded-[var(--radius-xl)] sm:border border-[var(--color-border)] shadow-2xl relative flex flex-col overflow-hidden pb-[var(--bottom-nav)]"
+        className="w-full bg-[var(--color-bg)] min-h-[100dvh] sm:min-h-[820px] sm:max-w-[var(--max-width)] sm:rounded-[var(--radius-xl)] sm:border border-[var(--color-border)] shadow-2xl relative flex flex-col overflow-hidden pb-[var(--bottom-nav)]"
         style={{ direction: 'rtl' }}
       >
         {/* Top Header toolbar element */}
@@ -62,39 +67,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          {/* Quick Dynamic Brand Switcher for the SaaS Sandbox */}
-          {import.meta.env.DEV && (
-            <div className="flex items-center gap-1">
-              <label htmlFor="tenant-select" className="sr-only">Switch brand</label>
-              <div className="relative">
-                <select
-                  id="tenant-select"
-                  value={currentTenant.id}
-                  onChange={(e) => selectTenant(e.target.value)}
-                  disabled={loadingTenant}
-                  className="appearance-none bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text)] py-1.5 pr-3 pl-7 rounded-[var(--radius-sm)] text-[11px] font-bold outline-none focus:border-[var(--color-primary)] cursor-pointer"
-                >
-                  {tenants.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                <CaretDown size={12} weight="bold" className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
-              </div>
-              <Storefront size={14} className="text-[var(--color-text-muted)]" weight="duotone" />
-            </div>
-          )}
         </header>
 
         {/* Content canvas */}
         <main className="flex-1 overflow-y-auto px-[var(--space-5)] py-[var(--space-5)]">
-          {loadingTenant ? (
-            <div className="flex flex-col items-center justify-center gap-[var(--space-4)] h-[300px]">
-              <ArrowClockwise size={32} className="text-[var(--color-primary)] animate-spin" />
-              <span className="text-[var(--text-sm)] text-[var(--color-text-muted)] font-bold">جاري تبديل ثيم ونظام الـ POS...</span>
-            </div>
-          ) : (
-            children
-          )}
+          {children}
         </main>
 
         {/* 10. Fixed Bottom Navigation tab bar */}
@@ -117,7 +94,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   <motion.div 
                     layoutId="activeTabIndicator"
                     className="absolute top-0 w-12 h-[3px] rounded-b-full bg-[var(--color-primary)]"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    transition={{ type: 'spring' as const, stiffness: 100, damping: 20 }}
                   />
                 )}
                 
@@ -132,7 +109,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           {/* MO2 branding */}
           <div className="absolute bottom-0 left-0 right-0 text-center pb-0.5 pointer-events-none">
             <span className="text-[8px] tracking-widest uppercase font-semibold text-[var(--color-text-light)] opacity-30">
-              MO2 CAPITAL
+              MO2
             </span>
           </div>
         </nav>

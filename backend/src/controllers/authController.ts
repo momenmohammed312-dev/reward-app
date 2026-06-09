@@ -3,8 +3,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 import { OTPService } from '../services/otp.js';
+import { logger } from '../services/logger.js';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
 
 export class AuthController {
   /**
@@ -49,7 +51,7 @@ export class AuthController {
       if (error.code === '23505') { // Unique constraint violation
         return res.status(409).json({ error: 'Conflict', message: 'User with this email already exists for this tenant' });
       }
-      console.error('Register error', error);
+      logger.error('Register error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -110,7 +112,7 @@ export class AuthController {
         },
       });
     } catch (error) {
-      console.error('Login error', error);
+      logger.error('Login error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -147,7 +149,7 @@ export class AuthController {
         } : null,
       });
     } catch (error) {
-      console.error('Check phone error:', error);
+      logger.error('Check phone error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -197,7 +199,7 @@ export class AuthController {
 
       res.json({ message: 'OTP sent successfully' });
     } catch (error) {
-      console.error('OTP request error', error);
+      logger.error('OTP request error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -247,7 +249,7 @@ export class AuthController {
 
       const customer = customerResult.rows[0];
 
-      // Generate customer JWT token
+      // Generate short-lived access token (1h)
       const token = jwt.sign(
         {
           id: customer.id,
@@ -256,11 +258,19 @@ export class AuthController {
           role: 'customer',
         },
         JWT_SECRET,
-        { expiresIn: '30d' } // Customers stay logged in longer on mobile PWA
+        { expiresIn: '1h' }
+      );
+
+      // Generate long-lived refresh token (30 days)
+      const refreshToken = jwt.sign(
+        { id: customer.id, tenant_id, phone: customer.phone, role: 'customer', type: 'refresh' },
+        JWT_REFRESH_SECRET,
+        { expiresIn: '30d' }
       );
 
       res.json({
         token,
+        refreshToken,
         customer: {
           id: customer.id,
           tenant_id,
@@ -270,8 +280,39 @@ export class AuthController {
         },
       });
     } catch (error) {
-      console.error('OTP verify error', error);
+      logger.error('OTP verify error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
+   * Refresh customer access token using a valid refresh token.
+   */
+  static async refreshCustomerToken(req: Request, res: Response) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ error: 'Missing fields', message: 'refreshToken is required' });
+      }
+
+      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any;
+
+      if (decoded.type !== 'refresh' || decoded.role !== 'customer') {
+        return res.status(403).json({ error: 'Forbidden', message: 'Invalid refresh token' });
+      }
+
+      // Generate new access token (15 min)
+      const newToken = jwt.sign(
+        { id: decoded.id, tenant_id: decoded.tenant_id, phone: decoded.phone, role: 'customer' },
+        JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      res.json({ token: newToken });
+    } catch (error) {
+      logger.error('Refresh token error', { error: (error as Error).message });
+      res.status(401).json({ error: 'Unauthorized', message: 'Invalid or expired refresh token' });
     }
   }
 }

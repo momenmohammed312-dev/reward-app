@@ -3,6 +3,7 @@ import { Tenant, User, Reward, RedeemedReward, Transaction } from '../types';
 import { mockTenants, mockRewards, mockTransactions } from '../services/mockData';
 import { applyTenantTheme } from '../theme/themeLoader';
 import { api } from '../services/api';
+import { t as translate, Language } from '../services/translations';
 
 interface AppContextType {
   // Tenant state
@@ -42,8 +43,13 @@ interface AppContextType {
   setSelectedReward: (reward: Reward | null) => void;
   activeRedemption: RedeemedReward | null;
   setActiveRedemption: (redemption: RedeemedReward | null) => void;
+  selectedTransaction: Transaction | null;
+  setSelectedTransaction: (tx: Transaction | null) => void;
 
   // Global utilities
+  language: 'ar' | 'en';
+  setLanguage: (lang: 'ar' | 'en') => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
   simulateErrorState: (hasError: boolean, msg?: string) => void;
   globalError: string | null;
   refetchData: () => Promise<void>;
@@ -78,6 +84,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [currentSubPage, setCurrentSubPage] = useState<'main' | 'redeem-detail' | 'code-display'>('main');
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [activeRedemption, setActiveRedemption] = useState<RedeemedReward | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('loyalty_lang') as Language) || 'ar';
+  });
+
+  const tFn = (key: string, vars?: Record<string, string | number>) => translate(language, key, vars);
+
+  const handleSetLanguage = (lang: Language) => {
+    setLanguage(lang);
+    localStorage.setItem('loyalty_lang', lang);
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang;
+  };
+
+  // Apply direction/lang on mount
+  useEffect(() => {
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = language;
+  }, [language]);
 
   const [globalError, setGlobalError] = useState<string | null>(null);
 
@@ -454,10 +480,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSelectedReward,
       activeRedemption,
       setActiveRedemption,
+      selectedTransaction,
+      setSelectedTransaction,
 
       simulateErrorState,
       globalError,
-      refetchData
+      refetchData,
+      language,
+      setLanguage: handleSetLanguage,
+      t: tFn,
     }}>
       {children}
     </AppContext.Provider>

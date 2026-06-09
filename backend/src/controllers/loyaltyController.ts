@@ -2,6 +2,7 @@ import { Response } from 'express';
 import db from '../config/db.js';
 import { LoyaltyService } from '../services/loyalty.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+import { logger } from '../services/logger.js';
 
 export class LoyaltyController {
   /**
@@ -50,7 +51,7 @@ export class LoyaltyController {
 
       res.json(result.rows[0]);
     } catch (error: any) {
-      console.error('Update profile error:', error);
+      logger.error('Update profile error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error', message: error.message });
     }
   }
@@ -77,7 +78,7 @@ export class LoyaltyController {
 
       res.json(result.rows);
     } catch (error) {
-      console.error('Ledger history error', error);
+      logger.error('Ledger history error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -116,7 +117,7 @@ export class LoyaltyController {
 
       res.json({ message: 'Points awarded successfully' });
     } catch (error) {
-      console.error('Admin earn error', error);
+      logger.error('Admin earn error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -199,7 +200,7 @@ export class LoyaltyController {
         },
       });
     } catch (error) {
-      console.error('Process redemption error', error);
+      logger.error('Process redemption error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }

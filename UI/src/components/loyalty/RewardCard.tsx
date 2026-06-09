@@ -14,7 +14,7 @@ interface RewardCardProps {
 }
 
 export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick }) => {
-  const { points, setSelectedReward, setCurrentSubPage } = useApp();
+  const { points, setSelectedReward, setCurrentSubPage, t } = useApp();
   const [spotlightCoords, setSpotlightCoords] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const canAfford = points >= reward.pointsRequired;
@@ -34,9 +34,6 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
 
   return (
     <Card 
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
       className="relative flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-card)] overflow-hidden transition-all duration-300 group"
     >
       {/* Spotlight Border Layer */}
@@ -57,8 +54,8 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover brightness-95 group-hover:brightness-100 transition-all duration-[var(--transition-slow)]"
         />
-        <div className="absolute top-3 right-3 flex gap-1 items-center">
-          <span className="bg-white/90 backdrop-blur-sm text-slate-800 text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm border border-white/50">
+        <div className="absolute top-2 right-2 flex gap-1 items-center">
+          <span className="bg-white/95 backdrop-blur-sm text-slate-700 text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs border border-white/60 leading-none">
             {reward.category}
           </span>
         </div>
@@ -89,8 +86,8 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
               <span className="points-value text-[var(--text-md)] font-black text-[var(--color-primary)] number">
                 {reward.pointsRequired.toLocaleString()}
               </span>
-              <span className="text-[10px] font-bold text-[var(--color-text-muted)]">
-                نقطة
+                <span className="text-[10px] font-bold text-[var(--color-text-muted)]">
+                {t('pointsLabel')}
               </span>
             </div>
           </div>
@@ -103,7 +100,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
                 <span className="text-[10px] font-bold text-[var(--color-text-light)] uppercase tracking-wider">Expiry</span>
               </div>
               <span className="text-[11px] font-bold text-[var(--color-text-muted)] number">
-                {reward.expiryDays} يوم
+                {reward.expiryDays} {t('reward.day')}
               </span>
             </div>
           )}
@@ -119,7 +116,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
             onClick={() => onRedeemClick(reward)}
             className="flex-1 text-[var(--text-xs)] font-bold flex items-center justify-center gap-1.5 shadow-sm"
           >
-            <span>استرد الآن</span>
+            <span>{t('reward.redeemNow')}</span>
             <Check size={14} weight="bold" />
           </Button>
         ) : (
@@ -130,7 +127,7 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
             className="flex-1 text-[var(--text-xs)] font-bold bg-[var(--color-primary-soft)] opacity-50 text-[var(--color-primary)] border-transparent flex items-center justify-center gap-1.5"
           >
             <Lock size={14} weight="bold" />
-            <span>يتبقى {formatPoints(reward.pointsRequired - points)} نقطة</span>
+            <span>{t('reward.remaining', { points: formatPoints(reward.pointsRequired - points) })}</span>
           </Button>
         )}
       </CardFooter>

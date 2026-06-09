@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useApp } from '../store/AppContext';
-import { Coffee, Drop, Hamburger, Cake, Star, CurrencyCircleDollar } from '@phosphor-icons/react';
+import { Coffee, Drop, Hamburger, Cake, Star, CurrencyCircleDollar, Info, ShoppingBag, X } from '@phosphor-icons/react';
+import { BottomSheet } from '../components/ui/BottomSheet';
 
 interface MenuItem {
   id: string;
@@ -33,7 +34,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 25 } },
+  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100, damping: 20 } },
 };
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -46,11 +47,34 @@ const categoryIcons: Record<string, React.ReactNode> = {
 
 export const MenuPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const { points } = useApp();
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const { points, t } = useApp();
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 400);
+    return () => clearTimeout(timer);
+  }, []);
 
   const filtered = activeCategory === 'all'
     ? menuItems
     : menuItems.filter(i => i.category === activeCategory);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-[var(--space-5)] animate-pulse">
+        <div className="h-3 w-28 bg-[var(--color-border)] rounded" />
+        <div className="h-8 w-36 bg-[var(--color-border)] rounded-lg" />
+        <div className="flex gap-2">
+          <div className="h-8 w-14 bg-[var(--color-border)] rounded-full" />
+          <div className="h-8 w-24 bg-[var(--color-border)] rounded-full" />
+          <div className="h-8 w-20 bg-[var(--color-border)] rounded-full" />
+        </div>
+        <div className="h-28 bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
+        <div className="h-28 bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -62,10 +86,10 @@ export const MenuPage: React.FC = () => {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none">
         <h1 className="text-[var(--text-2xl)] font-black text-[var(--color-text)] tracking-tight leading-none">
-          قائمة المشروبات
+          {t('menu.title')}
         </h1>
         <p className="text-[10px] tracking-widest font-bold text-[var(--color-text-light)] uppercase">
-          Menu & Offerings
+          {t('menu.subtitle')}
         </p>
       </motion.div>
 
@@ -73,7 +97,7 @@ export const MenuPage: React.FC = () => {
       <motion.div variants={itemVariants} className="flex items-center gap-2 bg-[var(--color-primary-soft)] rounded-xl px-[var(--space-3)] py-[var(--space-2)] self-start">
         <CurrencyCircleDollar size={16} weight="duotone" className="text-[var(--color-primary)]" />
         <span className="text-[11px] font-bold text-[var(--color-text)]">
-          رصيد نقاطك: <span className="number text-[var(--color-primary)]">{points.toLocaleString()}</span>
+          {t('menu.yourPoints')} <span className="number text-[var(--color-primary)]">{points.toLocaleString()}</span>
         </span>
       </motion.div>
 
@@ -87,7 +111,7 @@ export const MenuPage: React.FC = () => {
               : 'bg-[var(--color-surface)] text-[var(--color-text-muted)] border-[var(--color-border)] hover:bg-[var(--color-bg)]'
           }`}
         >
-          الكل
+          {t('menu.all')}
         </button>
         {categories.map(cat => (
           <button
@@ -107,48 +131,99 @@ export const MenuPage: React.FC = () => {
 
       {/* Menu Grid */}
       <motion.div variants={containerVariants} className="grid grid-cols-1 gap-[var(--space-4)] pb-[var(--space-10)]">
-        {filtered.map(item => (
-          <motion.div key={item.id} variants={itemVariants} layout>
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all group">
-              <div className="flex">
-                {/* Image */}
-                <div className="w-28 h-28 shrink-0 overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover brightness-95 group-hover:brightness-100 transition-all duration-300"
-                  />
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 p-[var(--space-3)] flex flex-col justify-between min-w-0">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[var(--text-sm)] font-black text-[var(--color-text)] leading-tight truncate">
-                        {item.name}
-                      </span>
-                      {item.popular && (
-                        <Star size={12} weight="fill" className="text-amber-500 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed">
-                      {item.description}
-                    </p>
+        {filtered.length > 0 ? (
+          filtered.map(item => (
+            <motion.div key={item.id} variants={itemVariants} layout>
+              <div onClick={() => setSelectedItem(item)} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all group cursor-pointer">
+                <div className="flex">
+                  <div className="w-28 h-28 shrink-0 overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-full h-full object-cover brightness-95 group-hover:brightness-100 transition-all duration-300"
+                    />
                   </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-[10px] font-bold text-[var(--color-text-light)] bg-[var(--color-bg)] px-2 py-0.5 rounded">
-                      {item.category}
-                    </span>
-                    <span className="text-[var(--text-md)] font-black text-[var(--color-primary)] number">
-                      {item.price} EGP
-                    </span>
+                  <div className="flex-1 p-[var(--space-3)] flex flex-col justify-between min-w-0">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-sm)] font-black text-[var(--color-text)] leading-tight truncate">
+                          {item.name}
+                        </span>
+                        {item.popular && (
+                          <Star size={12} weight="fill" className="text-amber-500 shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[10px] font-bold text-[var(--color-text-light)] bg-[var(--color-bg)] px-2 py-0.5 rounded">
+                        {item.category}
+                      </span>
+                      <span className="text-[var(--text-md)] font-black text-[var(--color-primary)] number">
+                        {item.price} EGP
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))
+        ) : (
+          <div className="py-16 text-center text-[var(--color-text-light)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-lg)] flex flex-col items-center gap-2">
+            <Info size={36} className="text-slate-300" />
+            <span className="text-[var(--text-sm)] font-bold">{t('menu.empty')}</span>
+            <span className="text-[11px] text-[var(--color-text-muted)]">{t('menu.emptyHint')}</span>
+          </div>
+        )}
       </motion.div>
+
+      {/* Item Detail BottomSheet */}
+      <BottomSheet
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        title={selectedItem?.name || ''}
+      >
+        {selectedItem && (
+          <div className="flex flex-col gap-[var(--space-4)]">
+            <div className="w-full h-44 rounded-[var(--radius-md)] overflow-hidden bg-[var(--color-bg)]">
+              <img
+                src={selectedItem.image}
+                alt={selectedItem.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-[var(--color-text-light)] bg-[var(--color-bg)] px-2 py-0.5 rounded self-start">
+                  {selectedItem.category}
+                </span>
+                <h3 className="text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight">
+                  {selectedItem.name}
+                </h3>
+              </div>
+              <div className="text-left">
+                <span className="text-xl font-black text-[var(--color-primary)] number">
+                  {selectedItem.price} EGP
+                </span>
+              </div>
+            </div>
+            <p className="text-[var(--text-sm)] text-[var(--color-text-muted)] leading-relaxed">
+              {selectedItem.description}
+            </p>
+            <div className="bg-[var(--color-primary-soft)] rounded-[var(--radius-md)] p-[var(--space-3)] flex items-center gap-3">
+              <ShoppingBag size={20} weight="duotone" className="text-[var(--color-primary)] shrink-0" />
+              <div>
+                <p className="text-[11px] font-bold text-[var(--color-text)]">
+                  {t('menu.youEarn', { points: Math.round(selectedItem.price * 1) })}
+                </p>
+                <p className="text-[10px] text-[var(--color-text-muted)]">{t('menu.whenBuy')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
     </motion.div>
   );
 };

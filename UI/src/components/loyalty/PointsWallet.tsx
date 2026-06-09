@@ -35,7 +35,7 @@ interface ScannerModalProps {
 }
 
 export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) => {
-  const { user } = useApp();
+  const { user, t } = useApp();
   const phoneValue = user?.phone || '01012345678';
   
   return (
@@ -56,18 +56,18 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
             initial={{ scale: 0.94, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.94, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            transition={{ type: 'spring' as const, stiffness: 100, damping: 20 }}
             className="relative z-10 w-full max-w-[340px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] p-[var(--space-5)] shadow-2xl flex flex-col items-center gap-[var(--space-4)] text-center select-none"
           >
             {/* Header / Dismiss */}
             <div className="w-full flex justify-between items-center border-b border-[var(--color-border)] pb-3">
               <span className="text-[var(--text-sm)] font-bold text-[var(--color-text)] font-sans">
-                كود بطاقة العميل
+                {t('home.customerCode')}
               </span>
               <button 
                 onClick={onClose}
                 className="p-1.5 rounded-full hover:bg-[var(--color-border)] text-[var(--color-text-muted)] cursor-pointer"
-                aria-label="إغلاق الرمز"
+                aria-label={t('home.closeCode')}
               >
                 <X size={16} weight="bold" />
               </button>
@@ -75,7 +75,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
 
             {/* Subtext description */}
             <p className="text-[11px] text-[var(--color-text-muted)] leading-relaxed">
-              قم بإبراز هذا الكود الثنائي الموحد لمسؤول الكاشير عند المحاسبة لتجميع نقاط الوفاء فور تسجيل الفاتورة بنظام الـ POS.
+              {t('home.codeDescription')}
             </p>
 
             {/* QR Card container */}
@@ -89,7 +89,7 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
                 <span className="code-display text-[var(--text-md)] font-bold tracking-[0.2em] font-mono text-slate-800">
                   {phoneValue ? phoneValue.slice(-7) : '0129482'}
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">صالحة لتجميع وتحديث نقاط الوفاء</span>
+                <span className="text-[10px] text-slate-400 font-medium">{t('home.validFor')}</span>
               </div>
             </div>
 
@@ -97,11 +97,10 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
             <Button 
               variant="ghost" 
               size="md" 
-              fullWidth 
               onClick={onClose}
               className="mt-1 border-[var(--color-border)] text-[var(--color-text)] font-bold py-2.5 hover:bg-[var(--color-primary-soft)]"
             >
-              <span>إغلاق الرمز الرقمي</span>
+              <span>{t('home.closeCode')}</span>
             </Button>
           </motion.div>
         </div>
@@ -115,7 +114,7 @@ interface PointsWalletProps {
 }
 
 export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode }) => {
-  const { currentTenant, user, points } = useApp();
+  const { currentTenant, user, points, t } = useApp();
 
   return (
     <Card className="relative overflow-hidden border border-[var(--color-border)] hover:shadow-[var(--shadow-md)] p-1 bg-[var(--color-surface)]">
@@ -141,27 +140,27 @@ export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode })
           
           <Badge variant="accent" className="px-2.5 py-1 text-[var(--text-xs)] flex items-center gap-1 font-bold">
             <Trophy size={14} weight="fill" />
-            <span>{user?.loyaltyTier || 'الذهبي'}</span>
+            <span>{user?.loyaltyTier || ''}</span>
           </Badge>
         </div>
 
         {/* Big Points counter widget */}
         <div className="flex flex-col items-center justify-center py-[var(--space-1)] text-center">
           <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-medium mb-1">
-            رصيد نقاطك الحالي
+            {t('home.points')}
           </span>
           <div className="flex items-baseline gap-2 direction-ltr justify-center">
             <motion.span 
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+transition={{ type: 'spring' as const, stiffness: 100, damping: 20 }}
               className="points-value text-[var(--text-3xl)] font-semibold text-[var(--color-primary)] tracking-wide leading-none"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {points}
             </motion.span>
             <span className="text-[var(--text-sm)] font-bold text-[var(--color-text-muted)]">
-              نقطة
+              {t('pointsLabel')}
             </span>
           </div>
         </div>
@@ -175,7 +174,7 @@ export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode })
             className="w-full flex items-center justify-center gap-2 border-[var(--color-primary)] text-[var(--color-primary)] font-bold py-3 transition-colors hover:bg-[var(--color-primary-soft)]"
           >
             <QrCode size={18} weight="bold" />
-            <span>امسح رمز العميل للكاشير</span>
+            <span>{t('home.scannerCode')}</span>
           </Button>
         )}
       </div>

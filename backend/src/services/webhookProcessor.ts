@@ -2,6 +2,7 @@ import { Queue, Worker, QueueEvents } from 'bullmq';
 import redisClient from '../config/redis.js';
 import { LoyaltyService } from './loyalty.js';
 import db from '../config/db.js';
+import { logger } from './logger.js';
 
 // Define the Webhook Job interface
 interface WebhookJobPayload {
@@ -35,7 +36,7 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
   'foodics-webhooks',
   async (job) => {
     const { tenantId, eventType, payload, logId } = job.data;
-    console.log(`Processing Webhook Job: ${job.id}, Event: ${eventType}, Tenant: ${tenantId}`);
+    logger.info(`Processing webhook job`, { jobId: job.id, eventType, tenantId });
 
     try {
       // Handle the event based on Foodics specs
@@ -107,7 +108,7 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
         [logId]
       );
     } catch (error: any) {
-      console.error(`Failed processing job ${job.id}:`, error.message);
+      logger.error(`Failed processing job ${job.id}`, { error: (error as Error).message });
       
       // Update webhook log with failure status and error details
       await db.query(
@@ -123,5 +124,5 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
 );
 
 webhookWorker.on('failed', (job, err) => {
-  console.error(`Job ${job?.id} failed permanently: ${err.message}`);
+  logger.error(`Job ${job?.id} failed permanently`, { error: err.message });
 });

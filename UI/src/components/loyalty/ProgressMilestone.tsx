@@ -7,7 +7,7 @@ import { Trophy, Flame, ArrowLeft } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 
 export const ProgressMilestone: React.FC = () => {
-  const { points, rewards, setSelectedReward, setCurrentSubPage } = useApp();
+  const { points, rewards, setSelectedReward, setCurrentSubPage, t } = useApp();
 
   const nextRewards = [...rewards]
     .filter(r => r.pointsRequired > points)
@@ -40,13 +40,13 @@ export const ProgressMilestone: React.FC = () => {
               <Trophy size={20} weight="duotone" />
             </div>
             <div className="flex flex-col text-right">
-              <span className="text-[var(--text-md)] font-black text-[var(--color-text)] leading-tight">
-                {isCompleted ? 'أهنئك! يمكنك استرداد المكافأة الآن' : 'هدفك التالي'}
+              <span className="text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight">
+                {isCompleted ? t('progress.congrats') : t('progress.nextTarget')}
               </span>
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] leading-tight mt-0.5">
-                {isCompleted
-                  ? `أنت مؤهل للحصول على "${activeTarget.title}"`
-                  : `استهدف "${activeTarget.title}"`}
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] opacity-60 leading-tight mt-0.5">
+{isCompleted
+                    ? t('progress.eligible', { title: activeTarget.title })
+                    : t('progress.target', { title: activeTarget.title })}
               </span>
             </div>
           </div>
@@ -56,7 +56,7 @@ export const ProgressMilestone: React.FC = () => {
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-1 text-[11px] font-bold text-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-primary)] hover:text-white transition-all shrink-0 cursor-pointer"
           >
-            <span>التفاصيل</span>
+            <span>{t('progress.details')}</span>
             <ArrowLeft size={14} weight="bold" />
           </motion.button>
         </div>
@@ -67,7 +67,7 @@ export const ProgressMilestone: React.FC = () => {
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${percentage}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+              transition={{ type: 'spring' as const, stiffness: 100, damping: 20 }}
               className={`h-full rounded-full ${isCompleted ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-accent)]'}`}
             />
           </div>
@@ -83,7 +83,7 @@ export const ProgressMilestone: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <Flame size={16} weight="duotone" className="text-[var(--color-accent)]" />
             <span className="text-[11px] font-bold text-[var(--color-text-muted)]">
-              النقاط المتبقية
+              {t('progress.remaining')}
             </span>
           </div>
           <span className="text-[var(--text-md)] font-black text-[var(--color-accent)] number">{pointsRemaining.toLocaleString()}</span>

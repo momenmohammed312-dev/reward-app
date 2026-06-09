@@ -10,5 +10,16 @@ router.get('/customers', authenticateJWT, requireRole(['owner', 'manager']), Adm
 router.get('/rewards', authenticateJWT, requireRole(['owner', 'manager']), AdminController.getRewards);
 router.post('/rewards', authenticateJWT, requireRole(['owner', 'manager']), validate(schemas.createReward), AdminController.createReward);
 router.get('/branches', authenticateJWT, requireRole(['owner', 'manager']), AdminController.getBranches);
+router.post('/branches', authenticateJWT, requireRole(['owner', 'manager']), AdminController.createBranch);
+router.patch('/branches/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.updateBranch);
+router.delete('/branches/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.deleteBranch);
+
+router.patch('/customers/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.updateCustomer);
+router.delete('/customers/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.deleteCustomer);
+
+router.patch('/rewards/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.updateReward);
+router.delete('/rewards/:id', authenticateJWT, requireRole(['owner', 'manager']), AdminController.deleteReward);
+
+router.get('/stats/chart', authenticateJWT, requireRole(['owner', 'manager']), AdminController.getStatsChart);
 
 export default router;

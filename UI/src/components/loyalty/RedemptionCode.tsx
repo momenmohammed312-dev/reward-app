@@ -84,7 +84,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
   onBackToRewards,
   onCopySuccess
 }) => {
-  const { markCodeAsUsed, currentTenant } = useApp();
+  const { markCodeAsUsed, currentTenant, t } = useApp();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [copied, setCopied] = useState(false);
 
@@ -146,7 +146,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
           </div>
           <div className="relative z-10 flex flex-col items-center gap-1.5">
             <span className="text-[var(--text-xs)] tracking-wider font-bold uppercase opacity-80 font-sans">
-              كوبون المكافأة الرقمي
+              {t('code.title')}
             </span>
             <span className="text-[var(--text-xl)] font-bold font-body leading-tight">
               {redemption.rewardTitle}
@@ -165,20 +165,20 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
               <div className="p-4 rounded-full bg-[rgba(5,150,105,0.08)]">
                 <Check size={48} className="animate-pulse" />
               </div>
-              <span className="text-[var(--text-lg)] font-bold">تم استخدام الكوبون بنجاح</span>
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">تم تسجيل المعاملة في سجل حركاتك</span>
+              <span className="text-[var(--text-lg)] font-bold">{t('code.used')}</span>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{t('code.usedDesc')}</span>
             </div>
           ) : isExpired ? (
             <div className="flex flex-col items-center gap-2 py-6 text-[var(--color-danger)]">
-              <span className="text-[var(--text-lg)] font-bold">انتهت صلاحية الرمز</span>
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] mt-1">الرموز صالحة لمدة ساعة واحدة من طلبها</span>
+              <span className="text-[var(--text-lg)] font-bold">{t('code.expired')}</span>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] mt-1">{t('code.expiredDesc')}</span>
             </div>
           ) : (
             <>
               {/* Countdown section */}
               <div className="flex items-center gap-2 bg-[var(--color-primary-soft)] text-[var(--color-primary)] px-4 py-1.5 rounded-full font-bold select-none text-[var(--text-sm)]">
                 <Clock size={15} />
-                <span>صالح للاستخدام خلال:</span>
+                <span>{t('code.validUntil')}</span>
                 <span className="number ml-1 tracking-wider text-[var(--text-md)]" style={{ direction: 'ltr' }}>
                   {formatTimer(timeLeft)}
                 </span>
@@ -193,12 +193,12 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
 
                 {/* Readable numbers layout */}
                 <div className="flex items-center justify-between w-full mt-1">
-                  <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] select-none">كود الاسترداد</span>
+                  <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] select-none">{t('code.redeemCode')}</span>
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={handleCopy}
                       className="p-1.5 rounded-full hover:bg-[var(--color-border)] text-[var(--color-primary)] cursor-pointer"
-                      title="نسخ الكود"
+                      title={t('code.copy')}
                     >
                       <Copy size={16} />
                     </button>
@@ -214,7 +214,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
 
               {/* Instructions text */}
               <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] px-3 leading-relaxed">
-                يُرجى إظهار الرمز الرقمي أعلاه أو إملاءه على الكاشير عند الكاونتر بالفرع لإتمام عملية المسح واستلام وجبتك مجاناً.
+                {t('code.instructions')}
               </p>
             </>
           )}
@@ -223,7 +223,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
         {/* Simulated POS triggers */}
         {!isUsed && !isExpired && (
           <CardFooter className="bg-[var(--color-bg)] border-t border-[var(--color-border)] py-3 px-[var(--space-5)] flex flex-col gap-2">
-            <span className="text-[11px] text-[var(--color-text-muted)] font-medium">تجربة المحاكاة (خاص بالتقييم)</span>
+            <span className="text-[11px] text-[var(--color-text-muted)] font-medium">{t('code.simulate')}</span>
             <Button
               variant="accent"
               size="sm"
@@ -231,7 +231,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
               className="w-full text-[var(--text-xs)] flex items-center justify-center gap-2 shadow-sm font-bold"
             >
               <ArrowsCounterClockwise size={13} className="animate-spin-slow" />
-              <span>محاكاة: مسح الرمز من طرف الكاشير</span>
+              <span>{t('code.scanSim')}</span>
             </Button>
           </CardFooter>
         )}
@@ -243,7 +243,7 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
         onClick={onBackToRewards}
         className="w-full flex items-center justify-center gap-1.5 font-bold border-[var(--color-border)] text-[var(--color-text)]"
       >
-        <span>العودة للمكافآت</span>
+        <span>{t('code.backToRewards')}</span>
       </Button>
     </div>
   );

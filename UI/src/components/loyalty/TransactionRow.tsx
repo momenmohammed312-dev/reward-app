@@ -4,6 +4,7 @@ import React from 'react';
 import { Transaction } from '../../types';
 import { ShoppingBag, Gift, ArrowCounterClockwise } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
+import { useApp } from '../../store/AppContext';
 
 type TxType = 'earn' | 'redeem' | 'refund';
 
@@ -52,8 +53,13 @@ interface TransactionRowProps {
 }
 
 export const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, index = 0, onClick }) => {
+  const { t } = useApp();
   const config = txConfig[transaction.type] || txConfig.earn;
   const Icon = config.icon;
+  const typeLabel =
+    transaction.type === 'earn' ? t('tx.typeEarn') :
+    transaction.type === 'redeem' ? t('tx.typeRedeem') :
+    t('tx.typeRefund');
 
   const formattedDate = new Date(transaction.date).toLocaleDateString('ar-EG', {
     day: '2-digit',
@@ -70,39 +76,39 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, ind
     <motion.div
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05, type: 'spring', stiffness: 280, damping: 28 }}
+      transition={{ delay: index * 0.05, type: 'spring' as const, stiffness: 100, damping: 20 }}
       onClick={() => onClick?.(transaction)}
-      className="flex items-center gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:shadow-sm transition-all duration-200 cursor-pointer"
+      className="flex items-center gap-3 py-3 cursor-pointer border-b border-[var(--color-border)] last:border-b-0 group"
     >
       <div className={`w-9 h-9 rounded-xl ${config.iconBg} ${config.iconColor} flex items-center justify-center shrink-0`}>
         <Icon size={18} weight="duotone" />
       </div>
 
       <div className="flex-1 min-w-0 text-right">
-        <p className="text-[var(--text-sm)] font-bold text-[var(--color-text)] truncate leading-tight">
+        <p className="text-[var(--text-sm)] font-bold text-[var(--color-text)] leading-tight group-hover:text-[var(--color-primary)] transition-colors">
           {transaction.description}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5 justify-end flex-row-reverse">
-          <span className="text-[10px] text-[var(--color-text-muted)] opacity-70">
+          <span className="text-[10px] text-[var(--color-text-muted)]">
             {formattedDate}
           </span>
           {transaction.invoiceNumber && (
             <>
-              <span className="text-[10px] opacity-30">·</span>
-              <span className="text-[10px] text-[var(--color-text-muted)] opacity-50 font-mono">
-                #{transaction.invoiceNumber.slice(-6)}
+              <span className="text-[10px] text-[var(--color-text-light)] mx-0.5">/</span>
+              <span className="text-[10px] text-[var(--color-text-light)] font-mono">
+                {transaction.invoiceNumber.slice(-6)}
               </span>
             </>
           )}
         </div>
       </div>
 
-      <div className={`shrink-0 px-2.5 py-1.5 rounded-xl ${config.pointsBg} flex flex-col items-center min-w-[52px]`}>
+      <div className="shrink-0 flex flex-col items-end">
         <span className={`text-sm font-black ${config.pointsColor} leading-none`}>
-          {config.prefix}{Math.abs(transaction.points).toLocaleString('ar-EG')}
+          {config.prefix}{Math.abs(transaction.points).toLocaleString('en-US')}
         </span>
-        <span className={`text-[9px] font-semibold ${config.pointsColor} opacity-70 mt-0.5`}>
-          نقطة
+        <span className={`text-[9px] font-semibold ${config.pointsColor} opacity-70`}>
+          {t('pointsLabel')}
         </span>
       </div>
     </motion.div>

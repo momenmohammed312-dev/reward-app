@@ -1,6 +1,7 @@
 import app from './app.js';
 import db from './config/db.js';
 import { connectRedis } from './config/redis.js';
+import { logger } from './services/logger.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -10,19 +11,16 @@ const startServer = async () => {
       throw new Error('JWT_SECRET environment variable is required');
     }
 
-    // 1. Check PostgreSQL Database connection
     await db.query('SELECT NOW()');
-    console.log('Connected to PostgreSQL Database successfully');
+    logger.info('Connected to PostgreSQL Database successfully');
 
-    // 2. Connect to Redis
     await connectRedis();
 
-    // 3. Start Listening
     app.listen(PORT, () => {
-      console.log(`Backend server is running on port ${PORT}`);
+      logger.info(`Backend server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to start loyalty platform backend server:', error);
+    logger.error('Failed to start backend server', { error: (error as Error).message });
     process.exit(1);
   }
 };

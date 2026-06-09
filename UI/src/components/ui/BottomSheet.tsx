@@ -46,7 +46,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+            transition={{ type: 'spring' as const, damping: 20, stiffness: 100 }}
             className="fixed bottom-0 left-0 right-0 max-w-[var(--max-width)] mx-auto bg-[var(--color-surface)] rounded-t-[var(--radius-xl)] shadow-[var(--shadow-lg)] z-50 overflow-hidden flex flex-col max-h-[85vh] border-t border-[var(--color-border)]"
           >
             {/* Grab Drag Bar Notch */}

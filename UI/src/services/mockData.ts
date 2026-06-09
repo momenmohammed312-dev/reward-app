@@ -15,8 +15,8 @@ export const mockTenants: Tenant[] = [
     accentColorSoft: 'rgba(245, 158, 11, 0.08)',
     bgColor: '#f8fafc',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Playfair Display',
-    fontBody: 'Cairo',
+    fontDisplay: 'Outfit',
+    fontBody: 'Geist',
   },
   {
     id: 'brew-co',
@@ -30,8 +30,8 @@ export const mockTenants: Tenant[] = [
     accentColorSoft: 'rgba(194, 65, 12, 0.08)',
     bgColor: '#fafaf9',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Playfair Display',
-    fontBody: 'Cairo',
+    fontDisplay: 'Outfit',
+    fontBody: 'Geist',
   },
   {
     id: 'yasmeen',
@@ -45,8 +45,8 @@ export const mockTenants: Tenant[] = [
     accentColorSoft: 'rgba(219, 39, 119, 0.08)',
     bgColor: '#f0fdf4',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Playfair Display',
-    fontBody: 'Cairo',
+    fontDisplay: 'Outfit',
+    fontBody: 'Geist',
   }
 ];
 

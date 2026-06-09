@@ -13,13 +13,13 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
   const [logoError, setLogoError] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-900 flex justify-center items-center py-0 sm:py-6 overflow-x-hidden font-body">
+    <div className="min-h-screen bg-[var(--color-bg)] flex justify-center items-center py-0 sm:py-6 overflow-x-hidden font-body">
       {/* PWA Phone Frame Simulator Wrapper constraint */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full bg-[var(--color-bg)] min-h-screen sm:min-h-[820px] max-w-[var(--max-width)] sm:rounded-[var(--radius-xl)] sm:border border-[var(--color-border)] shadow-2xl relative flex flex-col justify-start overflow-hidden px-[var(--space-6)] pt-10 pb-6 text-right gap-8"
+        className="w-full bg-[var(--color-bg)] min-h-screen sm:min-h-[820px] sm:max-w-[var(--max-width)] sm:rounded-[var(--radius-xl)] sm:border border-[var(--color-border)] shadow-2xl relative flex flex-col justify-start overflow-hidden px-[var(--space-6)] pt-10 pb-6 text-right gap-8"
         style={{ direction: 'rtl' }}
       >
         {/* Smart Logo Block */}
@@ -60,7 +60,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         {/* Footer info */}
         <div className="text-center py-2 select-none mt-auto">
           <span className="text-[9px] tracking-widest uppercase font-semibold text-[var(--color-text-light)] opacity-50">
-            Developed by MO2 CAPITAL © 2026
+            Developed by MO2 © 2026
           </span>
         </div>
       </motion.div>

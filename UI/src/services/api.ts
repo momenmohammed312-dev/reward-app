@@ -167,6 +167,94 @@ class ApiService {
     return response.json();
   }
 
+  async getAdminChartStats() {
+    const response = await fetch(`${API_BASE_URL}/admin/stats/chart`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch chart stats');
+    return response.json();
+  }
+
+  async updateCustomer(id: string, data: { name?: string; tier?: string; is_verified?: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/admin/customers/${id}`, {
+      method: 'PATCH',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update customer');
+    }
+    return response.json();
+  }
+
+  async deleteCustomer(id: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/customers/${id}`, {
+      method: 'DELETE',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to delete customer');
+    return response.json();
+  }
+
+  async updateReward(id: string, data: { title?: string; description?: string; points_required?: number; category?: string; expiry_days?: number; is_active?: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/admin/rewards/${id}`, {
+      method: 'PATCH',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update reward');
+    }
+    return response.json();
+  }
+
+  async deleteReward(id: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/rewards/${id}`, {
+      method: 'DELETE',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to delete reward');
+    return response.json();
+  }
+
+  async createBranch(data: { name: string; city?: string; pos_type?: string }) {
+    const response = await fetch(`${API_BASE_URL}/admin/branches`, {
+      method: 'POST',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create branch');
+    }
+    return response.json();
+  }
+
+  async updateBranch(id: string, data: { name?: string; city?: string; pos_type?: string; is_active?: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/admin/branches/${id}`, {
+      method: 'PATCH',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update branch');
+    }
+    return response.json();
+  }
+
+  async deleteBranch(id: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/branches/${id}`, {
+      method: 'DELETE',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to delete branch');
+    return response.json();
+  }
+
   async adminEarnPoints(data: { customer_id: string; amount: number; note?: string }) {
     const response = await fetch(`${API_BASE_URL}/loyalty/manual-earn`, {
       method: 'POST',

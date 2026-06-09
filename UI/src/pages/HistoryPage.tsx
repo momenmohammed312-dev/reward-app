@@ -26,18 +26,25 @@ const itemVariants = {
     opacity: 1, 
     y: 0, 
     transition: { 
-      type: 'spring', 
-      stiffness: 260, 
-      damping: 25 
+      type: 'spring' as const, 
+      stiffness: 100, 
+      damping: 20 
     } 
   }
 };
 
 export const HistoryPage: React.FC = () => {
-  const { transactions, redeemedRewards, currentTenant, setActiveRedemption, setCurrentSubPage } = useApp();
+  const { transactions, redeemedRewards, currentTenant, setActiveRedemption, setCurrentSubPage, selectedTransaction, setSelectedTransaction, t, language } = useApp();
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'tx' | 'vouchers'>('tx');
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(selectedTransaction);
+
+  useEffect(() => {
+    if (selectedTransaction) {
+      setActiveSubTab('tx');
+      setSelectedTransaction(null);
+    }
+  }, [selectedTransaction]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -78,10 +85,10 @@ export const HistoryPage: React.FC = () => {
         {/* Page header */}
         <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none text-right">
           <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
-            سجل الحركات
+            {t('history.title')}
           </h1>
           <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
-            تاريخ جميع عمليات الشراء والاستبدال
+            {t('history.subtitle')}
           </p>
         </motion.div>
 
@@ -96,7 +103,7 @@ export const HistoryPage: React.FC = () => {
               }
             `}
           >
-            سجل المعاملات المباشرة
+            {t('history.tx')}
           </button>
           <button
             onClick={() => setActiveSubTab('vouchers')}
@@ -107,7 +114,7 @@ export const HistoryPage: React.FC = () => {
               }
             `}
           >
-            الكوبونات المستردة ({redeemedRewards.length})
+            {t('history.vouchers', { count: redeemedRewards.length })}
           </button>
         </motion.div>
 
@@ -120,7 +127,7 @@ export const HistoryPage: React.FC = () => {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0 }}
-              className="flex flex-col gap-[var(--space-3)]"
+              className="flex flex-col"
             >
               {transactions.length > 0 ? (
                 transactions.map((tx, i) => (
@@ -131,8 +138,8 @@ export const HistoryPage: React.FC = () => {
               ) : (
                 <div className="py-20 text-center text-[var(--color-text-light)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-lg)] flex flex-col items-center gap-2">
                   <Receipt size={40} className="text-slate-300" />
-                  <span className="text-[var(--text-sm)] font-bold">السجل نظيف تماماً</span>
-                  <span className="text-[11px] text-[var(--color-text-muted)]">لم تقم بأي عمليات شراء مع العلامة بعد للمحاكاة.</span>
+                  <span className="text-[var(--text-sm)] font-bold">{t('history.empty')}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)]">{t('history.emptyHint')}</span>
                 </div>
               )}
             </motion.div>
@@ -143,7 +150,7 @@ export const HistoryPage: React.FC = () => {
               initial="hidden"
               animate="show"
               exit={{ opacity: 0 }}
-              className="flex flex-col gap-[var(--space-3)]"
+              className="flex flex-col"
             >
               {redeemedRewards.length > 0 ? (
                 redeemedRewards.map((voucher) => {
@@ -154,7 +161,7 @@ export const HistoryPage: React.FC = () => {
                       key={voucher.code}
                       variants={itemVariants}
                       onClick={() => handleVoucherClick(voucher)}
-                      className="flex justify-between items-center py-3.5 px-4 border border-[var(--color-border)] bg-[var(--color-surface)] rounded-[var(--radius-md)] hover:bg-[var(--color-bg)] transition-colors select-none cursor-pointer text-right group"
+                      className="flex justify-between items-center py-3.5 border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--color-bg)] -mx-[var(--space-5)] px-[var(--space-5)] transition-colors select-none cursor-pointer text-right group"
                     >
                       <div className="flex items-center gap-3">
                         <div 
@@ -166,7 +173,7 @@ export const HistoryPage: React.FC = () => {
                             {voucher.rewardTitle}
                           </span>
                           <div className="flex gap-2 items-center text-[var(--text-xs)] text-[var(--color-text-light)]">
-                            <span>كود: <strong className="number tracking-wider font-mono">{voucher.code}</strong></span>
+                            <span>{t('history.code')}: <strong className="number tracking-wider font-mono">{voucher.code}</strong></span>
                           </div>
                         </div>
                       </div>
@@ -175,19 +182,19 @@ export const HistoryPage: React.FC = () => {
                         {isActive ? (
                           <Badge variant="success" className="font-bold flex items-center gap-1.5 pl-2.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-dot-breath shrink-0" />
-                            <span>نشط ومتاح</span>
+                            <span>{t('history.active')}</span>
                           </Badge>
                         ) : isUsed ? (
                           <Badge variant="muted" className="opacity-70">
-                            <span>مستعمل</span>
+                            <span>{t('history.used')}</span>
                           </Badge>
                         ) : (
                           <Badge variant="danger" className="opacity-70">
-                            <span>منتهي صلاحية</span>
+                            <span>{t('history.expired')}</span>
                           </Badge>
                         )}
                         <span className="text-[11px] points-value font-mono font-bold text-[var(--color-text-muted)] mt-0.5">
-                          -{voucher.pointsSpent} ن
+                          {t('history.voucherPoints', { points: voucher.pointsSpent })}
                         </span>
                       </div>
                     </motion.div>
@@ -196,8 +203,8 @@ export const HistoryPage: React.FC = () => {
               ) : (
                 <div className="py-20 text-center text-[var(--color-text-light)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-lg)] flex flex-col items-center gap-2">
                   <ClipboardText size={40} className="text-slate-300" />
-                  <span className="text-[var(--text-sm)] font-bold">لا كوبونات مستبدلة</span>
-                  <span className="text-[11px] text-[var(--color-text-muted)]">توجه لكتالوج المكافآت لاستبدال نقاطك التراكمية.</span>
+                  <span className="text-[var(--text-sm)] font-bold">{t('history.voucherEmpty')}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)]">{t('history.voucherEmptyHint')}</span>
                 </div>
               )}
             </motion.div>
@@ -209,7 +216,7 @@ export const HistoryPage: React.FC = () => {
       <BottomSheet
         isOpen={!!selectedTx}
         onClose={() => setSelectedTx(null)}
-        title="تفاصيل المعاملة"
+        title={t('history.detailTitle')}
       >
         {selectedTx && (
           <div className="flex flex-col gap-[var(--space-4)]">
@@ -228,8 +235,8 @@ export const HistoryPage: React.FC = () => {
                   {selectedTx.description}
                 </p>
                 <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
-                  {selectedTx.type === 'earn' ? 'نقاط مكتسبة' :
-                   selectedTx.type === 'redeem' ? 'نقاط مستبدلة' : 'نقاط مسترجعة'}
+                  {selectedTx.type === 'earn' ? t('earn') :
+                   selectedTx.type === 'redeem' ? t('redeem') : t('refund')}
                 </p>
               </div>
               <div className={`shrink-0 px-3 py-2 rounded-xl font-black ${
@@ -244,22 +251,28 @@ export const HistoryPage: React.FC = () => {
 
             <div className="flex flex-col gap-[var(--space-3)]">
               <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
-                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">التاريخ</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.date')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
-                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">الوقت</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.time')}</span>
               </div>
+              {selectedTx.amount && selectedTx.type === 'earn' && (
+                <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
+                  <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-mono">{selectedTx.amount} {t('sr')}</span>
+                  <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.amount')}</span>
+                </div>
+              )}
               {selectedTx.invoiceNumber && (
                 <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
                   <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-mono">{selectedTx.invoiceNumber}</span>
-                  <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">رقم الفاتورة</span>
+                  <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.invoice')}</span>
                 </div>
               )}
               <div className="flex justify-between items-center py-2">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{Math.abs(selectedTx.points)} نقطة</span>
-                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">قيمة المعاملة</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{Math.abs(selectedTx.points)} {t('pointsLabel')}</span>
+                <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{selectedTx.type === 'earn' ? t('history.pointsEarned') : t('history.pointsUsed')}</span>
               </div>
             </div>
           </div>

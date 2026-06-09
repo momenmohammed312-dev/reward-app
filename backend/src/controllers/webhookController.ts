@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import db from '../config/db.js';
 import { webhookQueue } from '../services/webhookProcessor.js';
-
 import crypto from 'crypto';
+import { logger } from '../services/logger.js';
 
 export class WebhookController {
   /**
@@ -29,11 +29,11 @@ export class WebhookController {
           .digest('hex');
 
         if (signature !== expectedSig) {
-          console.warn('[Webhook] Invalid Foodics signature. Rejecting request.');
+          logger.warn('[Webhook] Invalid Foodics signature. Rejecting request.');
           return res.status(401).json({ error: 'Invalid signature' });
         }
       } else {
-        console.warn('[Webhook] FOODICS_WEBHOOK_SECRET not set — skipping signature check');
+        logger.warn('[Webhook] FOODICS_WEBHOOK_SECRET not set — skipping signature check');
       }
 
       const payload = typeof req.body === 'string' || req.body instanceof Buffer ? JSON.parse(rawBody) : req.body;
@@ -64,7 +64,7 @@ export class WebhookController {
         log_id: logId,
       });
     } catch (error: any) {
-      console.error('Webhook reception error:', error);
+      logger.error('Webhook reception error:', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error', message: error.message });
     }
   }

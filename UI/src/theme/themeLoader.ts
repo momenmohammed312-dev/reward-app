@@ -1,4 +1,3 @@
-// src/theme/themeLoader.ts
 import { Tenant } from '../types';
 
 export const applyTenantTheme = (tenant: Tenant | null | undefined): void => {
@@ -11,8 +10,8 @@ export const applyTenantTheme = (tenant: Tenant | null | undefined): void => {
     '--color-accent-soft': 'rgba(245, 158, 11, 0.08)',
     '--color-bg': '#f8fafc',
     '--color-surface': '#ffffff',
-    '--font-display': "'Playfair Display', serif",
-    '--font-body': "'Cairo', sans-serif",
+    '--font-display': "'Outfit', sans-serif",
+    '--font-body': "'Geist Variable', 'Geist', sans-serif",
   };
 
   Object.entries(defaults).forEach(([key, val]) => root.style.setProperty(key, val));
@@ -36,10 +35,9 @@ export const applyTenantTheme = (tenant: Tenant | null | undefined): void => {
   if (tenant.bgColor) root.style.setProperty('--color-bg', tenant.bgColor);
   if (tenant.surfaceColor) root.style.setProperty('--color-surface', tenant.surfaceColor);
   if (tenant.fontDisplay)
-    root.style.setProperty('--font-display', `'${tenant.fontDisplay}', serif`);
+    root.style.setProperty('--font-display', `'${tenant.fontDisplay}', sans-serif`);
   if (tenant.fontBody)
     root.style.setProperty('--font-body', `'${tenant.fontBody}', sans-serif`);
   if (tenant.name) root.style.setProperty('--brand-name', tenant.name);
   if (tenant.logo) root.style.setProperty('--brand-logo', `url(${tenant.logo})`);
 };
-

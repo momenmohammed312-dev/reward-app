@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store/AppContext';
 import { RewardCard } from '../components/loyalty/RewardCard';
-import { Coins, ShieldWarning, Info, Gift } from '@phosphor-icons/react';
+import { Info, Gift } from '@phosphor-icons/react';
 import { Reward } from '../types';
 import { motion } from 'motion/react';
 
@@ -28,15 +28,15 @@ const itemVariants = {
     opacity: 1, 
     y: 0, 
     transition: { 
-      type: 'spring', 
-      stiffness: 260, 
-      damping: 25 
+      type: 'spring' as const, 
+      stiffness: 100, 
+      damping: 20 
     } 
   }
 };
 
 export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger }) => {
-  const { rewards, points, currentTenant } = useApp();
+  const { rewards, points, currentTenant, t } = useApp();
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
@@ -83,34 +83,39 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
       {/* Page Title */}
       <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none">
         <h1 className="text-[var(--text-2xl)] font-black text-[var(--color-text)] tracking-tight leading-none">
-          كتالوج المكافآت
+          {t('rewards.title')}
         </h1>
         <p className="text-[10px] tracking-widest font-bold text-[var(--color-text-light)] uppercase">
-          Rewards Catalog
+          {t('rewards.subtitle')}
         </p>
       </motion.div>
 
       {/* Points Balance Card */}
       <motion.div
         variants={itemVariants}
-        className="relative overflow-hidden rounded-[var(--radius-lg)] p-5 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] text-white shadow-lg select-none"
+        className="relative p-[2px] rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] shadow-lg select-none"
       >
-        <div className="absolute -top-5 -left-5 w-24 h-24 rounded-full bg-white/10" />
-        <div className="absolute -bottom-8 -right-3 w-32 h-32 rounded-full bg-white/5" />
-        <div className="relative z-10 flex items-center justify-between">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">YOUR BALANCE</p>
-            <motion.p 
-              key={points} 
-              initial={{ opacity: 0, y: -6 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              className="text-4xl font-black tracking-tight leading-none number"
-            >
-              {points.toLocaleString('ar-EG')}
-            </motion.p>
-            <p className="text-[11px] opacity-70 font-bold">نقطة متاحة للاستبدال</p>
+        <div className="rounded-[calc(var(--radius-lg)-2px)] bg-[var(--color-surface)] p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.15em]">Live Balance</span>
+              </div>
+              <motion.p 
+                key={points} 
+                initial={{ opacity: 0, y: -6 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                className="text-4xl font-black text-[var(--color-text)] tracking-tight leading-none number"
+              >
+                {points.toLocaleString('en-US')}
+              </motion.p>
+              <p className="text-[10px] font-bold text-[var(--color-text-light)]">{t('rewards.pointsAvailable')}</p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-[var(--color-primary-soft)] flex items-center justify-center">
+              <Gift size={24} className="text-[var(--color-primary)]" weight="duotone" />
+            </div>
           </div>
-          <Gift size={48} className="opacity-20" weight="duotone" />
         </div>
       </motion.div>
 
@@ -128,7 +133,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
               }
             `}
           >
-            {cat === 'all' ? 'الكل' : cat}
+            {cat === 'all' ? t('rewards.all') : cat}
           </button>
         ))}
       </motion.div>
@@ -147,8 +152,8 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
         ) : (
           <div className="py-16 text-center text-[var(--color-text-light)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-lg)] flex flex-col items-center gap-2">
             <Info size={36} className="text-slate-300" />
-            <span className="text-[var(--text-sm)] font-bold">عذراً، الكتالوج فارغ حالياً!</span>
-            <span className="text-[11px] text-[var(--color-text-muted)]">لا توجد مكافآت مسجلة في هذا القسم.</span>
+                  <span className="text-[var(--text-sm)] font-bold">{t('rewards.empty')}</span>
+                  <span className="text-[11px] text-[var(--color-text-muted)]">{t('rewards.emptyHint')}</span>
           </div>
         )}
       </motion.div>

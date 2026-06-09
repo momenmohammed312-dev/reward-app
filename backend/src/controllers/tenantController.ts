@@ -2,6 +2,7 @@ import { Response } from 'express';
 import crypto from 'crypto';
 import db from '../config/db.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+import { logger } from '../services/logger.js';
 
 export class TenantController {
   /**
@@ -20,7 +21,7 @@ export class TenantController {
       }
       res.json(result.rows[0]);
     } catch (err: any) {
-      console.error('Public tenant error:', err);
+      logger.error('Public tenant error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -60,7 +61,7 @@ export class TenantController {
       if (error.code === '23505') { // Unique slug violation
         return res.status(409).json({ error: 'Conflict', message: 'A cafe with this slug already exists' });
       }
-      console.error('Create tenant error', error);
+      logger.error('Create tenant error', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -86,7 +87,7 @@ export class TenantController {
 
       res.json(result.rows[0]);
     } catch (error) {
-      console.error('Get tenant error', error);
+      logger.error('Get tenant error', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -115,7 +116,7 @@ export class TenantController {
 
       res.status(201).json({ message: 'Branch created successfully', branch: result.rows[0] });
     } catch (error) {
-      console.error('Create branch error', error);
+      logger.error('Create branch error', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -136,7 +137,7 @@ export class TenantController {
 
       res.json(result.rows);
     } catch (error) {
-      console.error('Get branches error', error);
+      logger.error('Get branches error', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -169,7 +170,7 @@ export class TenantController {
 
       res.json({ message: 'API key regenerated successfully', branch: result.rows[0] });
     } catch (error) {
-      console.error('Regenerate API key error', error);
+      logger.error('Regenerate API key error', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   }
