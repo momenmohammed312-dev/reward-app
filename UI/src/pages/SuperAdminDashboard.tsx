@@ -87,10 +87,6 @@ export const SuperAdminDashboard: React.FC = () => {
   };
 
   return (
-    <>
-    <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white text-xs p-2 text-center font-bold">
-      SuperAdminDashboard DEBUG: RENDERED OK
-    </div>
     <div className="w-full text-[var(--color-admin-text)] flex flex-col gap-6" style={{ direction: 'rtl' }}>
       {/* Title bar */}
       <div className="flex items-center justify-between bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl">
@@ -374,6 +370,5 @@ export const SuperAdminDashboard: React.FC = () => {
         </motion.div>
       </AnimatePresence>
     </div>
-    </>
   );
 };

@@ -136,12 +136,27 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminCustomers() {
-    const response = await fetch(`${API_BASE_URL}/admin/customers`, {
+  async getAdminCustomers(params?: { name?: string; phone?: string; page?: number; limit?: number }) {
+    const query = new URLSearchParams();
+    if (params?.name) query.set('name', params.name);
+    if (params?.phone) query.set('phone', params.phone);
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    const response = await fetch(`${API_BASE_URL}/admin/customers${qs ? '?' + qs : ''}`, {
       method: 'GET',
       headers: this.getAdminHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch customers');
+    return response.json();
+  }
+
+  async getAdminRewards() {
+    const response = await fetch(`${API_BASE_URL}/admin/rewards`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch rewards');
     return response.json();
   }
 
@@ -176,7 +191,7 @@ class ApiService {
     return response.json();
   }
 
-  async updateCustomer(id: string, data: { name?: string; tier?: string; is_verified?: boolean }) {
+  async updateCustomer(id: string, data: { name?: string; phone?: string; tier?: string; is_verified?: boolean }) {
     const response = await fetch(`${API_BASE_URL}/admin/customers/${id}`, {
       method: 'PATCH',
       headers: this.getAdminHeaders(),
@@ -220,11 +235,11 @@ class ApiService {
     return response.json();
   }
 
-  async createBranch(data: { name: string; city?: string; pos_type?: string }) {
+  async createBranch(data: { name: string; city?: string; posType?: string; timezone?: string; openingTime?: string; closingTime?: string }) {
     const response = await fetch(`${API_BASE_URL}/admin/branches`, {
       method: 'POST',
       headers: this.getAdminHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({ name: data.name, city: data.city, pos_type: data.posType, timezone: data.timezone, opening_time: data.openingTime || null, closing_time: data.closingTime || null }),
     });
     if (!response.ok) {
       const errorData = await response.json();
@@ -233,11 +248,11 @@ class ApiService {
     return response.json();
   }
 
-  async updateBranch(id: string, data: { name?: string; city?: string; pos_type?: string; is_active?: boolean }) {
+  async updateBranch(id: string, data: { name?: string; city?: string; posType?: string; is_active?: boolean; timezone?: string; openingTime?: string; closingTime?: string }) {
     const response = await fetch(`${API_BASE_URL}/admin/branches/${id}`, {
       method: 'PATCH',
       headers: this.getAdminHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({ name: data.name, city: data.city, pos_type: data.posType, is_active: data.is_active, timezone: data.timezone, opening_time: data.openingTime || null, closing_time: data.closingTime || null }),
     });
     if (!response.ok) {
       const errorData = await response.json();
@@ -264,6 +279,29 @@ class ApiService {
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'فشل منح النقاط');
+    }
+    return response.json();
+  }
+
+  // --- TENANT SETTINGS ---
+  async getTenantSettings() {
+    const response = await fetch(`${API_BASE_URL}/tenants/me`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch settings');
+    return response.json();
+  }
+
+  async updateTenantSettings(data: Record<string, any>) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me`, {
+      method: 'PATCH',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.message || 'Failed to update settings');
     }
     return response.json();
   }

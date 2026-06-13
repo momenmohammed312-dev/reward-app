@@ -6,7 +6,7 @@ import { OTPService } from '../services/otp.js';
 import { logger } from '../services/logger.js';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
-const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || (() => { throw new Error('FATAL: JWT_REFRESH_SECRET environment variable is not set'); })();
 
 export class AuthController {
   /**
@@ -134,7 +134,7 @@ export class AuthController {
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = String(tenantCheck.rows[0].id);
+      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
       const customer = await db.query(
         'SELECT id, name, tier FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
@@ -176,7 +176,7 @@ export class AuthController {
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = String(tenantCheck.rows[0].id);
+      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
       // Find or create customer
       let customerResult = await db.query(
@@ -226,7 +226,7 @@ export class AuthController {
       if (tenantCheck.rows.length === 0) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = String(tenantCheck.rows[0].id);
+      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
       // Verify OTP
       const isValid = await OTPService.verifyOTP(resolvedTenantId, phone, code);
@@ -253,7 +253,7 @@ export class AuthController {
       const token = jwt.sign(
         {
           id: customer.id,
-          tenant_id,
+          tenant_id: resolvedTenantId,
           phone: customer.phone,
           role: 'customer',
         },
@@ -263,7 +263,7 @@ export class AuthController {
 
       // Generate long-lived refresh token (30 days)
       const refreshToken = jwt.sign(
-        { id: customer.id, tenant_id, phone: customer.phone, role: 'customer', type: 'refresh' },
+        { id: customer.id, tenant_id: resolvedTenantId, phone: customer.phone, role: 'customer', type: 'refresh' },
         JWT_REFRESH_SECRET,
         { expiresIn: '30d' }
       );

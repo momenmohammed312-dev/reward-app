@@ -16,13 +16,20 @@ export class WebhookController {
         return res.status(400).json({ error: 'Missing tenant identifier' });
       }
 
-      // Verify signature
-      const webhookSecret = process.env.FOODICS_WEBHOOK_SECRET;
       const rawBody = req.body instanceof Buffer ? req.body.toString('utf8') : JSON.stringify(req.body);
-      
+
+      const signatureHeader = req.headers['x-foodics-signature'] || '';
+      const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+
+      // Try per-tenant HMAC key from branch API keys, fall back to global secret
+      const branchRes = await db.query(
+        `SELECT api_key FROM branches WHERE tenant_id = $1::uuid AND is_active = true AND api_key IS NOT NULL LIMIT 1`,
+        [tenant_id]
+      );
+      const branchKey = branchRes.rows[0]?.api_key;
+      const webhookSecret = branchKey || process.env.FOODICS_WEBHOOK_SECRET;
+
       if (webhookSecret) {
-        const signatureHeader = req.headers['x-foodics-signature'] || '';
-        const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
         const expectedSig = crypto
           .createHmac('sha256', webhookSecret)
           .update(rawBody)
@@ -33,7 +40,7 @@ export class WebhookController {
           return res.status(401).json({ error: 'Invalid signature' });
         }
       } else {
-        logger.warn('[Webhook] FOODICS_WEBHOOK_SECRET not set — skipping signature check');
+        logger.warn('[Webhook] No HMAC secret configured — skipping signature check');
       }
 
       const payload = typeof req.body === 'string' || req.body instanceof Buffer ? JSON.parse(rawBody) : req.body;

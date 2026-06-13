@@ -8,6 +8,7 @@ const router = Router();
 router.get('/public/:slug', TenantController.getTenantBySlug);
 router.post('/', authenticateJWT, TenantController.createTenant);
 router.get('/me', authenticateJWT, TenantController.getTenant);
+router.patch('/me', authenticateJWT, TenantController.updateTenant);
 router.post('/branches', authenticateJWT, validate(schemas.createBranch), TenantController.createBranch);
 router.get('/branches', authenticateJWT, TenantController.getBranches);
 router.post('/branches/:branch_id/regenerate-key', authenticateJWT, TenantController.regenerateBranchApiKey);

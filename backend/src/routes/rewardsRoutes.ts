@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import db from '../config/db.js';
+import { logger } from '../services/logger.js';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.get('/', async (req: Request, res: Response) => {
     `, [tenantId]);
     res.json(result.rows);
   } catch (err: any) {
-    console.error('Public rewards error:', err);
+    logger.error('Public rewards error:', { error: (err as Error).message });
     res.status(500).json({ error: 'Failed to fetch rewards' });
   }
 });

@@ -32,7 +32,7 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   </MessageData>
 </SMS>`;
 
-  const response = await fetch('http://www.victorylink.com/VictoryLink_WebService/SmsSend.asmx/XML_SendSMS', {
+  const response = await fetch('https://www.victorylink.com/VictoryLink_WebService/SmsSend.asmx/XML_SendSMS', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `xml_request=${encodeURIComponent(xmlBody)}`,
@@ -84,47 +84,42 @@ export class OTPService {
    * Returns true if valid, false if invalid/expired.
    */
   static async verifyOTP(tenantId: string, phone: string, code: string): Promise<boolean> {
-    // Get the latest unused OTP code for this phone and tenant
+    // Atomically verify and consume the OTP in a single transaction to prevent race conditions
     const result = await db.query(
-      `SELECT * FROM otp_codes
-       WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [tenantId, phone]
+      `UPDATE otp_codes
+       SET used_at = NOW(), attempts = attempts + 1
+       WHERE id = (
+         SELECT id FROM otp_codes
+         WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
+           AND expires_at > NOW()
+           AND attempts < max_attempts
+           AND code = $3
+         ORDER BY created_at DESC
+         LIMIT 1
+         FOR UPDATE
+       )
+       RETURNING id`,
+      [tenantId, phone, code]
     );
 
-    if (result.rows.length === 0) {
-      return false;
+    if (result.rows.length > 0) {
+      return true;
     }
 
-    const otpRecord = result.rows[0];
-
-    // Check if code has expired
-    if (new Date() > new Date(otpRecord.expires_at)) {
-      return false;
-    }
-
-    // Check if max attempts reached
-    if (otpRecord.attempts >= otpRecord.max_attempts) {
-      return false;
-    }
-
-    // Check code correctness
-    if (otpRecord.code !== code) {
-      // Increment attempts
-      await db.query(
-        `UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`,
-        [otpRecord.id]
-      );
-      return false;
-    }
-
-    // Mark as used
+    // Code was wrong, expired, or max attempts reached — increment attempts on any matching record
     await db.query(
-      `UPDATE otp_codes SET used_at = NOW() WHERE id = $1`,
-      [otpRecord.id]
+      `UPDATE otp_codes
+       SET attempts = attempts + 1
+       WHERE id = (
+         SELECT id FROM otp_codes
+         WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
+           AND code != $3
+         ORDER BY created_at DESC
+         LIMIT 1
+       )`,
+      [tenantId, phone, code]
     );
 
-    return true;
+    return false;
   }
 }

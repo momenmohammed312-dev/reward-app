@@ -140,7 +140,7 @@ export const AuthPage: React.FC = () => {
                   <h2 className="text-[var(--text-lg)] font-bold text-[var(--color-text)] mb-1">
                     {t('auth.otpTitle')}
                   </h2>
-                  <p className="text-[var(--text-xs)] text(--color-text-muted) leading-relaxed">
+                  <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] leading-relaxed">
                     {t('auth.otpDesc').split('{phone}')[0]}<strong className="number tracking-wider">{formatEgyptianPhoneForDisplay(phone)}</strong>{t('auth.otpDesc').split('{phone}')[1]}
                   </p>
                 </div>

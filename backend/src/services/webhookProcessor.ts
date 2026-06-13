@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import redisClient from '../config/redis.js';
 import { LoyaltyService } from './loyalty.js';
 import db from '../config/db.js';

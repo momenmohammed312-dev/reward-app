@@ -9,23 +9,38 @@ data/redis/
 # Build outputs
 dist/
 build/
-.next
+.next/
+UI/dist/
+
 # Logs
 *.log
 data/ui_err.log
 data/ui_out.log
+npm-debug.log*
+yarn-error.log*
 
 # Temporary files
+*.tmp
+*.temp
+*.cache
+*.swp
+*.swo
+*.bak
+*_old.*
+*_backup.*
 temp-tenant.json
 extracted_brd*.txt
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/
 .idea/
+*.iml
+.project
 
 # Environment configs
 backend/.env
@@ -33,3 +48,20 @@ backend/.env
 .env.local
 .env.production
 .env.staging
+
+# Agent skills registry (not project code)
+.agents/
+
+# Project planning artifacts (not source code)
+phases explain/
+install-services.ps1
+
+# Secrets and keys
+*.pem
+*.key
+*.cert
+
+# Test artifacts
+coverage/
+.nyc_output/
+test-results/

@@ -300,13 +300,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadWalletData(otpSentPhone);
       return true;
     } catch (e: any) {
-      if (import.meta.env.DEV && code === '000000') {
-        console.warn('[DEV MODE] Using test bypass code 000000');
-        setUser({ phone: otpSentPhone, name: 'مستخدم تجريبي', joinDate: '2026/01/01', loyaltyTier: 'الذهبي', totalPoints: 320 });
-        setIsAuthenticated(true);
-        localStorage.setItem('loyalty_user_phone', otpSentPhone);
-        return true;
-      }
       setAuthError('كود التحقق غير صحيح أو انتهت صلاحيته');
       return false;
     } finally {
@@ -346,7 +339,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         code: res.code,
         rewardId: reward.id,
         rewardTitle: reward.title,
-        rewardImageUrl: reward.imageUrl || reward.imageUrl,
+        rewardImageUrl: reward.imageUrl,
         pointsSpent: reward.pointsRequired,
         redeemedAt: new Date().toISOString(),
         expiresAt: res.expiresAt || new Date(Date.now() + 3600000).toISOString(),

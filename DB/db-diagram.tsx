@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 const C = {
-  bg: "#0f172a", card: "#1e293b", border: "#334155",
+  bg: "#0f172a", card: "#898a8b", border: "#334155",
   accent: "#38bdf8", green: "#4ade80", orange: "#fb923c",
   purple: "#c084fc", pink: "#f472b6", yellow: "#facc15",
   red: "#f87171", text: "#f1f5f9", muted: "#94a3b8",

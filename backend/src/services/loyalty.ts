@@ -6,7 +6,7 @@ export class LoyaltyService {
    */
   static async getCustomerPointsSummary(customerId: string) {
     const result = await db.query(
-      `SELECT * FROM customer_summary WHERE id = $1`,
+      `SELECT id, tenant_id, phone, name, tier, points_balance, total_earned, total_redeemed, is_verified, last_visit FROM customer_summary WHERE id = $1`,
       [customerId]
     );
 
@@ -59,11 +59,19 @@ export class LoyaltyService {
 
       const tier = customerRes.rows[0].tier;
 
-      // Tier multipliers (Bronze: 1x, Silver: 1.5x, Gold: 2x, Platinum: 3x)
+      // Look up tier multiplier from tier_benefits table (tenant-specific or system default)
+      const tbRes = await client.query(
+        `SELECT multiplier FROM tier_benefits
+         WHERE (tenant_id = $1 OR tenant_id IS NULL)
+         AND tier_name = $2
+         ORDER BY tenant_id NULLS LAST
+         LIMIT 1`,
+        [tenantId, tier]
+      );
       let multiplier = 1.0;
-      if (tier === 'silver') multiplier = 1.5;
-      else if (tier === 'gold') multiplier = 2.0;
-      else if (tier === 'platinum') multiplier = 3.0;
+      if (tbRes.rows.length > 0) {
+        multiplier = Number(tbRes.rows[0].multiplier);
+      }
 
       // Calculate final points
       const pointsEarned = Math.floor(amount * Number(points_per_egp) * multiplier);
@@ -113,9 +121,13 @@ export class LoyaltyService {
     try {
       await client.query('BEGIN');
 
-      // 1. Fetch current balance
+      // 1. Lock customer row and fetch current balance
       const balanceRes = await client.query(
-        `SELECT points_balance FROM customer_summary WHERE id = $1`,
+        `SELECT c.id, COALESCE(cb.current_balance, 0) AS points_balance
+         FROM customers c
+         LEFT JOIN customer_balances cb ON c.id = cb.customer_id
+         WHERE c.id = $1
+         FOR UPDATE`,
         [customerId]
       );
       if (balanceRes.rows.length === 0) {

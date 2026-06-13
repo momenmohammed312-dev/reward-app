@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import db from '../config/db.js';
+import { logger } from '../services/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -54,4 +56,46 @@ export const requireRole = (roles: string[]) => {
 
     next();
   };
+};
+
+export const requireSubscription = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (req.user.role === 'superadmin') {
+    return next();
+  }
+
+  db.query(
+    `SELECT t.is_active, s.status, s.current_period_end
+     FROM tenants t
+     LEFT JOIN subscriptions s ON s.tenant_id = t.id
+     WHERE t.id = $1::uuid`,
+    [req.user.tenant_id]
+  ).then(result => {
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const tenant = result.rows[0];
+
+    if (!tenant.is_active) {
+      return res.status(403).json({ error: 'Account suspended', message: 'Your account has been suspended' });
+    }
+
+    const activeStatuses = ['active', 'trialing'];
+    if (!activeStatuses.includes(tenant.status)) {
+      return res.status(403).json({ error: 'Subscription inactive', message: 'Your subscription is no longer active' });
+    }
+
+    if (tenant.current_period_end && new Date(tenant.current_period_end) < new Date()) {
+      return res.status(403).json({ error: 'Subscription expired', message: 'Your subscription period has ended' });
+    }
+
+    next();
+  }).catch((err) => {
+    logger.error('requireSubscription error:', { error: (err as Error).message });
+    res.status(500).json({ error: 'Failed to verify subscription' });
+  });
 };

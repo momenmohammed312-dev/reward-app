@@ -93,6 +93,45 @@ export class TenantController {
   }
 
   /**
+   * Updates the authenticated tenant's settings.
+   * Uses COALESCE to only update provided fields.
+   */
+  static async updateTenant(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      const { name, points_per_egp, min_purchase_egp, points_expiry_days, logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline } = req.body;
+
+      const result = await db.query(
+        `UPDATE tenants SET
+          name = COALESCE($1, name),
+          points_per_egp = COALESCE($2, points_per_egp),
+          min_purchase_egp = COALESCE($3, min_purchase_egp),
+          points_expiry_days = COALESCE($4, points_expiry_days),
+          logo_url = COALESCE($5, logo_url),
+          primary_color = COALESCE($6, primary_color),
+          accent_color = COALESCE($7, accent_color),
+          bg_color = COALESCE($8, bg_color),
+          surface_color = COALESCE($9, surface_color),
+          font_display = COALESCE($10, font_display),
+          font_body = COALESCE($11, font_body),
+          tagline = COALESCE($12, tagline)
+         WHERE id = $13::uuid
+         RETURNING *`,
+        [name ?? null, points_per_egp ?? null, min_purchase_egp ?? null, points_expiry_days ?? null, logo_url ?? null, primary_color ?? null, accent_color ?? null, bg_color ?? null, surface_color ?? null, font_display ?? null, font_body ?? null, tagline ?? null, tenantId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      logger.error('Update tenant error', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
    * Creates a new branch for the authenticated tenant.
    */
   static async createBranch(req: AuthenticatedRequest, res: Response) {

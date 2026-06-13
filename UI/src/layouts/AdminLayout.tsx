@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  ChartBar, Users, Gift, Storefront, SignOut, 
+  ChartBar, Users, Gift, Storefront, SignOut, Gear,
   UserGear, Gauge 
 } from '@phosphor-icons/react';
 import { applyTenantTheme } from '../theme/themeLoader';
@@ -16,6 +16,7 @@ const navItems = [
   { key: 'customers', label: 'العملاء', icon: Users },
   { key: 'rewards', label: 'المكافآت', icon: Gift },
   { key: 'branches', label: 'الفروع', icon: Storefront },
+  { key: 'settings', label: 'الإعدادات', icon: Gear },
 ];
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
@@ -33,6 +34,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const handleLogout = () => {
     localStorage.removeItem('loyalty_admin_token');
+    localStorage.removeItem('loyalty_superadmin_token');
     localStorage.removeItem('loyalty_user_phone');
     localStorage.removeItem('loyalty_customer_token');
     navigate('/admin/login');

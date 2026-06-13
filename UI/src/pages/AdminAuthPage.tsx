@@ -43,31 +43,19 @@ const AdminAuthPage: React.FC<AdminAuthPageProps> = ({ role }) => {
     setLoading(true);
     setError(null);
     try {
-      let res: Response;
-      try {
-        res = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.message || 'بيانات الدخول غير صحيحة');
-        }
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
         const data = await res.json();
-        const tokenKey =
-          role === 'superadmin' ? 'loyalty_superadmin_token' : 'loyalty_admin_token';
-        localStorage.setItem(tokenKey, data.token);
-      } catch (fetchErr: any) {
-        // If backend is unreachable, fall back to mock login
-        if (fetchErr.message === 'Failed to fetch' || fetchErr.name === 'TypeError') {
-          const tokenKey =
-            role === 'superadmin' ? 'loyalty_superadmin_token' : 'loyalty_admin_token';
-          localStorage.setItem(tokenKey, 'mock-' + role + '-token-' + Date.now());
-        } else {
-          throw fetchErr;
-        }
+        throw new Error(data.message || 'بيانات الدخول غير صحيحة');
       }
+      const data = await res.json();
+      const tokenKey =
+        role === 'superadmin' ? 'loyalty_superadmin_token' : 'loyalty_admin_token';
+      localStorage.setItem(tokenKey, data.token);
       navigate(role === 'superadmin' ? '/superadmin' : role === 'cashier' ? '/cashier' : '/admin');
     } catch (err: any) {
       setError(err.message);

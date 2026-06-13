@@ -13,6 +13,7 @@ import superadminRoutes from './routes/superadminRoutes.js';
 import { generalLimiter, authLimiter, webhookLimiter } from './middlewares/rateLimit.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
@@ -47,7 +48,20 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/superadmin', superadminRoutes);
 
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+const protectDocs = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const queryToken = req.query.token as string | undefined;
+  const token = queryToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+  jwt.verify(token, process.env.JWT_SECRET!, (err: any, decoded: any) => {
+    if (err || decoded?.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    next();
+  });
+};
+
+app.use('/api/docs', protectDocs, swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
 
 app.get('/api/docs.json', (req, res) => {
   res.json(swaggerSpec);

@@ -80,4 +80,11 @@ export const schemas = {
     tenant_id: z.string().min(1, 'tenant_id is required'),
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
   }),
+
+  updateCustomer: z.object({
+    name: z.string().min(1).max(100).optional(),
+    phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
+    tier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
+    is_verified: z.boolean().optional(),
+  }),
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   TrendUp, Users, Gift, Coins, Plus, CheckCircle, Storefront, 
   PencilSimple, TrashSimple, XCircle, ArrowClockwise, Star, 
@@ -20,14 +20,15 @@ const chartData = [
   { month: 'يونيو', earned: 20500, redeemed: 6100 },
 ];
 
-interface Customer { id: string; name: string; phone: string; tier: string; balance: number; totalEarned: number; status: string; }
-interface Branch { id: string; name: string; location: string; posType: string; active: boolean; key: string; }
+interface Customer { id: string; name: string; phone: string; tier: string; balance: number; totalEarned: number; status: string; lastVisit: string | null; }
+interface Branch { id: string; name: string; location: string; posType: string; active: boolean; key: string; timezone: string; openingTime: string | null; closingTime: string | null; }
 
 export const AdminDashboard: React.FC = () => {
   const location = useLocation();
   const activeSubTab = ((location.state as any)?.tab) || 'overview';
-  const { currentTenant, rewards } = useApp();
+  const { currentTenant } = useApp();
 
+  const [adminRewards, setAdminRewards] = useState<any[]>([]);
   const [pointsAmount, setPointsAmount] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [adjustmentNote, setAdjustmentNote] = useState('مكافأة يدوية من الإدارة');
@@ -42,38 +43,51 @@ export const AdminDashboard: React.FC = () => {
   const [adminStats, setAdminStats] = useState(mockAdminStats);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  const [cafeCustomers, setCafeCustomers] = useState<Customer[]>([
-    { id: 'c1', name: 'إبراهيم الهاشمي', phone: '+201027348192', tier: 'الذهبي', balance: 1450, totalEarned: 3500, status: 'نشط' },
-    { id: 'c2', name: 'نورة السعيدان', phone: '+201221649873', tier: 'البلاتيني', balance: 5200, totalEarned: 8900, status: 'نشط' },
-    { id: 'c3', name: 'مصطفى الدمرداش', phone: '+201544102398', tier: 'الفضي', balance: 320, totalEarned: 950, status: 'نشط' },
-    { id: 'c4', name: 'منى الشربيني', phone: '+201127389401', tier: 'العادي', balance: 90, totalEarned: 340, status: 'معلق' },
-    { id: 'c5', name: 'كريم بركات', phone: '+201098123475', tier: 'الذهبي', balance: 2100, totalEarned: 4800, status: 'نشط' },
-  ]);
+  const [cafeCustomers, setCafeCustomers] = useState<Customer[]>([]);
 
   const [branches, setBranches] = useState<Branch[]>([
-    { id: 'b1', name: 'فرع وسط البلد', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_balad' },
-    { id: 'b2', name: 'فرع مصر الجديدة', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_heliopolis' },
-    { id: 'b3', name: 'فرع سموحة', location: 'الإسكندرية', posType: 'Manual', active: false, key: 'api_key_****_alex' },
+    { id: 'b1', name: 'فرع وسط البلد', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_balad', timezone: 'Africa/Cairo', openingTime: '09:00', closingTime: '22:00' },
+    { id: 'b2', name: 'فرع مصر الجديدة', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_heliopolis', timezone: 'Africa/Cairo', openingTime: '09:00', closingTime: '23:00' },
+    { id: 'b3', name: 'فرع سموحة', location: 'الإسكندرية', posType: 'Manual', active: false, key: 'api_key_****_alex', timezone: 'Africa/Cairo', openingTime: null, closingTime: null },
   ]);
 
   const [chartStats, setChartStats] = useState(chartData);
   const [chartLoading, setChartLoading] = useState(true);
 
-  const loadAdminData = useCallback(async () => {
+  const [searchByName, setSearchByName] = useState('');
+  const [searchByPhone, setSearchByPhone] = useState('');
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerTotal, setCustomerTotal] = useState(0);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const handleSearch = () => {
+    setCustomerPage(1);
+    loadAdminData(1);
+  };
+
+  const loadAdminData = useCallback(async (page?: number) => {
+    const p = page ?? customerPage;
     try {
-      const [customers, branchesData, stats] = await Promise.all([
-        api.getAdminCustomers(),
+      const [customersRes, branchesData, stats, rewardsData] = await Promise.all([
+        api.getAdminCustomers({ name: searchByName || undefined, phone: searchByPhone || undefined, page: p, limit: 50 }),
         api.getAdminBranches(),
         api.getAdminStats(),
+        api.getAdminRewards(),
       ]);
-      setCafeCustomers(customers.map((c: any) => ({
+      setAdminRewards(rewardsData || []);
+      const customerList = Array.isArray(customersRes) ? customersRes : customersRes?.customers || [];
+      const total = customersRes?.total || customerList.length;
+      setCustomerTotal(total);
+      setCafeCustomers(customerList.map((c: any) => ({
         id: c.id, name: c.name || 'عميل', phone: c.phone,
         balance: c.balance || 0, totalEarned: c.total_earned || 0,
         tier: c.tier || 'bronze', status: c.is_verified ? 'نشط' : 'معلق',
+        lastVisit: c.last_visit || null,
       })));
       setBranches(branchesData.map((b: any) => ({
         id: b.id, name: b.name, location: b.city || 'القاهرة',
         posType: b.pos_type, active: b.is_active, key: 'API Key Active',
+        timezone: b.timezone || 'Africa/Cairo', openingTime: b.opening_time || null, closingTime: b.closing_time || null,
       })));
       setAdminStats({
         totalCustomers: Number(stats.total_customers || 0),
@@ -81,22 +95,57 @@ export const AdminDashboard: React.FC = () => {
         pointsIssuedThisMonth: Number(stats.points_this_month || 0),
         redemptionsToday: Number(stats.redemptions_today || 0),
       });
-    } catch { /* use mock */ } finally {
+    } catch {
+      setCafeCustomers([]);
+      setBranches([]);
+      setAdminStats({ totalCustomers: 0, activeLoyalists: 0, pointsIssuedThisMonth: 0, redemptionsToday: 0 });
+    } finally {
       setStatsLoading(false);
     }
+    const MONTH_NAMES_AR: string[] = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
     try {
       const chartRes = await api.getAdminChartStats();
       if (chartRes.length > 0) {
         setChartStats(chartRes.map((r: any) => ({
-          month: r.month, earned: Number(r.points_earned), redeemed: Number(r.points_redeemed),
+          month: MONTH_NAMES_AR[parseInt(r.month_num) - 1] || r.month_num,
+          earned: Number(r.points_earned), redeemed: Number(r.points_redeemed),
         })));
       }
-    } catch { /* use mock */ } finally {
+    } catch {
+      setChartStats([]);
+    } finally {
       setChartLoading(false);
     }
-  }, []);
+  }, [searchByName, searchByPhone, customerPage]);
 
-  useEffect(() => { loadAdminData(); }, [loadAdminData]);
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { loadAdminData(); }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [loadAdminData]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const t = await api.getTenantSettings();
+        setSettingsForm({
+          name: t.name || '',
+          points_per_egp: String(t.points_per_egp || '1.0'),
+          min_purchase_egp: String(t.min_purchase_egp || '0'),
+          points_expiry_days: String(t.points_expiry_days || '365'),
+          primary_color: t.primary_color || '#1e40af',
+          accent_color: t.accent_color || '#f59e0b',
+          bg_color: t.bg_color || '#f8fafc',
+          surface_color: t.surface_color || '#ffffff',
+          font_display: t.font_display || 'Playfair Display',
+          font_body: t.font_body || 'Cairo',
+          logo_url: t.logo_url || '',
+          tagline: t.tagline || '',
+        });
+      } catch { /* ignore */ }
+      setSettingsLoading(false);
+    })();
+  }, []);
 
   const handleCreateReward = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,9 +160,8 @@ export const AdminDashboard: React.FC = () => {
       setMessage({ text: `تم إنشاء مكافأة "${newReward.title}" بنجاح!`, type: 'success' });
       setNewReward({ title: '', description: '', pointsRequired: '', category: 'مشروبات', expiryDays: '30' });
       setShowCreateRewardForm(false);
-    } catch {
-      setMessage({ text: `تم إنشاء المكافأة "${newReward.title}" (وضع العرض)`, type: 'success' });
-      setShowCreateRewardForm(false);
+    } catch (err: any) {
+      setMessage({ text: err?.message || 'فشل إنشاء المكافأة', type: 'error' });
     } finally {
       setIsCreatingReward(false);
     }
@@ -149,23 +197,31 @@ export const AdminDashboard: React.FC = () => {
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [editBranch, setEditBranch] = useState<Branch | null>(null);
   const [deleteBranchId, setDeleteBranchId] = useState<string | null>(null);
-  const [newBranch, setNewBranch] = useState({ name: '', city: '', posType: 'Manual' });
+  const [newBranch, setNewBranch] = useState({ name: '', city: '', posType: 'Manual', timezone: 'Africa/Cairo', openingTime: '', closingTime: '' });
 
-  const [editCustomerForm, setEditCustomerForm] = useState({ name: '', tier: '', is_verified: true });
+  const [settingsForm, setSettingsForm] = useState({
+    name: '', points_per_egp: '1.0', min_purchase_egp: '0',
+    points_expiry_days: '365', primary_color: '#1e40af', accent_color: '#f59e0b',
+    bg_color: '#f8fafc', surface_color: '#ffffff', font_display: 'Playfair Display',
+    font_body: 'Cairo', logo_url: '', tagline: '',
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', tier: '', is_verified: true });
   const [editRewardForm, setEditRewardForm] = useState({ title: '', description: '', pointsRequired: '', category: '', expiryDays: '', is_active: true });
-  const [editBranchForm, setEditBranchForm] = useState({ name: '', city: '', posType: '', is_active: true });
+  const [editBranchForm, setEditBranchForm] = useState({ name: '', city: '', posType: '', is_active: true, timezone: 'Africa/Cairo', openingTime: '', closingTime: '' });
 
   const handleEditCustomer = async () => {
     if (!editCustomer) return;
     try {
       await api.updateCustomer(editCustomer.id, {
-        name: editCustomerForm.name, tier: editCustomerForm.tier, is_verified: editCustomerForm.is_verified,
+        name: editCustomerForm.name, phone: editCustomerForm.phone, tier: editCustomerForm.tier, is_verified: editCustomerForm.is_verified,
       });
       setCafeCustomers(prev => prev.map(c => c.id === editCustomer.id ? {
-        ...c, name: editCustomerForm.name, tier: editCustomerForm.tier, status: editCustomerForm.is_verified ? 'نشط' : 'معلق',
+        ...c, name: editCustomerForm.name, phone: editCustomerForm.phone, tier: editCustomerForm.tier, status: editCustomerForm.is_verified ? 'نشط' : 'معلق',
       } : c));
       setMessage({ text: 'تم تحديث العميل بنجاح', type: 'success' });
-    } catch { setMessage({ text: 'فشل تحديث العميل (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل تحديث العميل', type: 'error' }); }
     setEditCustomer(null);
   };
 
@@ -175,7 +231,7 @@ export const AdminDashboard: React.FC = () => {
       await api.deleteCustomer(deleteCustomerId);
       setCafeCustomers(prev => prev.filter(c => c.id !== deleteCustomerId));
       setMessage({ text: 'تم حذف العميل', type: 'success' });
-    } catch { setMessage({ text: 'تم حذف العميل (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل حذف العميل', type: 'error' }); }
     setDeleteCustomerId(null);
   };
 
@@ -188,7 +244,7 @@ export const AdminDashboard: React.FC = () => {
         expiry_days: Number(editRewardForm.expiryDays), is_active: editRewardForm.is_active,
       });
       setMessage({ text: 'تم تحديث المكافأة بنجاح', type: 'success' });
-    } catch { setMessage({ text: 'تم تحديث المكافأة (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل تحديث المكافأة', type: 'error' }); }
     setEditReward(null);
   };
 
@@ -197,7 +253,7 @@ export const AdminDashboard: React.FC = () => {
     try {
       await api.deleteReward(deleteRewardId);
       setMessage({ text: 'تم حذف المكافأة', type: 'success' });
-    } catch { setMessage({ text: 'تم حذف المكافأة (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل حذف المكافأة', type: 'error' }); }
     setDeleteRewardId(null);
   };
 
@@ -206,20 +262,20 @@ export const AdminDashboard: React.FC = () => {
     if (!newBranch.name) return;
     try {
       await api.createBranch(newBranch);
-      setBranches(prev => [...prev, { id: `b_${Date.now()}`, name: newBranch.name, location: newBranch.city || 'القاهرة', posType: newBranch.posType, active: true, key: 'API Key Active' }]);
+      setBranches(prev => [...prev, { id: `b_${Date.now()}`, name: newBranch.name, location: newBranch.city || 'القاهرة', posType: newBranch.posType, active: true, key: 'API Key Active', timezone: newBranch.timezone, openingTime: newBranch.openingTime || null, closingTime: newBranch.closingTime || null }]);
       setMessage({ text: 'تم إنشاء الفرع بنجاح', type: 'success' });
-    } catch { setMessage({ text: 'تم إنشاء الفرع (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل إنشاء الفرع', type: 'error' }); }
     setCreateBranchOpen(false);
-    setNewBranch({ name: '', city: '', posType: 'Manual' });
+    setNewBranch({ name: '', city: '', posType: 'Manual', timezone: 'Africa/Cairo', openingTime: '', closingTime: '' });
   };
 
   const handleEditBranch = async () => {
     if (!editBranch) return;
     try {
       await api.updateBranch(editBranch.id, editBranchForm);
-      setBranches(prev => prev.map(b => b.id === editBranch.id ? { ...b, name: editBranchForm.name, location: editBranchForm.city, posType: editBranchForm.posType, active: editBranchForm.is_active } : b));
+      setBranches(prev => prev.map(b => b.id === editBranch.id ? { ...b, name: editBranchForm.name, location: editBranchForm.city, posType: editBranchForm.posType, active: editBranchForm.is_active, timezone: editBranchForm.timezone, openingTime: editBranchForm.openingTime || null, closingTime: editBranchForm.closingTime || null } : b));
       setMessage({ text: 'تم تحديث الفرع بنجاح', type: 'success' });
-    } catch { setMessage({ text: 'تم تحديث الفرع (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل تحديث الفرع', type: 'error' }); }
     setEditBranch(null);
   };
 
@@ -229,13 +285,13 @@ export const AdminDashboard: React.FC = () => {
       await api.deleteBranch(deleteBranchId);
       setBranches(prev => prev.filter(b => b.id !== deleteBranchId));
       setMessage({ text: 'تم حذف الفرع', type: 'success' });
-    } catch { setMessage({ text: 'تم حذف الفرع (وضع العرض)', type: 'success' }); }
+    } catch (err: any) { setMessage({ text: err?.message || 'فشل حذف الفرع', type: 'error' }); }
     setDeleteBranchId(null);
   };
 
   const openEditCustomer = (c: Customer) => {
     setEditCustomer(c);
-    setEditCustomerForm({ name: c.name, tier: c.tier, is_verified: c.status === 'نشط' });
+    setEditCustomerForm({ name: c.name, phone: c.phone, tier: c.tier, is_verified: c.status === 'نشط' });
   };
 
   const openEditReward = (r: any) => {
@@ -245,22 +301,54 @@ export const AdminDashboard: React.FC = () => {
 
   const openEditBranch = (b: Branch) => {
     setEditBranch(b);
-    setEditBranchForm({ name: b.name, city: b.location, posType: b.posType, is_active: b.active });
+    setEditBranchForm({ name: b.name, city: b.location, posType: b.posType, is_active: b.active, timezone: b.timezone, openingTime: b.openingTime || '', closingTime: b.closingTime || '' });
   };
 
-  const tierBadge = (tier: string) => {
-    const styles: Record<string, string> = {
-      'البلاتيني': 'bg-indigo-950 text-indigo-300 border-indigo-800',
-      'الذهبي': 'bg-amber-950 text-amber-300 border-amber-800',
-      'الفضي': 'bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] border-[var(--color-admin-border)]',
-      'العادي': 'bg-orange-950 text-orange-300 border-orange-800',
-    };
-    return styles[tier] || styles['العادي'];
+  const tierLabel: Record<string, { ar: string; style: string }> = {
+    platinum: { ar: 'بلاتيني', style: 'bg-indigo-950 text-indigo-300 border-indigo-800' },
+    gold: { ar: 'ذهبي', style: 'bg-amber-950 text-amber-300 border-amber-800' },
+    silver: { ar: 'فضي', style: 'bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] border-[var(--color-admin-border)]' },
+    bronze: { ar: 'عادي', style: 'bg-orange-950 text-orange-300 border-orange-800' },
   };
+
+  const tierBadge = (tier: string) => tierLabel[tier]?.style || tierLabel.bronze.style;
+  const tierDisplay = (tier: string) => tierLabel[tier]?.ar || tier;
 
   const statusStyle = (status: string) => status === 'نشط' ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400';
 
-  const primaryVar = { '--primary': 'var(--color-primary)' } as React.CSSProperties;
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.updateTenantSettings({
+        points_per_egp: Number(settingsForm.points_per_egp),
+        min_purchase_egp: Number(settingsForm.min_purchase_egp),
+        points_expiry_days: settingsForm.points_expiry_days ? Number(settingsForm.points_expiry_days) : null,
+      });
+      setMessage({ text: 'تم حفظ إعدادات الولاء', type: 'success' });
+    } catch (err: any) {
+      setMessage({ text: err?.message || 'فشل حفظ الإعدادات', type: 'error' });
+    }
+  };
+
+  const handleSaveBranding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.updateTenantSettings({
+        name: settingsForm.name,
+        primary_color: settingsForm.primary_color,
+        accent_color: settingsForm.accent_color,
+        bg_color: settingsForm.bg_color,
+        surface_color: settingsForm.surface_color,
+        font_display: settingsForm.font_display,
+        font_body: settingsForm.font_body,
+        logo_url: settingsForm.logo_url || null,
+        tagline: settingsForm.tagline || null,
+      });
+      setMessage({ text: 'تم حفظ العلامة التجارية', type: 'success' });
+    } catch (err: any) {
+      setMessage({ text: err?.message || 'فشل حفظ العلامة التجارية', type: 'error' });
+    }
+  };
 
   return (
     <div className="w-full text-[var(--color-admin-text)] flex flex-col gap-6" style={{ direction: 'rtl' }}>
@@ -428,7 +516,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                   <button type="submit" disabled={isSubmittingAdjustment}
-                    className="w-full bg-[var(--color-primary)] text-white text-xs font-bold py-3 rounded-xl hover:opacity-90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+                    className="w-full bg-[var(--color-primary)] text-white text-xs font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
                   >
                     {isSubmittingAdjustment ? <ArrowClockwise className="animate-spin" size={16} /> : <Plus size={16} />}
                     تأكيد منح النقاط
@@ -482,9 +570,24 @@ export const AdminDashboard: React.FC = () => {
 
         {activeSubTab === 'customers' && (
           <div className="bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] rounded-2xl overflow-hidden">
-            <div className="p-5 border-b border-[var(--color-admin-border)] flex justify-between items-center">
-              <h2 className="text-sm font-bold">قاعدة بيانات العملاء</h2>
-              <span className="text-xs text-[var(--color-admin-text-muted)]">{cafeCustomers.length} عميل</span>
+            <div className="p-5 border-b border-[var(--color-admin-border)] flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold">قاعدة بيانات العملاء</h2>
+                <span className="text-xs text-[var(--color-admin-text-muted)]">{cafeCustomers.length} عميل</span>
+              </div>
+              <div className="flex gap-2">
+                <input type="text" placeholder="بحث بالاسم..." value={searchByName}
+                  onChange={e => setSearchByName(e.target.value)}
+                  className="flex-1 bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2 rounded-xl text-xs outline-none focus:border-[var(--color-admin-primary)]"
+                />
+                <input type="text" placeholder="بحث بالهاتف..." value={searchByPhone}
+                  onChange={e => setSearchByPhone(e.target.value)}
+                  className="flex-1 bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2 rounded-xl text-xs outline-none focus:border-[var(--color-admin-primary)]"
+                />
+                <button onClick={handleSearch}
+                  className="bg-[var(--color-admin-primary)] text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer hover:opacity-90"
+                >بحث</button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
@@ -495,6 +598,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-4">الفئة</th>
                     <th className="p-4">الرصيد</th>
                     <th className="p-4">النقاط المكتسبة</th>
+                    <th className="p-4">آخر زيارة</th>
                     <th className="p-4">الحالة</th>
                     <th className="p-4">الإجراءات</th>
                   </tr>
@@ -506,11 +610,12 @@ export const AdminDashboard: React.FC = () => {
                       <td className="p-4 font-mono text-[var(--color-admin-text-muted)]">{customer.phone}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${tierBadge(customer.tier)}`}>
-                          {customer.tier}
+                          {tierDisplay(customer.tier)}
                         </span>
                       </td>
                       <td className="p-4 font-bold" style={{ color: 'var(--color-admin-primary)' }}>{customer.balance.toLocaleString()}</td>
                       <td className="p-4 text-[var(--color-admin-text-muted)]">{customer.totalEarned.toLocaleString()}</td>
+                      <td className="p-4 text-[var(--color-admin-text-muted)] text-[11px]">{customer.lastVisit ? new Date(customer.lastVisit).toLocaleDateString('ar-SA') : '—'}</td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${statusStyle(customer.status)}`}>
                           {customer.status}
@@ -531,6 +636,18 @@ export const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            <div className="p-4 border-t border-[var(--color-admin-border)] flex justify-between items-center text-xs">
+              <span className="text-[var(--color-admin-text-muted)]">إجمالي: {customerTotal} عميل</span>
+              <div className="flex gap-2">
+                <button disabled={customerPage <= 1} onClick={() => { setCustomerPage(p => Math.max(1, p - 1)); loadAdminData(Math.max(1, customerPage - 1)); }}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--color-admin-border)] disabled:opacity-30 cursor-pointer disabled:cursor-default hover:bg-[var(--color-admin-bg)]"
+                >السابق</button>
+                <span className="px-3 py-1.5 text-[var(--color-admin-text-muted)]">صفحة {customerPage}</span>
+                <button disabled={customerPage * 50 >= customerTotal} onClick={() => { setCustomerPage(p => p + 1); loadAdminData(customerPage + 1); }}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--color-admin-border)] disabled:opacity-30 cursor-pointer disabled:cursor-default hover:bg-[var(--color-admin-bg)]"
+                >التالي</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -547,7 +664,7 @@ export const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {rewards.map((reward) => (
+                  {adminRewards.map((reward) => (
                     <div key={reward.id} className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-4 rounded-xl flex gap-3 relative overflow-hidden group">
                       <img src={reward.imageUrl} alt={reward.title}
                         className="w-16 h-16 rounded-lg object-cover border border-[var(--color-admin-border)] shrink-0"
@@ -617,7 +734,7 @@ export const AdminDashboard: React.FC = () => {
                   />
                 </div>
                 <button type="submit" disabled={isCreatingReward}
-                  className="w-full bg-[var(--color-admin-primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  className="w-full bg-[var(--color-admin-primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
                 >
                   {isCreatingReward ? <ArrowClockwise className="animate-spin" size={16} /> : 'إنشاء المكافأة'}
                 </button>
@@ -651,6 +768,10 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex flex-col gap-1 text-[11px] text-[var(--color-admin-text-muted)]">
                     <span className="flex items-center gap-1.5"><MapPin size={12} /> {branch.location}</span>
                     <span className="flex items-center gap-1.5"><DeviceMobile size={12} /> {branch.posType}</span>
+                    <span className="flex items-center gap-1.5 text-[10px]">{branch.timezone}</span>
+                    {branch.openingTime && branch.closingTime && (
+                      <span className="flex items-center gap-1.5">{branch.openingTime} — {branch.closingTime}</span>
+                    )}
                   </div>
                   <div className="flex gap-2 mt-2 pt-3 border-t border-[var(--color-admin-border)] opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => openEditBranch(branch)} className="flex-1 bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer text-center text-[var(--color-admin-text-muted)] flex items-center justify-center gap-1">
@@ -662,6 +783,124 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeSubTab === 'settings' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Loyalty Config Card */}
+            <div className="bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl flex flex-col gap-4">
+              <div className="flex items-center gap-2 border-b border-[var(--color-admin-border)] pb-3">
+                <Coins size={22} className="text-amber-500" />
+                <h2 className="text-sm font-bold">إعدادات برنامج الولاء</h2>
+              </div>
+              <form onSubmit={handleSaveSettings} className="flex flex-col gap-3 text-xs">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">النقاط لكل جنيه</label>
+                  <input type="number" step="0.1" value={settingsForm.points_per_egp}
+                    onChange={e => setSettingsForm(p => ({ ...p, points_per_egp: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">الحد الأدنى للشراء (جنيه)</label>
+                  <input type="number" step="0.1" value={settingsForm.min_purchase_egp}
+                    onChange={e => setSettingsForm(p => ({ ...p, min_purchase_egp: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">صلاحية النقاط (أيام)</label>
+                  <input type="number" value={settingsForm.points_expiry_days}
+                    onChange={e => setSettingsForm(p => ({ ...p, points_expiry_days: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <button type="submit" className="bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
+                  حفظ الإعدادات
+                </button>
+              </form>
+            </div>
+
+            {/* Branding Card */}
+            <div className="bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl flex flex-col gap-4">
+              <div className="flex items-center gap-2 border-b border-[var(--color-admin-border)] pb-3">
+                <Star size={22} className="text-purple-500" />
+                <h2 className="text-sm font-bold">العلامة التجارية</h2>
+              </div>
+              <form onSubmit={handleSaveBranding} className="flex flex-col gap-3 text-xs">
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">اسم الكافيه</label>
+                  <input type="text" value={settingsForm.name}
+                    onChange={e => setSettingsForm(p => ({ ...p, name: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">اللون الأساسي</label>
+                  <input type="color" value={settingsForm.primary_color}
+                    onChange={e => setSettingsForm(p => ({ ...p, primary_color: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none h-10 cursor-pointer" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">لون التمييز</label>
+                  <input type="color" value={settingsForm.accent_color}
+                    onChange={e => setSettingsForm(p => ({ ...p, accent_color: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none h-10 cursor-pointer" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">لون الخلفية</label>
+                  <input type="color" value={settingsForm.bg_color}
+                    onChange={e => setSettingsForm(p => ({ ...p, bg_color: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none h-10 cursor-pointer" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">لون البطاقات</label>
+                  <input type="color" value={settingsForm.surface_color}
+                    onChange={e => setSettingsForm(p => ({ ...p, surface_color: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none h-10 cursor-pointer" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">خط العناوين</label>
+                  <select value={settingsForm.font_display}
+                    onChange={e => setSettingsForm(p => ({ ...p, font_display: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+                  >
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Cairo">Cairo</option>
+                    <option value="Almarai">Almarai</option>
+                    <option value="Noto Kufi Arabic">Noto Kufi Arabic</option>
+                    <option value="Tajawal">Tajawal</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">خط النصوص</label>
+                  <select value={settingsForm.font_body}
+                    onChange={e => setSettingsForm(p => ({ ...p, font_body: e.target.value }))}
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+                  >
+                    <option value="Cairo">Cairo</option>
+                    <option value="Almarai">Almarai</option>
+                    <option value="Noto Kufi Arabic">Noto Kufi Arabic</option>
+                    <option value="Tajawal">Tajawal</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">رابط الشعار (URL)</label>
+                  <input type="url" value={settingsForm.logo_url}
+                    onChange={e => setSettingsForm(p => ({ ...p, logo_url: e.target.value }))}
+                    placeholder="https://example.com/logo.png"
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-[var(--color-admin-text-muted)]">الشعار النصي</label>
+                  <input type="text" value={settingsForm.tagline}
+                    onChange={e => setSettingsForm(p => ({ ...p, tagline: e.target.value }))}
+                    placeholder="شعار الكافيه"
+                    className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
+                </div>
+                <button type="submit" className="bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
+                  حفظ العلامة التجارية
+                </button>
+              </form>
             </div>
           </div>
         )}
@@ -678,15 +917,21 @@ export const AdminDashboard: React.FC = () => {
               className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none focus:border-[var(--color-admin-primary)]" />
           </div>
           <div className="flex flex-col gap-1">
+            <label className="font-bold text-[var(--color-admin-text-muted)]">رقم الهاتف</label>
+            <input type="text" value={editCustomerForm.phone}
+              onChange={(e) => setEditCustomerForm(p => ({ ...p, phone: e.target.value }))}
+              className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none focus:border-[var(--color-admin-primary)]" />
+          </div>
+          <div className="flex flex-col gap-1">
             <label className="font-bold text-[var(--color-admin-text-muted)]">الفئة</label>
             <select value={editCustomerForm.tier}
               onChange={(e) => setEditCustomerForm(p => ({ ...p, tier: e.target.value }))}
               className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
             >
-              <option value="العادي">العادي</option>
-              <option value="الفضي">الفضي</option>
-              <option value="الذهبي">الذهبي</option>
-              <option value="البلاتيني">البلاتيني</option>
+              <option value="bronze">عادي</option>
+              <option value="silver">فضي</option>
+              <option value="gold">ذهبي</option>
+              <option value="platinum">بلاتيني</option>
             </select>
           </div>
           <div className="flex items-center gap-2 mt-2">
@@ -826,6 +1071,34 @@ export const AdminDashboard: React.FC = () => {
                 <option value="Other">آخر</option>
               </select>
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">المنطقة الزمنية</label>
+              <select value={newBranch.timezone} onChange={(e) => setNewBranch(p => ({ ...p, timezone: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              >
+                <option value="Africa/Cairo">Africa/Cairo (UTC+2)</option>
+                <option value="Asia/Riyadh">Asia/Riyadh (UTC+3)</option>
+                <option value="Asia/Dubai">Asia/Dubai (UTC+4)</option>
+                <option value="Europe/London">Europe/London (UTC+1)</option>
+                <option value="America/New_York">America/New_York (UTC-4)</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[var(--color-admin-text-muted)]">وقت الفتح</label>
+                <input type="time" value={newBranch.openingTime}
+                  onChange={(e) => setNewBranch(p => ({ ...p, openingTime: e.target.value }))}
+                  className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="font-bold text-[var(--color-admin-text-muted)]">وقت الإغلاق</label>
+                <input type="time" value={newBranch.closingTime}
+                  onChange={(e) => setNewBranch(p => ({ ...p, closingTime: e.target.value }))}
+                  className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+                />
+              </div>
+            </div>
             <div className="flex gap-2 mt-2">
               <button type="submit" className="flex-1 bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
                 إنشاء الفرع
@@ -861,6 +1134,34 @@ export const AdminDashboard: React.FC = () => {
               <option value="Foodics">Foodics</option>
               <option value="Other">آخر</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-[var(--color-admin-text-muted)]">المنطقة الزمنية</label>
+            <select value={editBranchForm.timezone} onChange={(e) => setEditBranchForm(p => ({ ...p, timezone: e.target.value }))}
+              className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+            >
+              <option value="Africa/Cairo">Africa/Cairo (UTC+2)</option>
+              <option value="Asia/Riyadh">Asia/Riyadh (UTC+3)</option>
+              <option value="Asia/Dubai">Asia/Dubai (UTC+4)</option>
+              <option value="Europe/London">Europe/London (UTC+1)</option>
+              <option value="America/New_York">America/New_York (UTC-4)</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">وقت الفتح</label>
+              <input type="time" value={editBranchForm.openingTime}
+                onChange={(e) => setEditBranchForm(p => ({ ...p, openingTime: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">وقت الإغلاق</label>
+              <input type="time" value={editBranchForm.closingTime}
+                onChange={(e) => setEditBranchForm(p => ({ ...p, closingTime: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="branch_active" checked={editBranchForm.is_active}

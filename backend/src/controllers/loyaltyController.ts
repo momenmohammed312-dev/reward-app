@@ -4,6 +4,18 @@ import { LoyaltyService } from '../services/loyalty.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { logger } from '../services/logger.js';
 
+async function logAdminAction(tenantId: string, adminUserId: string | undefined, actionType: string, targetType: string, targetId: string | undefined, newValue?: any) {
+  try {
+    await db.query(
+      `INSERT INTO admin_activity_log (tenant_id, admin_user_id, action_type, target_type, target_id, new_value)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, $6::jsonb)`,
+      [tenantId, adminUserId || null, actionType, targetType, targetId || null, newValue ? JSON.stringify(newValue) : null]
+    );
+  } catch (err) {
+    logger.error('Audit log error', { error: (err as Error).message });
+  }
+}
+
 export class LoyaltyController {
   /**
    * Retrieves profile & point balance for the authenticated customer.
@@ -115,6 +127,7 @@ export class LoyaltyController {
         [tenantId, resolvedCustomerId, amount, note || 'Manual points adjustment', req.user?.email || 'admin']
       );
 
+      await logAdminAction(tenantId!, req.user?.id, 'earn_bonus', 'customer', resolvedCustomerId, { amount, note });
       res.json({ message: 'Points awarded successfully' });
     } catch (error) {
       logger.error('Admin earn error', { error: (error as Error).message });
@@ -154,13 +167,14 @@ export class LoyaltyController {
         return res.status(400).json({ error: 'Missing fields', message: 'code is required' });
       }
 
-      // Check if code is valid, unused, and not expired
+      // Check if code is valid, unused, and not expired (with row lock)
       const result = await db.query(
         `SELECT r.*, rw.name as reward_name, rw.reward_type, rw.discount_value, c.name as customer_name, c.phone as customer_phone
          FROM redemptions r
          JOIN rewards rw ON r.reward_id = rw.id
          JOIN customers c ON r.customer_id = c.id
-         WHERE r.code = $1 AND r.tenant_id = $2`,
+         WHERE r.code = $1 AND r.tenant_id = $2
+         FOR UPDATE OF r`,
         [code, tenantId]
       );
 
