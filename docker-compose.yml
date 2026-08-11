@@ -17,6 +17,12 @@ services:
       - ./DB/migrations/002_add_rewards_table.sql:/docker-entrypoint-initdb.d/03-migration-002.sql
       - ./DB/migrations/003_add_tenant_branding.sql:/docker-entrypoint-initdb.d/04-migration-003.sql
       - ./DB/migrations/004_add_superadmin_role.sql:/docker-entrypoint-initdb.d/05-migration-004.sql
+      - ./DB/migrations/005_admin_audit_soft_delete.sql:/docker-entrypoint-initdb.d/06-migration-005.sql
+      - ./DB/migrations/006_branch_timezone_working_hours.sql:/docker-entrypoint-initdb.d/07-migration-006.sql
+      - ./DB/migrations/007_cross_tenant_networks.sql:/docker-entrypoint-initdb.d/08-migration-007.sql
+      - ./DB/migrations/008_wallet_ledger_idempotency.sql:/docker-entrypoint-initdb.d/09-migration-008.sql
+      - ./DB/migrations/009_reversal_ledger_type.sql:/docker-entrypoint-initdb.d/10-migration-009.sql
+      - ./DB/migrations/010_branch_users.sql:/docker-entrypoint-initdb.d/11-migration-010.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

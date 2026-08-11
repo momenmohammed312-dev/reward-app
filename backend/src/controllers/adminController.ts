@@ -24,8 +24,8 @@ export class AdminController {
       const tenantId = req.user!.tenant_id;
       const statsQuery = await db.query(`
         SELECT 
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid) AS total_customers,
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND last_visit > NOW() - INTERVAL '30 days') AS active_customers,
+          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND deleted_at IS NULL) AS total_customers,
+          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND deleted_at IS NULL AND last_visit > NOW() - INTERVAL '30 days') AS active_customers,
           (SELECT COALESCE(SUM(points), 0) FROM wallet_ledger WHERE tenant_id = $1::uuid AND type = 'earned' AND created_at > date_trunc('month', NOW())) AS points_this_month,
           (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1::uuid AND created_at::date = CURRENT_DATE) AS redemptions_today
       `, [tenantId]);
@@ -46,7 +46,7 @@ export class AdminController {
       const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
       const offset = (page - 1) * limit;
 
-      let whereClause = 'WHERE c.tenant_id = $1::uuid';
+      let whereClause = 'WHERE c.tenant_id = $1::uuid AND c.deleted_at IS NULL';
       const params: any[] = [tenantId];
       let paramIdx = 2;
 
@@ -66,12 +66,13 @@ export class AdminController {
       `, params);
 
       const result = await db.query(`
-        SELECT id, phone, name, tier, 
-               COALESCE((SELECT SUM(CASE WHEN type IN ('earned','bonus','refund') THEN points WHEN type IN ('redeemed','expired') THEN -points ELSE 0 END) FROM wallet_ledger WHERE customer_id = c.id), 0) AS balance,
-               total_earned, is_verified, last_visit, created_at
+        SELECT c.id, c.phone, c.name, c.tier,
+               COALESCE(cb.current_balance, 0) AS balance,
+               c.total_earned, c.is_verified, c.last_visit, c.created_at
         FROM customers c
+        LEFT JOIN customer_balances cb ON c.id = cb.customer_id
         ${whereClause}
-        ORDER BY created_at DESC
+        ORDER BY c.created_at DESC
         LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
       `, [...params, limit, offset]);
 
@@ -118,19 +119,19 @@ export class AdminController {
   static async createReward(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user!.tenant_id;
-      const { title, description, points_required, category, expiry_days } = req.body;
+      const { title, description, points_required, category, expiry_days, reward_type, discount_value, max_redemptions } = req.body;
       
       if (!title || !points_required) {
         return res.status(400).json({ error: 'title and points_required are required' });
       }
 
       const result = await db.query(`
-        INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, expiry_days)
-        VALUES ($1::uuid, $2, 'free_item', $3, $4, $5, $6)
+        INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, expiry_days, discount_value, max_redemptions)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
-      `, [tenantId, title, points_required, description || null, category || 'مشروبات', expiry_days || 30]);
+      `, [tenantId, title, reward_type || 'free_item', points_required, description || null, category || 'مشروبات', expiry_days || 30, discount_value || null, max_redemptions || null]);
 
-      await logAdminAction(tenantId, req.user?.id, 'create_reward', 'reward', result.rows[0]?.id, undefined, { title: req.body.title, points_required: req.body.points_required });
+      await logAdminAction(tenantId, req.user?.id, 'create_reward', 'reward', result.rows[0]?.id, undefined, { title: req.body.title, points_required: req.body.points_required, reward_type: reward_type || 'free_item' });
       res.status(201).json(result.rows[0]);
     } catch (err: any) {
       logger.error('Create reward error:', { error: (err as Error).message });
@@ -192,6 +193,9 @@ export class AdminController {
       await logAdminAction(tenantId, req.user?.id, 'update_customer', 'customer', id, undefined, { name, phone, tier, is_verified });
       res.json(result.rows[0]);
     } catch (err: any) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: 'Conflict', message: 'A customer with this phone already exists' });
+      }
       logger.error('Update customer error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to update customer' });
     }
@@ -225,7 +229,7 @@ export class AdminController {
     try {
       const tenantId = req.user!.tenant_id;
       const { id } = req.params;
-      const { title, description, points_required, category, expiry_days, is_active } = req.body;
+      const { title, description, points_required, category, expiry_days, is_active, reward_type, discount_value, max_redemptions } = req.body;
 
       const result = await db.query(`
         UPDATE rewards
@@ -234,12 +238,15 @@ export class AdminController {
             required_points = COALESCE($5, required_points),
             category = COALESCE($6, category),
             expiry_days = COALESCE($7, expiry_days),
-            is_active = COALESCE($8, is_active)
+            is_active = COALESCE($8, is_active),
+            reward_type = COALESCE($9::reward_type, reward_type),
+            discount_value = COALESCE($10, discount_value),
+            max_redemptions = COALESCE($11, max_redemptions)
         WHERE id = $1::uuid AND tenant_id = $2::uuid
         RETURNING id, name AS title, reward_type, required_points AS "pointsRequired",
                   description, category, image_url AS "imageUrl", terms,
-                  expiry_days AS "expiryDays", is_active, created_at
-      `, [id, tenantId, title || null, description ?? null, points_required ? Number(points_required) : null, category || null, expiry_days ? Number(expiry_days) : null, is_active ?? null]);
+                  expiry_days AS "expiryDays", is_active, discount_value, max_redemptions, created_at
+      `, [id, tenantId, title || null, description ?? null, points_required ? Number(points_required) : null, category || null, expiry_days ? Number(expiry_days) : null, is_active ?? null, reward_type || null, discount_value ?? null, max_redemptions ?? null]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Reward not found' });
@@ -352,6 +359,58 @@ export class AdminController {
     } catch (err: any) {
       logger.error('Delete branch error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to delete branch' });
+    }
+  }
+
+  // GET /api/admin/staff
+  static async getStaff(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user!.tenant_id;
+      const result = await db.query(`
+        SELECT id, name, email, role, branch_id, created_at
+        FROM users
+        WHERE tenant_id = $1::uuid AND is_active = true
+        ORDER BY created_at DESC
+      `, [tenantId]);
+      res.json(result.rows);
+    } catch (err: any) {
+      logger.error('Admin staff error:', { error: (err as Error).message });
+      res.status(500).json({ error: 'Failed to fetch staff' });
+    }
+  }
+
+  // PATCH /api/admin/users/:id/branch
+  static async assignBranchToUser(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user!.tenant_id;
+      const { id } = req.params;
+      const { branch_id } = req.body;
+
+      if (branch_id) {
+        const branchCheck = await db.query(
+          'SELECT id FROM branches WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL',
+          [branch_id, tenantId]
+        );
+        if (branchCheck.rows.length === 0) {
+          return res.status(404).json({ error: 'Not Found', message: 'Branch not found for this tenant' });
+        }
+      }
+
+      const result = await db.query(`
+        UPDATE users
+        SET branch_id = $3::uuid, updated_at = NOW()
+        WHERE id = $1::uuid AND tenant_id = $2::uuid AND is_active = true
+        RETURNING id, name, email, role, branch_id
+      `, [id, tenantId, branch_id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'User not found for this tenant' });
+      }
+      await logAdminAction(tenantId, req.user?.id, 'assign_branch', 'user', id, undefined, { branch_id });
+      res.json(result.rows[0]);
+    } catch (err: any) {
+      logger.error('Assign branch error:', { error: (err as Error).message });
+      res.status(500).json({ error: 'Failed to assign branch' });
     }
   }
 

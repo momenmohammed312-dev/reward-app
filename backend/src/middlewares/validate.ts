@@ -39,7 +39,9 @@ export const schemas = {
     email: z.string().email('Invalid email'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     name: z.string().optional(),
-    role: z.enum(['owner', 'manager', 'cashier', 'superadmin']).optional(),
+    // superadmin is intentionally excluded: it can only be created via the seed
+    // script or a trusted internal process, never through the public endpoint.
+    role: z.enum(['owner', 'manager', 'cashier']).optional(),
   }),
 
   createReward: z.object({
@@ -48,6 +50,36 @@ export const schemas = {
     points_required: z.number().int().positive('Points must be positive'),
     category: z.string().optional(),
     expiry_days: z.number().int().positive().optional(),
+    reward_type: z.enum(['free_item', 'discount_fixed', 'discount_percent', 'free_upgrade']).optional(),
+    discount_value: z.number().positive().optional(),
+    max_redemptions: z.number().int().positive().optional(),
+  }),
+
+  updateReward: z.object({
+    title: z.string().min(1, 'Title is required').optional(),
+    description: z.string().nullable().optional(),
+    points_required: z.number().int().positive('Points must be positive').optional(),
+    category: z.string().nullable().optional(),
+    expiry_days: z.number().int().positive().nullable().optional(),
+    is_active: z.boolean().optional(),
+    reward_type: z.enum(['free_item', 'discount_fixed', 'discount_percent', 'free_upgrade']).optional(),
+    discount_value: z.number().positive().nullable().optional(),
+    max_redemptions: z.number().int().positive().nullable().optional(),
+  }),
+
+  refundTransaction: z.object({
+    invoice_id: z.string().min(1, 'invoice_id is required'),
+  }),
+
+  adjustPoints: z.object({
+    customer_id: z.string().uuid('Invalid customer ID').optional(),
+    customer_phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
+    points: z.number().int().refine(v => v !== 0, 'points must not be zero'),
+    note: z.string().optional(),
+  }).refine(d => d.customer_id || d.customer_phone, { message: 'Either customer_id or customer_phone is required' }),
+
+  assignBranch: z.object({
+    branch_id: z.string().uuid('Invalid branch ID').nullable(),
   }),
 
   updateProfile: z.object({
@@ -86,5 +118,24 @@ export const schemas = {
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
     tier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
     is_verified: z.boolean().optional(),
+  }),
+
+  // ─── Cross-Tenant Network Schemas ──────────────────────────
+  createNetwork: z.object({
+    name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+    slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+    description: z.string().max(500).optional(),
+    logo_url: z.string().url('Invalid URL').optional(),
+  }),
+
+  updateNetwork: z.object({
+    name: z.string().min(2).max(100).optional(),
+    description: z.string().max(500).optional(),
+    logo_url: z.string().url('Invalid URL').optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  addNetworkMember: z.object({
+    tenant_id: z.string().uuid('Invalid tenant ID'),
   }),
 };

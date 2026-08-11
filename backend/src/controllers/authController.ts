@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 import { OTPService } from '../services/otp.js';
 import { logger } from '../services/logger.js';
+import { resolveTenantId } from '../helpers/resolveTenant.js';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
 const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || (() => { throw new Error('FATAL: JWT_REFRESH_SECRET environment variable is not set'); })();
@@ -20,19 +21,20 @@ export class AuthController {
         return res.status(400).json({ error: 'Missing fields', message: 'Email and password are required' });
       }
 
-      // Superadmin doesn't need tenant_id
-      const isSuperAdmin = role === 'superadmin';
-
-      if (!isSuperAdmin && !tenant_id) {
-        return res.status(400).json({ error: 'Missing fields', message: 'tenant_id is required for non-superadmin users' });
+      // Defense in depth: superadmin must never be creatable via the public
+      // registration endpoint (schema also excludes it).
+      if (role === 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden', message: 'Superadmin accounts cannot be created via registration' });
       }
 
-      // Check if tenant exists (skip for superadmin)
-      if (tenant_id) {
-        const tenantCheck = await db.query('SELECT id FROM tenants WHERE id = $1::uuid', [tenant_id]);
-        if (tenantCheck.rows.length === 0) {
-          return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
-        }
+      if (!tenant_id) {
+        return res.status(400).json({ error: 'Missing fields', message: 'tenant_id is required' });
+      }
+
+      // Resolve tenant by UUID or slug
+      const resolvedTenantId = await resolveTenantId(tenant_id);
+      if (!resolvedTenantId) {
+        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
 
       // Hash password
@@ -43,7 +45,7 @@ export class AuthController {
         `INSERT INTO users (tenant_id, email, password_hash, name, role)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, name, role`,
-        [tenant_id || null, email, passwordHash, name || null, role || 'manager']
+        [resolvedTenantId, email, passwordHash, name || null, role || 'manager']
       );
 
       res.status(201).json({ message: 'User registered successfully', user: result.rows[0] });
@@ -124,20 +126,13 @@ export class AuthController {
     try {
       const { tenant_id, phone } = req.body;
 
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const tenantCheck = await db.query(
-        isUuid
-          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
-          : 'SELECT id FROM tenants WHERE slug = $1',
-        isUuid ? [tenant_id, tenant_id] : [tenant_id]
-      );
-      if (tenantCheck.rows.length === 0) {
+      const resolvedTenantId = await resolveTenantId(tenant_id);
+      if (!resolvedTenantId) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
       const customer = await db.query(
-        'SELECT id, name, tier FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
+        'SELECT id, name, tier FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
         [resolvedTenantId, phone]
       );
 
@@ -166,29 +161,26 @@ export class AuthController {
       }
 
       // Check if tenant exists by ID or Slug
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const tenantCheck = await db.query(
-        isUuid
-          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
-          : 'SELECT id FROM tenants WHERE slug = $1',
-        isUuid ? [tenant_id, tenant_id] : [tenant_id]
-      );
-      if (tenantCheck.rows.length === 0) {
+      const resolvedTenantId = await resolveTenantId(tenant_id);
+      if (!resolvedTenantId) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
-      // Find or create customer
+      // Find or create customer (resurrects a soft-deleted customer if one
+      // exists with the same phone, since the phone is unique per tenant)
       let customerResult = await db.query(
-        'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
+        'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
         [resolvedTenantId, phone]
       );
 
       if (customerResult.rows.length === 0) {
-        // Create new customer
+        // Create new customer (or resurrect a soft-deleted one)
         customerResult = await db.query(
           `INSERT INTO customers (tenant_id, phone)
            VALUES ($1::uuid, $2)
+           ON CONFLICT (tenant_id, phone) DO UPDATE SET
+             deleted_at = NULL,
+             updated_at = NOW()
            RETURNING id`,
           [resolvedTenantId, phone]
         );
@@ -216,17 +208,10 @@ export class AuthController {
       }
 
       // Check if tenant exists by ID or Slug
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant_id);
-      const tenantCheck = await db.query(
-        isUuid
-          ? 'SELECT id FROM tenants WHERE id = $1::uuid OR slug = $2'
-          : 'SELECT id FROM tenants WHERE slug = $1',
-        isUuid ? [tenant_id, tenant_id] : [tenant_id]
-      );
-      if (tenantCheck.rows.length === 0) {
+      const resolvedTenantId = await resolveTenantId(tenant_id);
+      if (!resolvedTenantId) {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
-      const resolvedTenantId = tenantCheck.rows[0].id as string;
 
       // Verify OTP
       const isValid = await OTPService.verifyOTP(resolvedTenantId, phone, code);

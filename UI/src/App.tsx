@@ -28,11 +28,13 @@ const App: React.FC = () => {
 
         {/* Protected Admin Routes with Layout */}
         <Route path="/admin" element={
-          <ProtectedRoute requiredRole="admin">
-            <AdminLayout>
-              <AdminDashboard />
-            </AdminLayout>
-          </ProtectedRoute>
+          <AppProvider>
+            <ProtectedRoute requiredRole="admin">
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
+            </ProtectedRoute>
+          </AppProvider>
         } />
         <Route path="/cashier" element={
           <ProtectedRoute requiredRole="cashier">
@@ -42,13 +44,15 @@ const App: React.FC = () => {
           </ProtectedRoute>
         } />
         <Route path="/superadmin" element={
-          <ErrorBoundary>
-          <ProtectedRoute requiredRole="superadmin">
-            <div className="min-h-screen bg-[var(--color-admin-bg)] flex flex-col font-body p-6">
-              <SuperAdminDashboard />
-            </div>
-          </ProtectedRoute>
-          </ErrorBoundary>
+          <AppProvider>
+            <ErrorBoundary>
+            <ProtectedRoute requiredRole="superadmin">
+              <div className="min-h-screen bg-[var(--color-admin-bg)] flex flex-col font-body p-6">
+                <SuperAdminDashboard />
+              </div>
+            </ProtectedRoute>
+            </ErrorBoundary>
+          </AppProvider>
         } />
       </Routes>
     </BrowserRouter>

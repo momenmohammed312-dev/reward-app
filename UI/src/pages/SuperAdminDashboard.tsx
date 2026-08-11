@@ -12,6 +12,40 @@ import {
   Coins 
 } from '@phosphor-icons/react';
 
+// ─── TYPES ──────────────────────────────────────────────────
+
+interface NetworkListItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logo_url: string | null;
+  is_active: boolean;
+  member_count: number;
+  created_at: string;
+}
+
+interface TenantItem {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  status: string;
+  monthlyFee: number;
+  joinedDate: string;
+}
+
+interface WebhookLog {
+  id: string;
+  tenant: string;
+  event: string;
+  status: string;
+  time: string;
+  message: string;
+}
+
+// ─── STYLE CONSTANTS ────────────────────────────────────────
+
 const statusConfig: Record<string, { label: string; bg: string }> = {
   active:   { label: 'نشط',      bg: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700' },
   past_due: { label: 'متأخر',    bg: 'bg-amber-900/50 text-amber-400 border border-amber-700' },
@@ -33,9 +67,18 @@ const webhookStatusConfig: Record<string, { dot: string; text: string; bg: strin
 };
 
 export const SuperAdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'tenants' | 'subscriptions' | 'logs'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'subscriptions' | 'logs' | 'networks'>('tenants');
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Network state
+  const [networks, setNetworks] = useState<NetworkListItem[]>([]);
+  const [networkLoading, setNetworkLoading] = useState(false);
+  const [showCreateNetworkModal, setShowCreateNetworkModal] = useState(false);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null);
+  const [newNetwork, setNewNetwork] = useState({ name: '', slug: '', description: '' });
+  const [addMemberTenantId, setAddMemberTenantId] = useState('');
 
   // Global stats from API with mock fallback
   const [globalStats, setGlobalStats] = useState({
@@ -46,7 +89,7 @@ export const SuperAdminDashboard: React.FC = () => {
     systemUptime: '99.98%'
   });
 
-  const [tenants, setTenants] = useState([
+  const [tenants, setTenants] = useState<TenantItem[]>([
     { id: 't1', name: 'أروما كافيه', slug: 'aroma', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
     { id: 't2', name: 'برو أند كو', slug: 'brew-co', plan: 'Premium', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/١٢' },
     { id: 't3', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠1' },
@@ -54,7 +97,7 @@ export const SuperAdminDashboard: React.FC = () => {
     { id: 't5', name: 'كافيين هاب', slug: 'caffeine-hub', plan: 'Premium', status: 'canceled', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠١/٠٥' }
   ]);
 
-  const [webhooks, setWebhooks] = useState([
+  const [webhooks, setWebhooks] = useState<WebhookLog[]>([
     { id: 'w1', tenant: 'أروما كافيه', event: 'order.paid', status: 'success', time: '13:54:12', message: 'Points processed successfully (+150 pts)' },
     { id: 'w2', tenant: 'حلويات الياسمين', event: 'order.closed', status: 'success', time: '13:52:05', message: 'Points processed successfully (+320 pts)' },
     { id: 'w3', tenant: 'برو أند كو', event: 'order.paid', status: 'failed', time: '13:50:00', message: 'Customer not registered under tenant. Phone created.' },
@@ -65,6 +108,73 @@ export const SuperAdminDashboard: React.FC = () => {
   useEffect(() => {
     setLoading(false);
   }, []);
+
+  // Network functions
+  const loadNetworks = async () => {
+    setNetworkLoading(true);
+    try {
+      const data = await api.getSuperAdminNetworks();
+      setNetworks(data.networks || []);
+    } catch (err) {
+      setApiError('Failed to load networks');
+    } finally {
+      setNetworkLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'networks') loadNetworks();
+  }, [activeTab]);
+
+  const handleCreateNetwork = async () => {
+    if (!newNetwork.name || !newNetwork.slug) return;
+    try {
+      await api.createNetwork(newNetwork);
+      setShowCreateNetworkModal(false);
+      setNewNetwork({ name: '', slug: '', description: '' });
+      loadNetworks();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Failed to create network');
+    }
+  };
+
+  const handleDeactivateNetwork = async (id: string) => {
+    if (!confirm('Are you sure you want to deactivate this network?')) return;
+    try {
+      await api.deactivateNetwork(id);
+      loadNetworks();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Failed to deactivate network');
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!selectedNetworkId || !addMemberTenantId) return;
+    try {
+      await api.addNetworkMember(selectedNetworkId, addMemberTenantId);
+      setShowAddMemberModal(false);
+      setAddMemberTenantId('');
+      loadNetworks();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Failed to add member');
+    }
+  };
+
+  const handleRemoveMember = async (networkId: string, tenantId: string) => {
+    if (!confirm('Remove this tenant from the network?')) return;
+    try {
+      await api.removeNetworkMember(networkId, tenantId);
+      loadNetworks();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : 'Failed to remove member');
+    }
+  };
+
+  const networkStatusConfig: Record<string, { label: string; bg: string }> = {
+    active:   { label: 'نشط',  bg: 'bg-emerald-900/50 text-emerald-400 border border-emerald-700' },
+    pending:  { label: 'معلق', bg: 'bg-amber-900/50 text-amber-400 border border-amber-700' },
+    suspended:{ label: 'معلّق', bg: 'bg-red-900/50 text-red-400 border border-red-700' },
+  };
 
   const handleToggleTenantStatus = async (tenantId: string) => {
     try {
@@ -213,6 +323,12 @@ export const SuperAdminDashboard: React.FC = () => {
           className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'logs' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
           شاشة مراقبة الـ Webhooks
+        </button>
+        <button 
+          onClick={() => setActiveTab('networks')}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'networks' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
+        >
+          الشبكات (Networks)
         </button>
       </div>
 
@@ -367,8 +483,178 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+        {activeTab === 'networks' && (
+          <div className={`${adminCard} overflow-hidden`}>
+            <div className="p-5 border-b border-[var(--color-admin-border)] flex justify-between items-center">
+              <h2 className="text-sm font-bold">الشبكات (Networks)</h2>
+              <button 
+                onClick={() => setShowCreateNetworkModal(true)}
+                className="bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-amber-500"
+              >
+                إنشاء شبكة جديدة
+              </button>
+            </div>
+
+            {networkLoading ? (
+              <div className="p-6 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-[var(--color-admin-primary)] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : networks.length === 0 ? (
+              <div className="p-6 text-center text-[var(--color-admin-text-muted)] text-sm">
+                لا توجد شبكات بعد
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] uppercase text-[10px] font-bold border-b border-[var(--color-admin-border)]">
+                    <tr>
+                      <th className="p-4">اسم الشبكة</th>
+                      <th className="p-4">Slug</th>
+                      <th className="p-4">الوصف</th>
+                      <th className="p-4">عدد الأعضاء</th>
+                      <th className="p-4">الحالة</th>
+                      <th className="p-4">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-admin-border)] text-[var(--color-admin-text)]">
+                    {networks.map((net: NetworkListItem) => (
+                      <tr key={net.id} className="hover:bg-[var(--color-admin-bg)] transition-all">
+                        <td className="p-4 font-bold">{net.name}</td>
+                        <td className="p-4 font-mono text-[var(--color-admin-text-muted)]">/{net.slug}</td>
+                        <td className="p-4 text-[var(--color-admin-text-muted)] max-w-[200px] truncate">{net.description || '-'}</td>
+                        <td className="p-4 font-bold">{net.member_count || 0}</td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${net.is_active ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-700' : 'bg-red-900/50 text-red-400 border border-red-700'}`}>
+                            {net.is_active ? 'نشط' : 'معطل'}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => { setSelectedNetworkId(net.id); setShowAddMemberModal(true); }}
+                              className="bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1 px-2.5 rounded border border-[var(--color-admin-border)] cursor-pointer"
+                            >
+                              إضافة عضو
+                            </button>
+                            {net.is_active && (
+                              <button 
+                                onClick={() => handleDeactivateNetwork(net.id)}
+                                className="bg-red-950/50 hover:bg-red-900/50 text-red-400 text-[10px] font-bold py-1 px-2.5 rounded border border-red-800/40 cursor-pointer"
+                              >
+                                تعطيل
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Create Network Modal */}
+      {showCreateNetworkModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowCreateNetworkModal(false)}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${adminCard} p-6 rounded-2xl w-full max-w-md`} 
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold mb-4">إنشاء شبكة جديدة</h3>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-[10px] text-[var(--color-admin-text-muted)] font-bold mb-1 block">اسم الشبكة *</label>
+                <input 
+                  type="text" 
+                  value={newNetwork.name}
+                  onChange={e => setNewNetwork(p => ({...p, name: e.target.value}))}
+                  className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] rounded-lg px-3 py-2 text-xs text-[var(--color-admin-text)] focus:outline-none focus:border-[var(--color-admin-primary)]"
+                  placeholder="مثال: شبكة المقاهي المتحدة"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[var(--color-admin-text-muted)] font-bold mb-1 block">Slug (المسار) *</label>
+                <input 
+                  type="text" 
+                  value={newNetwork.slug}
+                  onChange={e => setNewNetwork(p => ({...p, slug: e.target.value}))}
+                  className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] rounded-lg px-3 py-2 text-xs text-[var(--color-admin-text)] font-mono focus:outline-none focus:border-[var(--color-admin-primary)]"
+                  placeholder="مثال: unified-coffee-network"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-[var(--color-admin-text-muted)] font-bold mb-1 block">الوصف</label>
+                <textarea 
+                  value={newNetwork.description}
+                  onChange={e => setNewNetwork(p => ({...p, description: e.target.value}))}
+                  className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] rounded-lg px-3 py-2 text-xs text-[var(--color-admin-text)] focus:outline-none focus:border-[var(--color-admin-primary)]"
+                  rows={3}
+                  placeholder="وصف الشبكة..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button 
+                onClick={() => setShowCreateNetworkModal(false)}
+                className="bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1.5 px-3 rounded border border-[var(--color-admin-border)] cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={handleCreateNetwork}
+                className="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold py-1.5 px-3 rounded cursor-pointer"
+              >
+                إنشاء
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowAddMemberModal(false)}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${adminCard} p-6 rounded-2xl w-full max-w-sm`} 
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold mb-4">إضافة عضو للشبكة</h3>
+            <div>
+              <label className="text-[10px] text-[var(--color-admin-text-muted)] font-bold mb-1 block">Tenant ID *</label>
+              <input 
+                type="text" 
+                value={addMemberTenantId}
+                onChange={e => setAddMemberTenantId(e.target.value)}
+                className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] rounded-lg px-3 py-2 text-xs text-[var(--color-admin-text)] font-mono focus:outline-none focus:border-[var(--color-admin-primary)]"
+                placeholder="أدخل Tenant ID"
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button 
+                onClick={() => setShowAddMemberModal(false)}
+                className="bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1.5 px-3 rounded border border-[var(--color-admin-border)] cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={handleAddMember}
+                className="bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-bold py-1.5 px-3 rounded cursor-pointer"
+              >
+                إضافة
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

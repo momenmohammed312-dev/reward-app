@@ -77,10 +77,10 @@ async function seed() {
     [yasmeen.id, 'admin@yasmeen.com', hash, 'مدير الياسمين', 'owner']
   );
 
-  // Superadmin user
+  // Superadmin user (must have tenant_id = NULL so it is platform-scoped)
   await db.query(
     `INSERT INTO users (tenant_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5)`,
-    [aroma.id, 'superadmin@mo2.com', hash, 'MO2 Super Admin', 'superadmin']
+    [null, 'superadmin@mo2.com', hash, 'MO2 Super Admin', 'superadmin']
   );
   console.log('  ✅ Admin users created (password: admin123)');
 
@@ -125,13 +125,17 @@ async function seed() {
   console.log(`  ✅ ${aromaCustomers.length + brewCustomers.length + yasmeenCustomers.length} customers created`);
 
   // 7. Seed wallet_ledger entries (so customers have balances)
-  const allCustomers = [...aromaCustomers, ...brewCustomers, ...yasmeenCustomers].map(c => c.rows[0]);
+  const allCustomers = [
+    ...aromaCustomers.map(c => ({ ...c.rows[0], tenant_id: aroma.id })),
+    ...brewCustomers.map(c => ({ ...c.rows[0], tenant_id: brewCo.id })),
+    ...yasmeenCustomers.map(c => ({ ...c.rows[0], tenant_id: yasmeen.id })),
+  ];
 
   for (const c of allCustomers) {
     const earned = Math.floor(Math.random() * 2000) + 100;
     await db.query(
       `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, note, created_by, created_at) VALUES ($1, $2, 'earned', $3, $4, 'system', NOW() - INTERVAL '1 day')`,
-      [c.tenant_id || aroma.id, c.id, earned, 'ترحيب جديد في برنامج الولاء']
+      [c.tenant_id, c.id, earned, 'ترحيب جديد في برنامج الولاء']
     );
   }
   console.log(`  ✅ Wallet ledger entries created`);

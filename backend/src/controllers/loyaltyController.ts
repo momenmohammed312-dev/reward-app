@@ -80,15 +80,28 @@ export class LoyaltyController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const offset = (page - 1) * limit;
+
+      const countRes = await db.query(
+        `SELECT COUNT(*)::int AS total
+         FROM wallet_ledger
+         WHERE tenant_id = $1::uuid AND customer_id = $2`,
+        [tenantId, customerId]
+      );
+      const total = countRes.rows[0].total;
+
       const result = await db.query(
         `SELECT type, points, reference_type, note, created_at
          FROM wallet_ledger
          WHERE tenant_id = $1::uuid AND customer_id = $2
-         ORDER BY created_at DESC`,
-        [tenantId, customerId]
+         ORDER BY created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [tenantId, customerId, limit, offset]
       );
 
-      res.json(result.rows);
+      res.json({ rows: result.rows, total, page, limit });
     } catch (error) {
       logger.error('Ledger history error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
@@ -111,13 +124,27 @@ export class LoyaltyController {
 
       if (!resolvedCustomerId && customer_phone) {
         const custRes = await db.query(
-          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2',
+          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
           [tenantId, customer_phone]
         );
         if (custRes.rows.length === 0) {
           return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone' });
         }
         resolvedCustomerId = custRes.rows[0].id;
+      }
+
+      if (!resolvedCustomerId) {
+        return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) is required' });
+      }
+
+      // Verify the customer actually belongs to this tenant (guards against
+      // cross-tenant writes when customer_id is passed directly) and is active
+      const customerCheck = await db.query(
+        `SELECT id FROM customers WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL`,
+        [resolvedCustomerId, tenantId]
+      );
+      if (customerCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Customer not found for this tenant' });
       }
 
       // Record a manual bonus ledger record
@@ -132,6 +159,64 @@ export class LoyaltyController {
     } catch (error) {
       logger.error('Admin earn error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
+   * Allows admins to refund a transaction and claw back the awarded points.
+   */
+  static async adminRefundTransaction(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      const { invoice_id } = req.body;
+
+      const result = await LoyaltyService.refundPoints(tenantId!, invoice_id);
+      res.json(result);
+    } catch (error: any) {
+      logger.error('Admin refund error', { error: (error as Error).message });
+      res.status(400).json({ error: 'Refund Failed', message: error.message });
+    }
+  }
+
+  /**
+   * Allows admins to apply a signed points adjustment (credit or reversal).
+   */
+  static async adminAdjustPoints(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      const { customer_id, customer_phone, points, note } = req.body;
+
+      let resolvedCustomerId = customer_id;
+
+      if (!resolvedCustomerId && customer_phone) {
+        const custRes = await db.query(
+          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+          [tenantId, customer_phone]
+        );
+        if (custRes.rows.length === 0) {
+          return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone' });
+        }
+        resolvedCustomerId = custRes.rows[0].id;
+      }
+
+      if (!resolvedCustomerId) {
+        return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) is required' });
+      }
+
+      const customerCheck = await db.query(
+        `SELECT id FROM customers WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL`,
+        [resolvedCustomerId, tenantId]
+      );
+      if (customerCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Customer not found for this tenant' });
+      }
+
+      const result = await LoyaltyService.adjustPoints(tenantId!, resolvedCustomerId, points, note);
+      await logAdminAction(tenantId!, req.user?.id, 'adjust_points', 'customer', resolvedCustomerId, { points, note });
+      res.json({ message: 'Points adjusted successfully', ...result });
+    } catch (error: any) {
+      logger.error('Admin adjust error', { error: (error as Error).message });
+      res.status(400).json({ error: 'Adjustment Failed', message: error.message });
     }
   }
 

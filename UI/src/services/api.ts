@@ -349,6 +349,121 @@ class ApiService {
     if (!response.ok) throw new Error('Failed to fetch superadmin stats');
     return response.json();
   }
+
+  // --- SUPER ADMIN: NETWORKS ---
+
+  async getSuperAdminNetworks() {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks`, {
+      method: 'GET',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch networks');
+    return response.json();
+  }
+
+  async getSuperAdminNetworkById(id: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${id}`, {
+      method: 'GET',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch network');
+    return response.json();
+  }
+
+  async createNetwork(data: { name: string; slug: string; description?: string; logo_url?: string }) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks`, {
+      method: 'POST',
+      headers: this.getSuperAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create network');
+    }
+    return response.json();
+  }
+
+  async updateNetwork(id: string, data: { name?: string; description?: string; logo_url?: string; is_active?: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${id}`, {
+      method: 'PATCH',
+      headers: this.getSuperAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update network');
+    }
+    return response.json();
+  }
+
+  async deactivateNetwork(id: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${id}`, {
+      method: 'DELETE',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to deactivate network');
+    return response.json();
+  }
+
+  async addNetworkMember(networkId: string, tenantId: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${networkId}/members`, {
+      method: 'POST',
+      headers: this.getSuperAdminHeaders(),
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to add member');
+    }
+    return response.json();
+  }
+
+  async removeNetworkMember(networkId: string, tenantId: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${networkId}/members/${tenantId}`, {
+      method: 'DELETE',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to remove member');
+    return response.json();
+  }
+
+  async suspendNetworkMember(networkId: string, tenantId: string) {
+    const response = await fetch(`${API_BASE_URL}/superadmin/networks/${networkId}/members/${tenantId}/suspend`, {
+      method: 'PATCH',
+      headers: this.getSuperAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to suspend member');
+    return response.json();
+  }
+
+  // --- TENANT: NETWORKS ---
+
+  async getMyNetworks() {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch networks');
+    return response.json();
+  }
+
+  async getMyNetworkDetails(id: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${id}`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch network details');
+    return response.json();
+  }
+
+  async leaveNetwork(id: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${id}/leave`, {
+      method: 'DELETE',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to leave network');
+    return response.json();
+  }
 }
 
 export const api = new ApiService();

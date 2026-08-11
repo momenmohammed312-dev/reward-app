@@ -10,6 +10,8 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import rewardsRoutes from './routes/rewardsRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
+import superadminNetworkRoutes from './routes/superadminNetworkRoutes.js';
+import tenantNetworkRoutes from './routes/tenantNetworkRoutes.js';
 import { generalLimiter, authLimiter, webhookLimiter } from './middlewares/rateLimit.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
@@ -21,17 +23,34 @@ const app = express();
 
 app.use(helmet());
 
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:5173')
-  .split(',')
-  .map(o => o.trim());
+// Default dev origins cover Vite (5173/4173), CRA/Next.js (3000), and common alt ports.
+// In production, set CORS_ALLOWED_ORIGINS in your .env (comma-separated list).
+const defaultDevOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:8080',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:8080',
+];
+
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : defaultDevOrigins;
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Origin not allowed by CORS'), false);
+    // Allow requests with no origin (server-to-server, Postman, curl) during dev.
+    if (!origin) {
+      return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    logger.warn(`CORS blocked request from origin: ${origin}`);
+    return callback(new Error('Origin not allowed by CORS'), false);
   },
   credentials: true,
 }));
@@ -47,6 +66,8 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/superadmin', superadminRoutes);
+app.use('/api/superadmin/networks', superadminNetworkRoutes);
+app.use('/api/tenants', tenantNetworkRoutes);
 
 const protectDocs = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;

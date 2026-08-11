@@ -10,6 +10,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import { useApp } from '../store/AppContext';
 import { api } from '../services/api';
 import { Modal } from '../components/ui/Modal';
+import { MyNetworks } from '../components/MyNetworks';
 
 const chartData = [
   { month: 'يناير', earned: 12400, redeemed: 3200 },
@@ -903,6 +904,10 @@ export const AdminDashboard: React.FC = () => {
               </form>
             </div>
           </div>
+        )}
+
+        {activeSubTab === 'networks' && (
+          <MyNetworks />
         )}
         </motion.div>
       </AnimatePresence>

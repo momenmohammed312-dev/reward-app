@@ -21,6 +21,22 @@ router.post(
 );
 
 router.post(
+  '/refund',
+  authenticateJWT,
+  requireRole(['owner', 'manager']),
+  validate(schemas.refundTransaction),
+  LoyaltyController.adminRefundTransaction
+);
+
+router.post(
+  '/adjust',
+  authenticateJWT,
+  requireRole(['owner', 'manager']),
+  validate(schemas.adjustPoints),
+  LoyaltyController.adminAdjustPoints
+);
+
+router.post(
   '/process-redemption',
   authenticateJWT,
   requireRole(['owner', 'manager', 'cashier']),

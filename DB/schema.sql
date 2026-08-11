@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. ENUMS Creation
-CREATE TYPE ledger_type AS ENUM ('earned', 'redeemed', 'bonus', 'refund', 'expired', 'adjustment');
+CREATE TYPE ledger_type AS ENUM ('earned', 'redeemed', 'bonus', 'refund', 'expired', 'adjustment', 'reversal');
 CREATE TYPE reward_type AS ENUM ('free_item', 'discount_fixed', 'discount_percent', 'free_upgrade');
 CREATE TYPE pos_type AS ENUM ('foodics', 'square', 'toast', 'custom_api', 'manual');
 CREATE TYPE tier_type AS ENUM ('bronze', 'silver', 'gold', 'platinum');
@@ -184,8 +184,8 @@ CREATE OR REPLACE VIEW customer_balances AS
 SELECT 
     tenant_id,
     customer_id,
-    SUM(CASE WHEN type IN ('earned', 'bonus', 'refund') THEN points
-             WHEN type IN ('redeemed', 'expired') THEN -points
+    SUM(CASE WHEN type IN ('earned', 'bonus', 'refund', 'adjustment') THEN points
+             WHEN type IN ('redeemed', 'expired', 'reversal') THEN -points
         END) AS current_balance,
     SUM(CASE WHEN type IN ('earned', 'bonus') THEN points ELSE 0 END) AS total_earned,
     SUM(CASE WHEN type = 'redeemed' THEN points ELSE 0 END) AS total_redeemed

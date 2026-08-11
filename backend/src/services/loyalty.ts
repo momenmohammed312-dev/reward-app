@@ -1,4 +1,6 @@
 import db from '../config/db.js';
+import { calculatePointsEarned } from '../helpers/points.js';
+import { LedgerService } from './ledger.js';
 
 export class LoyaltyService {
   /**
@@ -45,13 +47,9 @@ export class LoyaltyService {
 
       const { points_per_egp, min_purchase_egp } = tenantRes.rows[0];
 
-      if (amount < Number(min_purchase_egp)) {
-        throw new Error(`Amount is less than minimum purchase threshold (${min_purchase_egp} EGP)`);
-      }
-
       const customerRes = await client.query(
-        'SELECT tier FROM customers WHERE id = $1',
-        [customerId]
+        'SELECT tier FROM customers WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL',
+        [customerId, tenantId]
       );
       if (customerRes.rows.length === 0) {
         throw new Error('Customer not found');
@@ -74,7 +72,7 @@ export class LoyaltyService {
       }
 
       // Calculate final points
-      const pointsEarned = Math.floor(amount * Number(points_per_egp) * multiplier);
+      const pointsEarned = calculatePointsEarned(amount, Number(points_per_egp), multiplier, Number(min_purchase_egp));
 
       // 2. Record transaction (with ON CONFLICT DO NOTHING to ensure idempotency)
       const txRes = await client.query(
@@ -89,12 +87,17 @@ export class LoyaltyService {
       if (txRes.rows.length > 0) {
         const transactionId = txRes.rows[0].id;
 
-        // 3. Record in Wallet Ledger
-        await client.query(
-          `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, reference_id, reference_type, note)
-           VALUES ($1, $2, 'earned', $3, $4, 'transaction', $5)`,
-          [tenantId, customerId, pointsEarned, transactionId, notes || 'Earned from purchase']
-        );
+        // 3. Record in Wallet Ledger (idempotent per transaction)
+        await LedgerService.insert(client, {
+          tenantId,
+          customerId,
+          type: 'earned',
+          points: pointsEarned,
+          referenceId: transactionId,
+          referenceType: 'transaction',
+          note: notes || 'Earned from purchase',
+          idempotencyKey: `earn:${transactionId}`,
+        });
       }
 
       await client.query('COMMIT');
@@ -121,14 +124,14 @@ export class LoyaltyService {
     try {
       await client.query('BEGIN');
 
-      // 1. Lock customer row and fetch current balance
+      // 1. Lock customer row and fetch current balance (scoped to tenant)
       const balanceRes = await client.query(
         `SELECT c.id, COALESCE(cb.current_balance, 0) AS points_balance
          FROM customers c
          LEFT JOIN customer_balances cb ON c.id = cb.customer_id
-         WHERE c.id = $1
+         WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL
          FOR UPDATE`,
-        [customerId]
+        [customerId, tenantId]
       );
       if (balanceRes.rows.length === 0) {
         throw new Error('Customer not found');
@@ -138,14 +141,14 @@ export class LoyaltyService {
 
       // 2. Fetch reward details
       const rewardRes = await client.query(
-        `SELECT required_points, code_validity_hours, min_tier, is_active FROM rewards WHERE id = $1 AND tenant_id = $2`,
+        `SELECT required_points, code_validity_hours, min_tier, max_redemptions, is_active FROM rewards WHERE id = $1 AND tenant_id = $2`,
         [rewardId, tenantId]
       );
       if (rewardRes.rows.length === 0) {
         throw new Error('Reward not found');
       }
 
-      const { required_points, code_validity_hours, min_tier, is_active } = rewardRes.rows[0];
+      const { required_points, code_validity_hours, min_tier, max_redemptions, is_active } = rewardRes.rows[0];
 
       if (!is_active) {
         throw new Error('Reward is currently inactive');
@@ -153,6 +156,17 @@ export class LoyaltyService {
 
       if (balance < required_points) {
         throw new Error(`Insufficient points balance. Required: ${required_points}, Available: ${balance}`);
+      }
+
+      // Enforce global redemption cap for the reward, if configured
+      if (max_redemptions !== null) {
+        const redemptionCountRes = await client.query(
+          `SELECT COUNT(*)::int AS total FROM redemptions WHERE reward_id = $1`,
+          [rewardId]
+        );
+        if (redemptionCountRes.rows[0].total >= Number(max_redemptions)) {
+          throw new Error('Reward has reached its redemption limit');
+        }
       }
 
       // Check tier permission if needed
@@ -184,12 +198,17 @@ export class LoyaltyService {
 
       const redemptionId = redemptionRes.rows[0].id;
 
-      // 5. Deduct points via Wallet Ledger
-      await client.query(
-        `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, reference_id, reference_type, note)
-         VALUES ($1, $2, 'redeemed', $3, $4, 'redemption', $5)`,
-        [tenantId, customerId, required_points, redemptionId, `Redeemed reward: ${rewardId}`]
-      );
+      // 5. Deduct points via Wallet Ledger (idempotent per redemption)
+      await LedgerService.insert(client, {
+        tenantId,
+        customerId,
+        type: 'redeemed',
+        points: required_points,
+        referenceId: redemptionId,
+        referenceType: 'redemption',
+        note: `Redeemed reward: ${rewardId}`,
+        idempotencyKey: `redeem:${redemptionId}`,
+      });
 
       await client.query('COMMIT');
       return { success: true, code: redemptionCode, expiresAt };
@@ -233,15 +252,67 @@ export class LoyaltyService {
         throw new Error('Transaction has already been refunded');
       }
 
-      // Record refund in ledger
-      await client.query(
-        `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, reference_id, reference_type, note)
-         VALUES ($1, $2, 'refund', $3, $4, 'transaction', $5)`,
-        [tenantId, customer_id, points_earned, id, `Refund for invoice: ${invoiceId}`]
-      );
+      // Record refund in ledger (idempotent per transaction)
+      await LedgerService.insert(client, {
+        tenantId,
+        customerId: customer_id,
+        type: 'refund',
+        points: points_earned,
+        referenceId: id,
+        referenceType: 'transaction',
+        note: `Refund for invoice: ${invoiceId}`,
+        idempotencyKey: `refund:${id}`,
+      });
 
       await client.query('COMMIT');
       return { success: true, pointsRefunded: points_earned };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Manual points adjustment by an admin: positive points become an
+   * 'adjustment' credit, negative points a 'reversal' debit. Reversals are
+   * refused if they would take the customer's balance below zero.
+   */
+  static async adjustPoints(tenantId: string, customerId: string, points: number, note?: string) {
+    const client = await db.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const balanceRes = await client.query(
+        `SELECT COALESCE(cb.current_balance, 0) AS balance
+         FROM customers c
+         LEFT JOIN customer_balances cb ON c.id = cb.customer_id
+         WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL
+         FOR UPDATE`,
+        [customerId, tenantId]
+      );
+      if (balanceRes.rows.length === 0) {
+        throw new Error('Customer not found');
+      }
+
+      const balance = Number(balanceRes.rows[0].balance);
+      if (points < 0 && balance + points < 0) {
+        throw new Error(`Cannot reverse ${Math.abs(points)} points; available balance is ${balance}`);
+      }
+
+      await LedgerService.insert(client, {
+        tenantId,
+        customerId,
+        type: points > 0 ? 'adjustment' : 'reversal',
+        points: Math.abs(points),
+        referenceType: 'adjustment',
+        note: note || 'Manual points adjustment',
+      });
+
+      await client.query('COMMIT');
+      return { success: true, newBalance: balance + points };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

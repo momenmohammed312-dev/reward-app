@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ChartBar, Users, Gift, Storefront, SignOut, Gear,
-  UserGear, Gauge 
+  UserGear, Gauge, Network 
 } from '@phosphor-icons/react';
 import { applyTenantTheme } from '../theme/themeLoader';
 import { mockTenants } from '../services/mockData';
@@ -16,6 +16,7 @@ const navItems = [
   { key: 'customers', label: 'العملاء', icon: Users },
   { key: 'rewards', label: 'المكافآت', icon: Gift },
   { key: 'branches', label: 'الفروع', icon: Storefront },
+  { key: 'networks', label: 'الشبكات', icon: Network },
   { key: 'settings', label: 'الإعدادات', icon: Gear },
 ];
 
