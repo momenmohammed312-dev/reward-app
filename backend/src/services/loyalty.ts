@@ -6,11 +6,12 @@ export class LoyaltyService {
   /**
    * Fetches customer details including points balance and summary.
    */
-  static async getCustomerPointsSummary(customerId: string) {
-    const result = await db.query(
-      `SELECT id, tenant_id, phone, name, tier, points_balance, total_earned, total_redeemed, is_verified, last_visit FROM customer_summary WHERE id = $1`,
-      [customerId]
-    );
+  static async getCustomerPointsSummary(customerId: string, tenantId?: string) {
+    const query = tenantId
+      ? `SELECT id, tenant_id, phone, name, tier, points_balance, total_earned, total_redeemed, is_verified, last_visit FROM customer_summary WHERE id = $1 AND tenant_id = $2::uuid`
+      : `SELECT id, tenant_id, phone, name, tier, points_balance, total_earned, total_redeemed, is_verified, last_visit FROM customer_summary WHERE id = $1`;
+    const params = tenantId ? [customerId, tenantId] : [customerId];
+    const result = await db.query(query, params);
 
     if (result.rows.length === 0) {
       throw new Error('Customer not found');
@@ -83,11 +84,16 @@ export class LoyaltyService {
         [tenantId, customerId, branchId, invoiceId, amount, pointsEarned]
       );
 
-      // If the transaction already exists, skip ledger insertion to prevent duplicate points
-      if (txRes.rows.length > 0) {
-        const transactionId = txRes.rows[0].id;
+      // If transaction already existed, idempotently return existing summary
+      if (txRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return await this.getCustomerPointsSummary(customerId, tenantId);
+      }
 
-        // 3. Record in Wallet Ledger (idempotent per transaction)
+      const transactionId = txRes.rows[0].id;
+
+      // 3. Record positive points in Wallet Ledger (idempotent per invoice)
+      if (pointsEarned > 0) {
         await LedgerService.insert(client, {
           tenantId,
           customerId,
@@ -95,13 +101,19 @@ export class LoyaltyService {
           points: pointsEarned,
           referenceId: transactionId,
           referenceType: 'transaction',
-          note: notes || 'Earned from purchase',
-          idempotencyKey: `earn:${transactionId}`,
+          note: notes || `Earned from invoice ${invoiceId}`,
+          idempotencyKey: `earn:${tenantId}:${invoiceId}`,
         });
       }
 
+      // 4. Update customer last_visit timestamp
+      await client.query(
+        'UPDATE customers SET last_visit = NOW() WHERE id = $1 AND tenant_id = $2',
+        [customerId, tenantId]
+      );
+
       await client.query('COMMIT');
-      return { success: true, pointsEarned };
+      return await this.getCustomerPointsSummary(customerId, tenantId);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -111,7 +123,8 @@ export class LoyaltyService {
   }
 
   /**
-   * Generates a redemption code and deducts points for a reward.
+   * Generates a redemption code and deducts points for a reward
+   * with OTP verification guard and atomic max_redemptions protection.
    */
   static async redeemReward(
     tenantId: string,
@@ -124,60 +137,55 @@ export class LoyaltyService {
     try {
       await client.query('BEGIN');
 
-      // 1. Lock customer row and fetch current balance (scoped to tenant)
+      // 1. Lock customer row, verify OTP verification status, and fetch current balance
       const balanceRes = await client.query(
-        `SELECT c.id, COALESCE(cb.current_balance, 0) AS points_balance
+        `SELECT c.id, c.tier, c.is_verified, COALESCE(cb.current_balance, 0) AS points_balance
          FROM customers c
-         LEFT JOIN customer_balances cb ON c.id = cb.customer_id
+         LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
          WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL
-         FOR UPDATE`,
+         FOR UPDATE OF c`,
         [customerId, tenantId]
       );
       if (balanceRes.rows.length === 0) {
         throw new Error('Customer not found');
       }
 
-      const balance = balanceRes.rows[0].points_balance;
+      const customer = balanceRes.rows[0];
 
-      // 2. Fetch reward details
-      const rewardRes = await client.query(
-        `SELECT required_points, code_validity_hours, min_tier, max_redemptions, is_active FROM rewards WHERE id = $1 AND tenant_id = $2`,
+      if (!customer.is_verified) {
+        throw new Error('Customer phone must be verified via OTP before redeeming rewards');
+      }
+
+      // 2. Atomic reward reservation (prevents concurrent over-redemption past max_redemptions)
+      const rewardUpdateRes = await client.query(
+        `UPDATE rewards
+         SET current_redemptions = COALESCE(current_redemptions, 0) + 1,
+             updated_at = NOW()
+         WHERE id = $1
+           AND tenant_id = $2
+           AND deleted_at IS NULL
+           AND is_active = true
+           AND (max_redemptions IS NULL OR COALESCE(current_redemptions, 0) < max_redemptions)
+         RETURNING id, name, required_points, code_validity_hours, min_tier`,
         [rewardId, tenantId]
       );
-      if (rewardRes.rows.length === 0) {
-        throw new Error('Reward not found');
+      if (rewardUpdateRes.rows.length === 0) {
+        throw new Error('Reward is inactive or redemption limit has been reached');
       }
 
-      const { required_points, code_validity_hours, min_tier, max_redemptions, is_active } = rewardRes.rows[0];
+      const reward = rewardUpdateRes.rows[0];
+      const pointsRequired = Number(reward.required_points);
+      const balance = Number(customer.points_balance);
 
-      if (!is_active) {
-        throw new Error('Reward is currently inactive');
-      }
-
-      if (balance < required_points) {
-        throw new Error(`Insufficient points balance. Required: ${required_points}, Available: ${balance}`);
-      }
-
-      // Enforce global redemption cap for the reward, if configured
-      if (max_redemptions !== null) {
-        const redemptionCountRes = await client.query(
-          `SELECT COUNT(*)::int AS total FROM redemptions WHERE reward_id = $1`,
-          [rewardId]
-        );
-        if (redemptionCountRes.rows[0].total >= Number(max_redemptions)) {
-          throw new Error('Reward has reached its redemption limit');
-        }
+      if (balance < pointsRequired) {
+        throw new Error(`Insufficient points balance. Required: ${pointsRequired}, Available: ${balance}`);
       }
 
       // Check tier permission if needed
-      // (Simplified: assuming tier ranking order bronze < silver < gold < platinum)
-      if (min_tier) {
-        const customerRes = await client.query('SELECT tier FROM customers WHERE id = $1', [customerId]);
-        const currentTier = customerRes.rows[0].tier;
+      if (reward.min_tier && customer.tier) {
         const tierHierarchy: Record<string, number> = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
-
-        if (tierHierarchy[currentTier] < tierHierarchy[min_tier]) {
-          throw new Error(`Reward is restricted to ${min_tier} tier and above`);
+        if ((tierHierarchy[customer.tier] ?? 0) < (tierHierarchy[reward.min_tier] ?? 0)) {
+          throw new Error(`Reward is restricted to ${reward.min_tier} tier and above`);
         }
       }
 
@@ -185,33 +193,43 @@ export class LoyaltyService {
       const codeRes = await client.query('SELECT generate_redemption_code() as code');
       const redemptionCode = codeRes.rows[0].code;
 
+      const validityHours = Number(reward.code_validity_hours ?? 24);
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + code_validity_hours);
+      expiresAt.setHours(expiresAt.getHours() + validityHours);
 
       // 4. Create Redemption Record
       const redemptionRes = await client.query(
         `INSERT INTO redemptions (tenant_id, customer_id, reward_id, branch_id, code, points_used, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [tenantId, customerId, rewardId, branchId || null, redemptionCode, required_points, expiresAt]
+         RETURNING id, code`,
+        [tenantId, customerId, rewardId, branchId || null, redemptionCode, pointsRequired, expiresAt]
       );
 
       const redemptionId = redemptionRes.rows[0].id;
+      const finalCode = redemptionRes.rows[0].code || redemptionCode;
 
       // 5. Deduct points via Wallet Ledger (idempotent per redemption)
       await LedgerService.insert(client, {
         tenantId,
         customerId,
         type: 'redeemed',
-        points: required_points,
+        points: pointsRequired,
         referenceId: redemptionId,
         referenceType: 'redemption',
-        note: `Redeemed reward: ${rewardId}`,
+        note: `Redeemed reward: ${reward.name || rewardId}`,
         idempotencyKey: `redeem:${redemptionId}`,
       });
 
       await client.query('COMMIT');
-      return { success: true, code: redemptionCode, expiresAt };
+      return {
+        success: true,
+        redemptionId,
+        code: finalCode,
+        redemptionCode: finalCode,
+        expiresAt,
+        pointsSpent: pointsRequired,
+        remainingBalance: balance - pointsRequired,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -221,51 +239,51 @@ export class LoyaltyService {
   }
 
   /**
-   * Handles refunding a transaction and clawing back loyalty points.
+   * Claws back points for a refunded transaction using 'reversal' debit type.
    */
-  static async refundPoints(tenantId: string, invoiceId: string) {
+  static async refundPoints(tenantId: string, invoiceId: string, notes?: string) {
     const client = await db.pool.connect();
 
     try {
       await client.query('BEGIN');
 
-      // Find original transaction
       const txRes = await client.query(
         'SELECT id, customer_id, points_earned FROM transactions WHERE tenant_id = $1 AND invoice_id = $2',
         [tenantId, invoiceId]
       );
 
       if (txRes.rows.length === 0) {
-        throw new Error('Original transaction not found');
+        throw new Error('Original transaction for refund not found');
       }
 
-      const { id, customer_id, points_earned } = txRes.rows[0];
+      const { id: transactionId, customer_id: customerId, points_earned: pointsEarned } = txRes.rows[0];
 
-      // Check if already refunded
-      const refundCheck = await client.query(
+      // Check if already refunded/reversed
+      const existingReversal = await client.query(
         `SELECT id FROM wallet_ledger
-         WHERE tenant_id = $1 AND customer_id = $2 AND type = 'refund' AND reference_id = $3`,
-        [tenantId, customer_id, id]
+         WHERE tenant_id = $1 AND customer_id = $2 AND reference_id = $3 AND type = 'reversal'`,
+        [tenantId, customerId, transactionId]
       );
 
-      if (refundCheck.rows.length > 0) {
+      if (existingReversal.rows.length > 0) {
         throw new Error('Transaction has already been refunded');
       }
 
-      // Record refund in ledger (idempotent per transaction)
-      await LedgerService.insert(client, {
-        tenantId,
-        customerId: customer_id,
-        type: 'refund',
-        points: points_earned,
-        referenceId: id,
-        referenceType: 'transaction',
-        note: `Refund for invoice: ${invoiceId}`,
-        idempotencyKey: `refund:${id}`,
-      });
+      if (Number(pointsEarned) > 0) {
+        await LedgerService.insert(client, {
+          tenantId,
+          customerId,
+          type: 'reversal',
+          points: Number(pointsEarned),
+          referenceId: transactionId,
+          referenceType: 'transaction',
+          note: notes || `Refund reversal for invoice ${invoiceId}`,
+          idempotencyKey: `reversal:${tenantId}:${invoiceId}`,
+        });
+      }
 
       await client.query('COMMIT');
-      return { success: true, pointsRefunded: points_earned };
+      return await this.getCustomerPointsSummary(customerId, tenantId);
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

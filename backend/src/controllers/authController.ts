@@ -214,7 +214,16 @@ export class AuthController {
       }
 
       // Verify OTP
-      const isValid = await OTPService.verifyOTP(resolvedTenantId, phone, code);
+      let isValid = false;
+      try {
+        isValid = await OTPService.verifyOTP(resolvedTenantId, phone, code);
+      } catch (otpError: unknown) {
+        const message =
+          otpError instanceof Error
+            ? otpError.message
+            : 'The OTP code is invalid, expired, or has exceeded attempts';
+        return res.status(400).json({ error: 'Invalid OTP', message });
+      }
       if (!isValid) {
         return res.status(400).json({ error: 'Invalid OTP', message: 'The OTP code is invalid, expired, or has exceeded attempts' });
       }
@@ -223,7 +232,7 @@ export class AuthController {
       const customerResult = await db.query(
         `UPDATE customers
          SET is_verified = true, last_visit = NOW()
-         WHERE tenant_id = $1::uuid AND phone = $2
+         WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL
          RETURNING id, name, phone, tier`,
         [resolvedTenantId, phone]
       );

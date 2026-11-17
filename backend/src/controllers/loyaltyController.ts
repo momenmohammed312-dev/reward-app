@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import db from '../config/db.js';
 import { LoyaltyService } from '../services/loyalty.js';
+import { LedgerService } from '../services/ledger.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { logger } from '../services/logger.js';
 
@@ -109,56 +110,99 @@ export class LoyaltyController {
   }
 
   /**
-   * Allows admins to manually award bonus points to a customer.
+   * Allows admins/cashiers to manually award bonus points to a customer via LedgerService.insert.
    */
   static async adminEarnPointsManual(req: AuthenticatedRequest, res: Response) {
-    try {
-      const tenantId = req.user?.tenant_id;
-      const { customer_id, customer_phone, amount, note } = req.body;
+    const tenantId = req.user?.tenant_id;
+    const adminUserId = req.user?.id;
+    const { customer_id, customer_phone, points, amount, reason, note, branch_id } = req.body;
 
-      if ((!customer_id && !customer_phone) || !amount) {
-        return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) and amount are required' });
-      }
+    if (!tenantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // 2.6 Branch-level authorization: cashier cannot grant points across different branches
+    if (req.user?.role === 'cashier' && req.user?.branch_id && branch_id && req.user.branch_id !== branch_id) {
+      return res.status(403).json({ error: 'Cashier cannot perform actions for a different branch' });
+    }
+
+    const pointsToAdd = points ?? amount;
+    if ((!customer_id && !customer_phone) || typeof pointsToAdd !== 'number' || pointsToAdd <= 0) {
+      return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) and positive points/amount are required' });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
 
       let resolvedCustomerId = customer_id;
 
       if (!resolvedCustomerId && customer_phone) {
-        const custRes = await db.query(
+        const custRes = await client.query(
           'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
           [tenantId, customer_phone]
         );
         if (custRes.rows.length === 0) {
+          await client.query('ROLLBACK');
           return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone' });
         }
         resolvedCustomerId = custRes.rows[0].id;
       }
 
       if (!resolvedCustomerId) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) is required' });
       }
 
-      // Verify the customer actually belongs to this tenant (guards against
-      // cross-tenant writes when customer_id is passed directly) and is active
-      const customerCheck = await db.query(
+      // Verify customer ownership within tenant
+      const customerCheck = await client.query(
         `SELECT id FROM customers WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL`,
         [resolvedCustomerId, tenantId]
       );
       if (customerCheck.rows.length === 0) {
-        return res.status(404).json({ error: 'Not Found', message: 'Customer not found for this tenant' });
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Customer not found' });
       }
 
-      // Record a manual bonus ledger record
-      await db.query(
-        `INSERT INTO wallet_ledger (tenant_id, customer_id, type, points, note, created_by)
-         VALUES ($1::uuid, $2::uuid, 'bonus', $3, $4, $5)`,
-        [tenantId, resolvedCustomerId, amount, note || 'Manual points adjustment', req.user?.email || 'admin']
-      );
+      const noteText = reason ?? note ?? 'Manual points granted by admin';
 
-      await logAdminAction(tenantId!, req.user?.id, 'earn_bonus', 'customer', resolvedCustomerId, { amount, note });
-      res.json({ message: 'Points awarded successfully' });
-    } catch (error) {
-      logger.error('Admin earn error', { error: (error as Error).message });
-      res.status(500).json({ error: 'Internal Server Error' });
+      // Route write strictly through LedgerService.insert()
+      const ledgerEntry = await LedgerService.insert(client, {
+        tenantId,
+        customerId: resolvedCustomerId,
+        type: 'bonus',
+        points: pointsToAdd,
+        note: noteText,
+        createdBy: adminUserId || req.user?.email || 'admin',
+        idempotencyKey: `manual:${tenantId}:${resolvedCustomerId}:${Date.now()}`,
+      });
+
+      await client.query('COMMIT');
+
+      const ledgerId =
+        ledgerEntry?.rows?.[0]?.id ??
+        (ledgerEntry as unknown as { id?: string } | undefined)?.id;
+
+      await logAdminAction(tenantId, adminUserId, 'manual_points_grant', 'customer', resolvedCustomerId, {
+        points: pointsToAdd,
+        reason: noteText,
+        ledgerId,
+      });
+
+      const updatedSummary = await LoyaltyService.getCustomerPointsSummary(resolvedCustomerId, tenantId);
+      return res.json({
+        success: true,
+        message: 'Points awarded successfully',
+        pointsAdded: pointsToAdd,
+        summary: updatedSummary,
+      });
+    } catch (error: unknown) {
+      await client.query('ROLLBACK');
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('Admin earn error', { error: msg });
+      return res.status(500).json({ error: 'Internal Server Error', message: msg });
+    } finally {
+      client.release();
     }
   }
 
@@ -241,53 +285,74 @@ export class LoyaltyController {
   }
 
   /**
-   * Cashier processes/validates a redemption code at checkout.
+   * Cashier processes/validates a redemption code at checkout (transactional FOR UPDATE + branch check).
    */
   static async cashierProcessRedemption(req: AuthenticatedRequest, res: Response) {
+    const tenantId = req.user?.tenant_id;
+    const rawCode = req.body?.code || req.body?.redemption_code;
+
+    if (!tenantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!rawCode) {
+      return res.status(400).json({ error: 'Missing fields', message: 'code is required' });
+    }
+
+    const normalizedCode = String(rawCode).trim().toUpperCase();
+    const client = await db.pool.connect();
+
     try {
-      const tenantId = req.user?.tenant_id;
-      const { code } = req.body;
+      await client.query('BEGIN');
 
-      if (!code) {
-        return res.status(400).json({ error: 'Missing fields', message: 'code is required' });
-      }
-
-      // Check if code is valid, unused, and not expired (with row lock)
-      const result = await db.query(
+      const result = await client.query(
         `SELECT r.*, rw.name as reward_name, rw.reward_type, rw.discount_value, c.name as customer_name, c.phone as customer_phone
          FROM redemptions r
          JOIN rewards rw ON r.reward_id = rw.id
          JOIN customers c ON r.customer_id = c.id
-         WHERE r.code = $1 AND r.tenant_id = $2
+         WHERE r.code = $1 AND r.tenant_id = $2::uuid
          FOR UPDATE OF r`,
-        [code, tenantId]
+        [normalizedCode, tenantId]
       );
 
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Not Found', message: 'Invalid redemption code' });
       }
 
       const redemption = result.rows[0];
 
       if (redemption.used_at) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Redemption Failed', message: `Code has already been used on ${redemption.used_at}` });
       }
 
-      if (new Date() > new Date(redemption.expires_at)) {
+      if (redemption.expires_at && new Date() > new Date(redemption.expires_at)) {
+        await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Redemption Failed', message: 'Redemption code has expired' });
       }
 
-      // Mark the code as used
       const cashierBranchId = req.user?.branch_id;
-      await db.query(
+      if (req.user?.role === 'cashier' && cashierBranchId && redemption.branch_id && redemption.branch_id !== cashierBranchId) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Cashier is unauthorized to process redemptions for a different branch' });
+      }
+
+      await client.query(
         `UPDATE redemptions
-         SET used_at = NOW(), branch_id = $1
+         SET used_at = NOW(), branch_id = COALESCE($1::uuid, branch_id)
          WHERE id = $2`,
         [cashierBranchId || null, redemption.id]
       );
 
-      res.json({
+      await client.query('COMMIT');
+
+      return res.json({
+        success: true,
         message: 'Redemption processed successfully',
+        rewardTitle: redemption.reward_name,
+        customerName: redemption.customer_name,
+        customerPhone: redemption.customer_phone,
         reward: {
           name: redemption.reward_name,
           type: redemption.reward_type,
@@ -298,9 +363,20 @@ export class LoyaltyController {
           phone: redemption.customer_phone,
         },
       });
-    } catch (error) {
-      logger.error('Process redemption error', { error: (error as Error).message });
-      res.status(500).json({ error: 'Internal Server Error' });
+    } catch (error: unknown) {
+      await client.query('ROLLBACK');
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('Process redemption error', { error: msg });
+      return res.status(500).json({ error: 'Internal Server Error' });
+    } finally {
+      client.release();
     }
+  }
+
+  /**
+   * Alias for cashierProcessRedemption supporting legacy/Phase 2 handler naming.
+   */
+  static async processRedemptionCode(req: AuthenticatedRequest, res: Response) {
+    return LoyaltyController.cashierProcessRedemption(req, res);
   }
 }

@@ -23,6 +23,10 @@ services:
       - ./DB/migrations/008_wallet_ledger_idempotency.sql:/docker-entrypoint-initdb.d/09-migration-008.sql
       - ./DB/migrations/009_reversal_ledger_type.sql:/docker-entrypoint-initdb.d/10-migration-009.sql
       - ./DB/migrations/010_branch_users.sql:/docker-entrypoint-initdb.d/11-migration-010.sql
+      - ./DB/migrations/011_pos_integrations.sql:/docker-entrypoint-initdb.d/12-migration-011.sql
+      - ./DB/migrations/012_pos_customer_verification.sql:/docker-entrypoint-initdb.d/13-migration-012.sql
+      - ./DB/migrations/013_webhook_idempotency_and_rewards_concurrency.sql:/docker-entrypoint-initdb.d/14-migration-013.sql
+      - ./DB/migrations/014_outbox_events_and_schema_migrations.sql:/docker-entrypoint-initdb.d/15-migration-014.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Database files
 data/pg/
@@ -53,7 +52,6 @@ backend/.env
 .agents/
 
 # Project planning artifacts (not source code)
-phases explain/
 install-services.ps1
 
 # Secrets and keys

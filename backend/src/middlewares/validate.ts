@@ -91,15 +91,21 @@ export const schemas = {
   }),
 
   processRedemption: z.object({
-    code: z.string().min(1, 'Code is required'),
-  }),
+    code: z.string().min(1, 'Code is required').optional(),
+    redemption_code: z.string().min(1, 'Code is required').optional(),
+  }).refine(d => d.code || d.redemption_code, { message: 'Code is required' }),
 
   manualEarn: z.object({
     customer_id: z.string().optional(),
     customer_phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
-    amount: z.number().int().positive('Amount must be positive'),
+    amount: z.number().int().positive('Amount must be positive').optional(),
+    points: z.number().int().positive('Points must be positive').optional(),
     note: z.string().optional(),
-  }).refine(d => d.customer_id || d.customer_phone, { message: 'Either customer_id or customer_phone is required' }),
+    reason: z.string().optional(),
+    branch_id: z.string().uuid().optional(),
+  })
+    .refine(d => d.customer_id || d.customer_phone, { message: 'Either customer_id or customer_phone is required' })
+    .refine(d => (d.points ?? d.amount) !== undefined, { message: 'Either amount or points is required' }),
 
   createBranch: z.object({
     name: z.string().min(1, 'Name is required'),

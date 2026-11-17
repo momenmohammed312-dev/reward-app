@@ -12,6 +12,8 @@ import rewardsRoutes from './routes/rewardsRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import superadminNetworkRoutes from './routes/superadminNetworkRoutes.js';
 import tenantNetworkRoutes from './routes/tenantNetworkRoutes.js';
+import healthRoutes from './routes/healthRoutes.js';
+import { correlationMiddleware } from './middlewares/correlation.js';
 import { generalLimiter, authLimiter, webhookLimiter } from './middlewares/rateLimit.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
@@ -21,6 +23,7 @@ dotenv.config();
 
 const app = express();
 
+app.use(correlationMiddleware);
 app.use(helmet());
 
 // Default dev origins cover Vite (5173/4173), CRA/Next.js (3000), and common alt ports.
@@ -87,6 +90,8 @@ app.use('/api/docs', protectDocs, swaggerUi.serve, swaggerUi.setup(swaggerSpec, 
 app.get('/api/docs.json', (req, res) => {
   res.json(swaggerSpec);
 });
+
+app.use('/api/health', healthRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });

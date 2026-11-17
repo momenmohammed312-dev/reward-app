@@ -1,9 +1,13 @@
+import crypto from 'crypto';
 import db from '../config/db.js';
 import { logger } from './logger.js';
 
 const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10);
+const MAX_FAILED_ATTEMPTS = 5;
 
-const SMS_PROVIDER = process.env.SMS_PROVIDER || 'victorylink';
+function hashOtp(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
 
 async function sendVictoryLinkSMS(phone: string, message: string) {
   const username = process.env.VICTORYLINK_USERNAME;
@@ -11,7 +15,10 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   const sender = process.env.VICTORYLINK_SENDER || 'LoyaltyApp';
 
   if (!username || !password) {
-    logger.warn('VictoryLink credentials missing — skipping SMS in development');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('VictoryLink SMS credentials are not configured in production');
+    }
+    logger.warn(`[DEV] SMS sending skipped for ${phone} (VictoryLink credentials not configured)`);
     return;
   }
 
@@ -39,8 +46,6 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   });
 
   const responseText = await response.text();
-  logger.debug('VictoryLink response', { responseText });
-
   if (!responseText.includes('<Result>0</Result>')) {
     throw new Error(`VictoryLink SMS failed: ${responseText}`);
   }
@@ -50,76 +55,125 @@ const sendSMS = async (phone: string, code: string) => {
   try {
     const message = `كود التحقق الخاص بك هو: ${code}\nصالح لمدة ${OTP_EXPIRY_MINUTES} دقائق.`;
     await sendVictoryLinkSMS(phone, message);
-    logger.info(`OTP sent to ${phone} via VictoryLink`);
-  } catch (err: any) {
-    logger.warn('Failed to send via VictoryLink, falling back to mock', { error: (err as Error).message });
-    logger.info(`Mock OTP sent to ${phone}`, { code });
+  } catch (error) {
+    logger.error('SMS Delivery failure', {
+      phone: phone.replace(/(\d{3})\d+(\d{3})/, '$1****$2'),
+      error: (error as Error).message,
+    });
+    throw new Error('Failed to send SMS OTP code');
   }
 };
 
 export class OTPService {
   /**
-   * Generates a 6-digit OTP code, stores it in the database and returns it.
+   * Generates a cryptographically secure 6-digit OTP, stores its SHA-256 hash, and sends via SMS.
    */
-  static async generateOTP(tenantId: string, phone: string): Promise<string> {
-    // Generate a random 6 digit numeric code
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + OTP_EXPIRY_MINUTES);
+  static async generateOTP(tenantId: string, phone: string) {
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const otpHash = hashOtp(otpCode);
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Save to database
-    await db.query(
-      `INSERT INTO otp_codes (tenant_id, phone, code, expires_at)
-       VALUES ($1::uuid, $2, $3, $4)`,
-      [tenantId, phone, code, expiresAt]
-    );
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    await sendSMS(phone, code);
+      // Invalidate existing active OTPs for this phone
+      await client.query(
+        `UPDATE otp_codes SET is_used = true, used_at = NOW()
+         WHERE tenant_id = $1::uuid AND phone = $2 AND is_used = false AND used_at IS NULL`,
+        [tenantId, phone]
+      );
 
-    return code;
+      // Store SHA-256 hash, never plaintext
+      await client.query(
+        `INSERT INTO otp_codes (tenant_id, phone, code, expires_at)
+         VALUES ($1::uuid, $2, $3, $4)`,
+        [tenantId, phone, otpHash, expiresAt]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await sendSMS(phone, otpCode);
+
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info(`[DEV ONLY] OTP generated for ${phone}: ${otpCode}`);
+    }
+
+    return { success: true, message: 'OTP sent successfully' };
   }
 
   /**
-   * Verifies the OTP for a given phone and tenant.
-   * Returns true if valid, false if invalid/expired.
+   * Verifies an OTP code against stored hash with brute-force attempt limits.
    */
   static async verifyOTP(tenantId: string, phone: string, code: string): Promise<boolean> {
-    // Atomically verify and consume the OTP in a single transaction to prevent race conditions
+    const inputHash = hashOtp(code.trim());
+
     const result = await db.query(
-      `UPDATE otp_codes
-       SET used_at = NOW(), attempts = attempts + 1
-       WHERE id = (
-         SELECT id FROM otp_codes
-         WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
-           AND expires_at > NOW()
-           AND attempts < max_attempts
-           AND code = $3
-         ORDER BY created_at DESC
-         LIMIT 1
-         FOR UPDATE
-       )
-       RETURNING id`,
-      [tenantId, phone, code]
+      `SELECT id, code, attempts, max_attempts, expires_at, is_used
+       FROM otp_codes
+       WHERE tenant_id = $1::uuid AND phone = $2 AND is_used = false AND used_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [tenantId, phone]
     );
 
-    if (result.rows.length > 0) {
-      return true;
+    if (result.rows.length === 0) {
+      throw new Error('No active OTP found. Please request a new code.');
     }
 
-    // Code was wrong, expired, or max attempts reached — increment attempts on any matching record
-    await db.query(
-      `UPDATE otp_codes
-       SET attempts = attempts + 1
-       WHERE id = (
-         SELECT id FROM otp_codes
-         WHERE tenant_id = $1::uuid AND phone = $2 AND used_at IS NULL
-           AND code != $3
-         ORDER BY created_at DESC
-         LIMIT 1
-       )`,
-      [tenantId, phone, code]
-    );
+    const otpRecord = result.rows[0];
 
-    return false;
+    if (new Date() > new Date(otpRecord.expires_at)) {
+      await db.query(`UPDATE otp_codes SET is_used = true, used_at = NOW() WHERE id = $1`, [otpRecord.id]);
+      throw new Error('OTP has expired. Please request a new one.');
+    }
+
+    const maxAttempts = otpRecord.max_attempts ?? MAX_FAILED_ATTEMPTS;
+    if (otpRecord.attempts >= maxAttempts) {
+      await db.query(`UPDATE otp_codes SET is_used = true, used_at = NOW() WHERE id = $1`, [otpRecord.id]);
+      throw new Error('Too many failed attempts. Code locked for security.');
+    }
+
+    const storedHashBuffer = Buffer.from(otpRecord.code, 'utf8');
+    const inputHashBuffer = Buffer.from(inputHash, 'utf8');
+
+    const isMatch =
+      storedHashBuffer.length === inputHashBuffer.length &&
+      crypto.timingSafeEqual(storedHashBuffer, inputHashBuffer);
+
+    if (!isMatch) {
+      await db.query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otpRecord.id]);
+      throw new Error('Invalid OTP code. Please check and try again.');
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE otp_codes SET is_used = true, used_at = NOW() WHERE id = $1 AND is_used = false`,
+        [otpRecord.id]
+      );
+
+      await client.query(
+        `UPDATE customers SET is_verified = true
+         WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL`,
+        [tenantId, phone]
+      );
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return true;
   }
 }

@@ -1,6 +1,7 @@
 import app from './app.js';
 import db from './config/db.js';
 import { connectRedis } from './config/redis.js';
+import { validateEnv } from './config/validateEnv.js';
 import { ExpiryService } from './services/expiry.js';
 import { logger } from './services/logger.js';
 
@@ -8,6 +9,8 @@ const PORT = process.env.PORT || 4000;
 
 const startServer = async () => {
   try {
+    validateEnv();
+
     if (!process.env.JWT_SECRET) {
       throw new Error('JWT_SECRET environment variable is required');
     }

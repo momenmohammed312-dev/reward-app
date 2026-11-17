@@ -57,33 +57,23 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
         const invoiceId = order.invoiceId;
         const branchLocationId = order.branchLocationId;
 
-        // 1. Resolve Customer by Phone (create if doesn't exist under this tenant)
-        let customerRes = await db.query(
-          'SELECT id FROM customers WHERE tenant_id = $1 AND phone = $2 AND deleted_at IS NULL',
-          [tenantId, customerPhone]
+        // 1. Resolve or create customer (marks pos_identified_at; never auto-verifies OTP flag)
+        const custRes = await db.query(
+          `INSERT INTO customers (tenant_id, phone, name, is_verified, pos_identified_at)
+           VALUES ($1::uuid, $2, $3, false, NOW())
+           ON CONFLICT (tenant_id, phone) DO UPDATE SET
+             name = COALESCE(NULLIF(customers.name, 'POS Customer'), EXCLUDED.name, customers.name),
+             pos_identified_at = NOW(),
+             deleted_at = NULL,
+             updated_at = NOW()
+           RETURNING id`,
+          [tenantId, customerPhone, order.customerName || 'POS Customer']
         );
-
-        let customerId: string;
-        if (customerRes.rows.length === 0) {
-          const newCustRes = await db.query(
-            `INSERT INTO customers (tenant_id, phone, name, is_verified)
-             VALUES ($1, $2, $3, true)
-             ON CONFLICT (tenant_id, phone) DO UPDATE SET
-               name = EXCLUDED.name,
-               is_verified = true,
-               deleted_at = NULL,
-               updated_at = NOW()
-             RETURNING id`,
-            [tenantId, customerPhone, order.customerName || 'POS Customer']
-          );
-          customerId = newCustRes.rows[0].id;
-        } else {
-          customerId = customerRes.rows[0].id;
-        }
+        const customerId: string = custRes.rows[0].id;
 
         // 2. Resolve Branch by location ID
-        let branchRes = await db.query(
-          'SELECT id FROM branches WHERE tenant_id = $1 AND pos_location_id = $2 AND deleted_at IS NULL',
+        const branchRes = await db.query(
+          'SELECT id FROM branches WHERE tenant_id = $1::uuid AND pos_location_id = $2 AND deleted_at IS NULL',
           [tenantId, branchLocationId]
         );
 
@@ -92,7 +82,7 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
           // Create default fallback branch if not registered
           const newBranchRes = await db.query(
             `INSERT INTO branches (tenant_id, name, pos_type, pos_location_id, is_active)
-             VALUES ($1, $2, 'foodics', $3, true)
+             VALUES ($1::uuid, $2, 'foodics', $3, true)
              RETURNING id`,
             [tenantId, order.branchName || `Branch ${branchLocationId}`, branchLocationId]
           );
@@ -109,6 +99,19 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
           invoiceId,
           totalAmount,
           `Points earned from POS Order #${invoiceId}`
+        );
+      } else if (eventType === 'order.refunded') {
+        const adapter = getAdapter(payload.pos_type);
+        const order = adapter.parseOrder(payload);
+
+        if (!order.invoiceId) {
+          throw new Error('Invoice ID is missing for refund event');
+        }
+
+        await LoyaltyService.refundPoints(
+          tenantId,
+          order.invoiceId,
+          `POS Webhook Refund #${order.invoiceId}`
         );
       }
 
