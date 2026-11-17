@@ -66,4 +66,41 @@ router.patch(
   NetworkController.suspendMember
 );
 
+// ─── PHASE 2 & 4: RATES & SETTLEMENTS (SUPERADMIN) ─────────
+router.get(
+  '/:id/rates',
+  authenticateJWT,
+  requireRole(['superadmin']),
+  NetworkController.getNetworkRates
+);
+
+router.get(
+  '/:id/positions',
+  authenticateJWT,
+  requireRole(['superadmin']),
+  NetworkController.getNetworkNetPositions
+);
+
+router.get(
+  '/:id/settlements',
+  authenticateJWT,
+  requireRole(['superadmin']),
+  NetworkController.getNetworkSettlements
+);
+
+router.post(
+  '/:id/settlements',
+  authenticateJWT,
+  requireRole(['superadmin']),
+  validate(schemas.createSettlement),
+  NetworkController.createNetworkSettlement
+);
+
+router.post(
+  '/:id/settlements/:settlementId/process',
+  authenticateJWT,
+  requireRole(['superadmin']),
+  NetworkController.processSettlement
+);
+
 export default router;

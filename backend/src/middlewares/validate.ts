@@ -144,4 +144,36 @@ export const schemas = {
   addNetworkMember: z.object({
     tenant_id: z.string().uuid('Invalid tenant ID'),
   }),
+
+  upsertExchangeRate: z.object({
+    egp_per_point: z.number().positive('egp_per_point must be greater than 0').max(1000),
+  }),
+
+  previewConversion: z.object({
+    target_tenant_id: z.string().uuid('Invalid target_tenant_id'),
+    source_points: z.number().int().positive('source_points must be a positive integer'),
+  }),
+
+  crossTenantRedeem: z.object({
+    target_tenant_id: z.string().uuid('Invalid target_tenant_id'),
+    target_reward_id: z.string().uuid('Invalid target_reward_id'),
+    source_points: z.number().int().positive('source_points must be a positive integer'),
+    idempotency_key: z.string().min(1).max(120).optional(),
+  }),
+
+  createSettlement: z.object({
+    from_tenant_id: z.string().uuid('Invalid from_tenant_id'),
+    to_tenant_id: z.string().uuid('Invalid to_tenant_id'),
+    method: z.enum(['bank_transfer', 'subscription_deduction']),
+    idempotency_key: z.string().min(1).max(120).optional(),
+  }),
+
+  networkLinkRequestOtp: z.object({
+    phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
+  }),
+
+  networkLinkVerifyOtp: z.object({
+    phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
+    code: z.string().length(6, 'Code must be 6 digits'),
+  }),
 };

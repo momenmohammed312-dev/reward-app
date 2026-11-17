@@ -476,6 +476,46 @@ class ApiService {
     if (!response.ok) throw new Error('Failed to leave network');
     return response.json();
   }
+
+  async getMyNetworkRates(networkId: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${networkId}/rates`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch exchange rates');
+    return response.json();
+  }
+
+  async upsertMyNetworkRate(networkId: string, egpPerPoint: number) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${networkId}/rates`, {
+      method: 'PUT',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify({ egp_per_point: egpPerPoint }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update exchange rate');
+    }
+    return response.json();
+  }
+
+  async getMyNetPositions(networkId: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${networkId}/positions`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch net positions');
+    return response.json();
+  }
+
+  async getMyNetworkSettlements(networkId: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/me/networks/${networkId}/settlements`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch settlements');
+    return response.json();
+  }
 }
 
 export const api = new ApiService();

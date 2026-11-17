@@ -12,6 +12,7 @@ import rewardsRoutes from './routes/rewardsRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import superadminNetworkRoutes from './routes/superadminNetworkRoutes.js';
 import tenantNetworkRoutes from './routes/tenantNetworkRoutes.js';
+import networkCustomerRoutes from './routes/networkCustomerRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import { correlationMiddleware } from './middlewares/correlation.js';
 import { generalLimiter, authLimiter, webhookLimiter } from './middlewares/rateLimit.js';
@@ -71,6 +72,7 @@ app.use('/api/rewards', rewardsRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/superadmin/networks', superadminNetworkRoutes);
 app.use('/api/tenants', tenantNetworkRoutes);
+app.use('/api/networks', networkCustomerRoutes);
 
 const protectDocs = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;

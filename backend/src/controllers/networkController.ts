@@ -1,23 +1,39 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { NetworkService, NetworkError } from '../services/network.js';
+import { NetworkExchangeService } from '../services/networkExchange.js';
+import { NetworkSettlementService } from '../services/networkSettlement.js';
+import { NetworkCustomerService } from '../services/networkCustomer.js';
 import { logger } from '../services/logger.js';
 
 // ─── ERROR MAP ──────────────────────────────────────────────
 
 const ERROR_RESPONSES: Record<string, { status: number; message: string }> = {
-  NETWORK_NOT_FOUND: { status: 404, message: 'Network not found' },
-  NETWORK_INACTIVE:  { status: 400, message: 'Network is inactive' },
-  TENANT_NOT_FOUND:  { status: 404, message: 'Tenant not found' },
-  TENANT_INACTIVE:   { status: 400, message: 'Tenant is inactive' },
-  ALREADY_MEMBER:    { status: 409, message: 'Tenant is already a member' },
+  NETWORK_NOT_FOUND:            { status: 404, message: 'Network not found' },
+  NETWORK_INACTIVE:             { status: 400, message: 'Network is inactive' },
+  TENANT_NOT_FOUND:             { status: 404, message: 'Tenant not found' },
+  TENANT_INACTIVE:              { status: 400, message: 'Tenant is inactive' },
+  ALREADY_MEMBER:               { status: 409, message: 'Tenant is already a member' },
+  INVALID_RATE:                 { status: 400, message: 'Exchange rate must be greater than 0' },
+  NOT_NETWORK_MEMBER:           { status: 403, message: 'Tenant is not an active member of this network' },
+  SAME_TENANT_REDEMPTION:       { status: 400, message: 'Source and target tenants must be different' },
+  RATE_NOT_CONFIGURED:          { status: 400, message: 'Exchange rates are not configured for both tenants' },
+  CUSTOMER_NOT_FOUND:           { status: 404, message: 'Customer not found' },
+  CUSTOMER_NOT_VERIFIED:        { status: 403, message: 'Customer phone must be verified via OTP' },
+  INSUFFICIENT_BALANCE:         { status: 400, message: 'Insufficient points balance' },
+  REWARD_UNAVAILABLE:           { status: 400, message: 'Target reward is inactive or limit reached' },
+  INSUFFICIENT_EQUIVALENT_POINTS: { status: 400, message: 'Converted points are insufficient for target reward' },
+  NO_PENDING_REDEMPTIONS:       { status: 404, message: 'No unsettled cross-tenant redemptions found' },
+  SETTLEMENT_NOT_FOUND:         { status: 404, message: 'Settlement not found' },
+  SUBSCRIPTION_NOT_FOUND:       { status: 400, message: 'Debtor tenant subscription record not found' },
+  NETWORK_CUSTOMER_NOT_FOUND:   { status: 404, message: 'Network customer identity not found' },
 };
 
 function handleNetworkError(err: unknown, res: Response, context: string) {
   if (err instanceof NetworkError) {
     const mapped = ERROR_RESPONSES[err.code];
     if (mapped) {
-      return res.status(mapped.status).json({ error: mapped.message });
+      return res.status(mapped.status).json({ error: mapped.message, details: err.message });
     }
   }
   const message = err instanceof Error ? err.message : String(err);
@@ -196,6 +212,189 @@ export class NetworkController {
       res.json({ message: 'Left network successfully' });
     } catch (err) {
       handleNetworkError(err, res, 'Leave network error');
+    }
+  }
+
+  // ─── PHASE 2: EXCHANGE RATES ───────────────────────────────
+  static async getNetworkRates(req: AuthenticatedRequest, res: Response) {
+    try {
+      const rates = await NetworkExchangeService.getNetworkRates(req.params.id);
+      res.json({ rates });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get network rates error');
+    }
+  }
+
+  static async getMyNetworkRates(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const rates = await NetworkExchangeService.getNetworkRates(req.params.id);
+      res.json({ rates });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get my network rates error');
+    }
+  }
+
+  static async upsertMyExchangeRate(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const rate = await NetworkExchangeService.upsertTenantRate(
+        req.params.id,
+        tenantId,
+        req.body.egp_per_point,
+        req.user?.id
+      );
+      res.json({ rate });
+    } catch (err) {
+      handleNetworkError(err, res, 'Upsert exchange rate error');
+    }
+  }
+
+  // ─── PHASE 3: PREVIEW & CROSS-TENANT REDEMPTION ────────────
+  static async previewCrossConversion(req: AuthenticatedRequest, res: Response) {
+    try {
+      const sourceTenantId = req.user?.tenant_id;
+      if (!sourceTenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const conversion = await NetworkExchangeService.previewConversion(
+        req.params.id,
+        sourceTenantId,
+        req.body.target_tenant_id,
+        req.body.source_points
+      );
+      res.json({ conversion });
+    } catch (err) {
+      handleNetworkError(err, res, 'Preview conversion error');
+    }
+  }
+
+  static async crossTenantRedeem(req: AuthenticatedRequest, res: Response) {
+    try {
+      const sourceTenantId = req.user?.tenant_id;
+      const sourceCustomerId = req.user?.id;
+      if (!sourceTenantId || !sourceCustomerId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const redemption = await NetworkExchangeService.redeemAcrossNetwork({
+        networkId: req.params.id,
+        sourceTenantId,
+        sourceCustomerId,
+        targetTenantId: req.body.target_tenant_id,
+        targetRewardId: req.body.target_reward_id,
+        sourcePoints: req.body.source_points,
+        idempotencyKey: req.body.idempotency_key,
+      });
+      res.status(201).json({ redemption });
+    } catch (err) {
+      handleNetworkError(err, res, 'Cross-tenant redemption error');
+    }
+  }
+
+  // ─── PHASE 4: POSITIONS & SETTLEMENTS ──────────────────────
+  static async getNetworkNetPositions(req: AuthenticatedRequest, res: Response) {
+    try {
+      const positions = await NetworkSettlementService.getPendingNetPositions(req.params.id);
+      res.json({ positions });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get network net positions error');
+    }
+  }
+
+  static async getMyNetPositions(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const positions = await NetworkSettlementService.getPendingNetPositions(req.params.id, tenantId);
+      res.json({ positions });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get my net positions error');
+    }
+  }
+
+  static async getNetworkSettlements(req: AuthenticatedRequest, res: Response) {
+    try {
+      const settlements = await NetworkSettlementService.getNetworkSettlements(req.params.id);
+      res.json({ settlements });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get network settlements error');
+    }
+  }
+
+  static async getMyNetworkSettlements(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const settlements = await NetworkSettlementService.getNetworkSettlements(req.params.id, tenantId);
+      res.json({ settlements });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get my network settlements error');
+    }
+  }
+
+  static async createNetworkSettlement(req: AuthenticatedRequest, res: Response) {
+    try {
+      const result = await NetworkSettlementService.createSettlement({
+        networkId: req.params.id,
+        fromTenantId: req.body.from_tenant_id,
+        toTenantId: req.body.to_tenant_id,
+        method: req.body.method,
+        idempotencyKey: req.body.idempotency_key,
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      handleNetworkError(err, res, 'Create network settlement error');
+    }
+  }
+
+  static async processSettlement(req: AuthenticatedRequest, res: Response) {
+    try {
+      const settlement = await NetworkSettlementService.processSettlementJob(req.params.settlementId);
+      res.json({ settlement });
+    } catch (err) {
+      handleNetworkError(err, res, 'Process settlement error');
+    }
+  }
+
+  // ─── PHASE 5: UNIFIED NETWORK CUSTOMER IDENTITY ───────────
+  static async requestNetworkLinkOtp(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const result = await NetworkCustomerService.requestLinkOtp(req.params.id, tenantId, req.body.phone);
+      res.json(result);
+    } catch (err) {
+      handleNetworkError(err, res, 'Request network link OTP error');
+    }
+  }
+
+  static async verifyAndLinkNetworkCustomer(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      if (!tenantId) return res.status(400).json({ error: 'tenant_id required' });
+      const wallet = await NetworkCustomerService.verifyAndLinkCustomer(
+        req.params.id,
+        tenantId,
+        req.body.phone,
+        req.body.code
+      );
+      res.json({ wallet });
+    } catch (err) {
+      if (err instanceof Error && !(err instanceof NetworkError) && err.message.toLowerCase().includes('otp')) {
+        return res.status(400).json({ error: 'Invalid OTP', message: err.message });
+      }
+      handleNetworkError(err, res, 'Verify network link OTP error');
+    }
+  }
+
+  static async getUnifiedNetworkWallet(req: AuthenticatedRequest, res: Response) {
+    try {
+      const phone = req.user?.phone;
+      if (!phone) return res.status(400).json({ error: 'Customer phone context required' });
+      const wallet = await NetworkCustomerService.getUnifiedProfile(req.params.id, phone);
+      res.json({ wallet });
+    } catch (err) {
+      handleNetworkError(err, res, 'Get unified network wallet error');
     }
   }
 }
