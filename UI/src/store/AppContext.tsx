@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Tenant, User, Reward, RedeemedReward, Transaction } from '../types';
-import { mockTenants, mockRewards, mockTransactions } from '../services/mockData';
+import { mockTenants } from '../services/mockData';
 import { applyTenantTheme } from '../theme/themeLoader';
 import { api } from '../services/api';
 import { t as translate, Language } from '../services/translations';
@@ -72,7 +72,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [otpSentPhone, setOtpSentPhone] = useState<string | null>(null);
 
   // Loyalty Stats
-  const [points, setPoints] = useState<number>(320); // Static demo starter points
+  const [points, setPoints] = useState<number>(0);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [redeemedRewards, setRedeemedRewards] = useState<RedeemedReward[]>([]);
@@ -115,10 +115,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Helper function to load wallet data from the API
   const loadWalletData = async (phoneToUse?: string) => {
     setLoadingWallet(true);
+    setWalletError(null);
     try {
       const profile = await api.getProfile();
       setPoints(Number(profile.points_balance || 0));
-      
+
       const savedPhone = phoneToUse || localStorage.getItem('loyalty_user_phone') || '';
       setUser({
         phone: savedPhone,
@@ -128,8 +129,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         totalPoints: Number(profile.points_balance || 0),
       });
 
-      const history = await api.getHistory();
-      const mappedHistory = history.map((h: any, idx: number) => ({
+      const historyRes = await api.getHistory();
+      const historyRows = Array.isArray(historyRes) ? historyRes : (historyRes?.rows || []);
+      const mappedHistory = historyRows.map((h: any, idx: number) => ({
         id: h.id || `tx_${idx}`,
         date: h.created_at,
         points: Number(h.points),
@@ -139,23 +141,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }));
       setTransactions(mappedHistory);
     } catch (err: any) {
-      console.warn('Real API backend not reachable, using offline mock mode.', err.message);
-      // Fallback mock mode
-      const savedPhone = phoneToUse || localStorage.getItem('loyalty_user_phone');
-      const savedName = localStorage.getItem('loyalty_user_name') || 'أحمد عبد الله';
-      const savedPoints = localStorage.getItem(`loyalty_points_${currentTenant.id}`);
-      
-      if (savedPhone) {
-        setUser({
-          phone: savedPhone,
-          name: savedName,
-          joinDate: '٢٠٢٤/١٢/١٥',
-          loyaltyTier: 'الذهبي',
-          totalPoints: savedPoints ? parseInt(savedPoints) : 320,
-        });
-        setPoints(savedPoints ? parseInt(savedPoints) : 320);
-      }
-      setTransactions(mockTransactions[currentTenant.id] || []);
+      setWalletError(err?.message || 'فشل تحميل بيانات المحفظة');
     } finally {
       setLoadingWallet(false);
     }
@@ -208,15 +194,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [currentTenant.id]);
 
-  // Helper function to sync points with local storage
-  const updatePointsInStorage = (newPointsValue: number) => {
-    setPoints(newPointsValue);
-    localStorage.setItem(`loyalty_points_${currentTenant.id}`, newPointsValue.toString());
-    if (user) {
-      setUser(prev => prev ? { ...prev, totalPoints: newPointsValue } : null);
-    }
-  };
-
   // Helper to change tenant
   const selectTenant = async (id: string) => {
     setLoadingTenant(true);
@@ -224,23 +201,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentSubPage('main');
     setSelectedReward(null);
     setActiveRedemption(null);
-    
+
     try {
-      // Simulate POS API network response
       await new Promise(resolve => setTimeout(resolve, 800));
       const target = tenants.find(t => t.id === id);
       if (target) {
         setCurrentTenant(target);
         applyTenantTheme(target);
-        
-        // Sync points and redeemed rewards
+
         const savedPoints = localStorage.getItem(`loyalty_points_${target.id}`);
         const savedRedeemed = localStorage.getItem(`loyalty_redeemed_${target.id}`);
-        
+
         if (savedPoints) {
           setPoints(parseInt(savedPoints));
         } else {
-          setPoints(320); // Default points per cafe
+          setPoints(0);
         }
 
         if (savedRedeemed) {
@@ -252,8 +227,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } else {
           setRedeemedRewards([]);
         }
-        
-        setTransactions(mockTransactions[target.id] || []);
+
+        setTransactions([]);
       } else {
         setTenantError('عذراً، لم نتمكن من العثور على العلامة التجارية المطلوبة');
       }
@@ -273,10 +248,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setOtpSentPhone(phone);
       return true;
     } catch (e: any) {
-      console.warn('Backend sendOtp failed, falling back to mock mode:', e.message);
-      // Fallback: simulate success in development
-      setOtpSentPhone(phone);
-      return true;
+      setAuthError(e?.message || 'فشل إرسال كود التحقق');
+      return false;
     } finally {
       setLoadingAuth(false);
     }
@@ -288,7 +261,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       if (!otpSentPhone) return false;
       const data = await api.verifyOtp(currentTenant.id, otpSentPhone, code);
-      
+      localStorage.setItem('loyalty_user_phone', data.customer.phone || otpSentPhone);
+
       setUser({
         phone: data.customer.phone,
         name: data.customer.name || 'عميل كافيه',
@@ -297,10 +271,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         totalPoints: 0,
       });
       setIsAuthenticated(true);
+      setOtpSentPhone(null);
       await loadWalletData(otpSentPhone);
       return true;
     } catch (e: any) {
-      setAuthError('كود التحقق غير صحيح أو انتهت صلاحيته');
+      setAuthError(e?.message || 'كود التحقق غير صحيح أو انتهت صلاحيته');
       return false;
     } finally {
       setLoadingAuth(false);
@@ -319,12 +294,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user) {
       try {
         await api.updateProfileName(newName);
-      } catch {
-        console.warn('Backend updateProfile failed, saving locally only');
+        const updatedUser = { ...user, name: newName };
+        setUser(updatedUser);
+        localStorage.setItem('loyalty_user_name', newName);
+      } catch (e: any) {
+        setGlobalError(e?.message || 'فشل تحديث الاسم');
+        return;
       }
-      const updatedUser = { ...user, name: newName };
-      setUser(updatedUser);
-      localStorage.setItem('loyalty_user_name', newName);
     }
   };
 
@@ -334,7 +310,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setWalletError(null);
     try {
       const res = await api.redeemReward(reward.id);
-      
+
       const newRedemption: RedeemedReward = {
         code: res.code,
         rewardId: reward.id,
@@ -353,45 +329,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadWalletData();
       return newRedemption;
     } catch (e: any) {
-      console.warn('Backend redeemReward failed, falling back to mock mode:', e.message);
-      
-      if (points < reward.pointsRequired) {
-        throw new Error('رصيد نقاطك غير كافٍ لاستعادة هذه المكافأة');
-      }
-
-      const generatedCode = `${Math.floor(100000 + Math.random() * 900000)}`;
-      const now = new Date();
-      const expiry = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour validity
-
-      const newRedemption: RedeemedReward = {
-        code: generatedCode,
-        rewardId: reward.id,
-        rewardTitle: reward.title,
-        rewardImageUrl: reward.imageUrl,
-        pointsSpent: reward.pointsRequired,
-        redeemedAt: now.toISOString(),
-        expiresAt: expiry.toISOString(),
-        status: 'active'
-      };
-
-      const updatedRedeemed = [newRedemption, ...redeemedRewards];
-      setRedeemedRewards(updatedRedeemed);
-      localStorage.setItem(`loyalty_redeemed_${currentTenant.id}`, JSON.stringify(updatedRedeemed));
-
-      const nextPoints = points - reward.pointsRequired;
-      updatePointsInStorage(nextPoints);
-
-      const newTx: Transaction = {
-        id: `tx_rdm_${Date.now()}`,
-        date: now.toISOString(),
-        points: reward.pointsRequired,
-        type: 'redeem',
-        description: `استبدال مكافأة: ${reward.title}`,
-        invoiceNumber: `RDM-${generatedCode}`
-      };
-      setTransactions([newTx, ...transactions]);
-      
-      return newRedemption;
+      setWalletError(e?.message || 'فشل استبدال المكافأة');
+      throw e;
     } finally {
       setLoadingWallet(false);
     }
@@ -420,7 +359,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const freshRewards = await api.getRewards(currentTenant.id);
         setRewards(freshRewards);
       } catch {
-        setRewards(mockRewards[currentTenant.id] || []);
+        setRewards([]);
+        setWalletError('فشل تحميل المكافآت');
       }
     }
   };
@@ -431,10 +371,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       api.getRewards(currentTenant.id)
         .then(setRewards)
         .catch(() => {
-          setRewards(mockRewards[currentTenant.id] || []);
+          setRewards([]);
+          setWalletError('فشل تحميل المكافآت');
         });
     } else {
-      setRewards(mockRewards[currentTenant.id] || []);
+      setRewards([]);
     }
   }, [isAuthenticated, currentTenant]);
 

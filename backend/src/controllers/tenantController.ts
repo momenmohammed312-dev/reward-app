@@ -170,7 +170,7 @@ export class TenantController {
       const result = await db.query(
         `SELECT id, name, city, pos_type, pos_location_id, is_active, created_at
          FROM branches
-         WHERE tenant_id = $1::uuid`,
+         WHERE tenant_id = $1::uuid AND deleted_at IS NULL`,
         [tenantId]
       );
 
@@ -198,7 +198,7 @@ export class TenantController {
       const result = await db.query(
         `UPDATE branches
          SET api_key = $1
-         WHERE id = $2::uuid AND tenant_id = $3::uuid
+         WHERE id = $2::uuid AND tenant_id = $3::uuid AND deleted_at IS NULL
          RETURNING id, name, api_key`,
         [apiKey, branch_id, tenantId]
       );

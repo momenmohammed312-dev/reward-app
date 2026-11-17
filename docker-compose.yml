@@ -55,7 +55,8 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/loyalty
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-m02_l0y4lty_s3cr3t_k3y_2026_#Secure!}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET environment variable is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET environment variable is required}
       OTP_EXPIRY_MINUTES: 5
       SMS_PROVIDER: console
     depends_on:

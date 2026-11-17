@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/authController.js';
+import { authenticateJWT, requireRole } from '../middlewares/auth.js';
 import { validate, schemas } from '../middlewares/validate.js';
 import { authLimiter } from '../middlewares/rateLimit.js';
 
 const router = Router();
 
 // Dashboard user registration & login
-router.post('/register', authLimiter, validate(schemas.register), AuthController.registerUser);
+router.post('/register', authLimiter, authenticateJWT, requireRole(['owner', 'superadmin']), validate(schemas.register), AuthController.registerUser);
 router.post('/login', authLimiter, validate(schemas.login), AuthController.loginUser);
 
 // Customer PWA OTP authentication

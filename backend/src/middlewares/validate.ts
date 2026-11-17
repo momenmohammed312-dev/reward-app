@@ -35,7 +35,7 @@ export const schemas = {
   }),
 
   register: z.object({
-    tenant_id: z.string().uuid('Invalid tenant ID').optional(),
+    tenant_id: z.string().min(1, 'Invalid tenant ID').optional(),
     email: z.string().email('Invalid email'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     name: z.string().optional(),

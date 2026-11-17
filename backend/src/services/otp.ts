@@ -10,6 +10,14 @@ function hashOtp(code: string): string {
 }
 
 async function sendVictoryLinkSMS(phone: string, message: string) {
+  const provider = (process.env.SMS_PROVIDER || 'victorylink').toLowerCase();
+  if (provider === 'console') {
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info(`[CONSOLE SMS] Skipped external SMS dispatch for ${phone}`);
+    }
+    return;
+  }
+
   const username = process.env.VICTORYLINK_USERNAME;
   const password = process.env.VICTORYLINK_PASSWORD;
   const sender = process.env.VICTORYLINK_SENDER || 'LoyaltyApp';

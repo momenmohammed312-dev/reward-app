@@ -5,6 +5,7 @@ import db from '../config/db.js';
 import { OTPService } from '../services/otp.js';
 import { logger } from '../services/logger.js';
 import { resolveTenantId } from '../helpers/resolveTenant.js';
+import { AuthenticatedRequest } from '../middlewares/auth.js';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
 const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || (() => { throw new Error('FATAL: JWT_REFRESH_SECRET environment variable is not set'); })();
@@ -12,8 +13,9 @@ const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || (() => { th
 export class AuthController {
   /**
    * Registers a new dashboard user for a tenant.
+   * Caller must be superadmin (explicit tenant_id required) or tenant owner (JWT tenant_id enforced).
    */
-  static async registerUser(req: Request, res: Response) {
+  static async registerUser(req: AuthenticatedRequest, res: Response) {
     try {
       const { tenant_id, email, password, name, role } = req.body;
 
@@ -21,20 +23,25 @@ export class AuthController {
         return res.status(400).json({ error: 'Missing fields', message: 'Email and password are required' });
       }
 
-      // Defense in depth: superadmin must never be creatable via the public
-      // registration endpoint (schema also excludes it).
+      // Defense in depth: superadmin must never be creatable via this endpoint
       if (role === 'superadmin') {
         return res.status(403).json({ error: 'Forbidden', message: 'Superadmin accounts cannot be created via registration' });
       }
 
-      if (!tenant_id) {
-        return res.status(400).json({ error: 'Missing fields', message: 'tenant_id is required' });
-      }
-
-      // Resolve tenant by UUID or slug
-      const resolvedTenantId = await resolveTenantId(tenant_id);
-      if (!resolvedTenantId) {
-        return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+      let resolvedTenantId: string | null = null;
+      if (req.user?.role === 'superadmin') {
+        if (!tenant_id) {
+          return res.status(400).json({ error: 'Missing fields', message: 'tenant_id is required when registering as superadmin' });
+        }
+        resolvedTenantId = await resolveTenantId(tenant_id);
+        if (!resolvedTenantId) {
+          return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
+        }
+      } else {
+        if (!req.user?.tenant_id) {
+          return res.status(401).json({ error: 'Unauthorized', message: 'Authenticated tenant context is required' });
+        }
+        resolvedTenantId = req.user.tenant_id;
       }
 
       // Hash password
@@ -43,7 +50,7 @@ export class AuthController {
       // Save user
       const result = await db.query(
         `INSERT INTO users (tenant_id, email, password_hash, name, role)
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1::uuid, $2, $3, $4, $5)
          RETURNING id, email, name, role`,
         [resolvedTenantId, email, passwordHash, name || null, role || 'manager']
       );
