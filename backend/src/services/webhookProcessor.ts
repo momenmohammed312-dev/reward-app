@@ -32,17 +32,23 @@ export const webhookQueue = new Queue<WebhookJobPayload, any, string>('foodics-w
   },
 });
 
-// Process Webhook Jobs
-export const webhookWorker = new Worker<WebhookJobPayload>(
-  'foodics-webhooks',
-  async (job) => {
-    const { tenantId, eventType, payload, logId } = job.data;
-    logger.info(`Processing webhook job`, { jobId: job.id, eventType, tenantId });
+let webhookWorkerInstance: Worker<WebhookJobPayload> | null = null;
 
-    try {
-      // Handle the event based on POS specs (payloads are POS-agnostic via adapters)
-      if (eventType === 'order.paid' || eventType === 'order.closed') {
-        const adapter = getAdapter(payload.pos_type);
+/**
+ * Starts the BullMQ Foodics webhook worker (invoked by worker.ts).
+ */
+export function startWebhookWorker(): Worker<WebhookJobPayload> {
+  if (webhookWorkerInstance) return webhookWorkerInstance;
+
+  webhookWorkerInstance = new Worker<WebhookJobPayload>(
+    'foodics-webhooks',
+    async (job) => {
+      const { tenantId, eventType, payload, logId } = job.data;
+      logger.info(`Processing webhook job`, { jobId: job.id, eventType, tenantId });
+
+      try {
+        if (eventType === 'order.paid' || eventType === 'order.closed') {
+          const adapter = getAdapter(payload.pos_type);
         const order = adapter.parseOrder(payload);
 
         if (!order.customerPhone) {
@@ -134,8 +140,16 @@ export const webhookWorker = new Worker<WebhookJobPayload>(
     }
   },
   { connection: connectionOptions }
-);
+  );
 
-webhookWorker.on('failed', (job, err) => {
-  logger.error(`Job ${job?.id} failed permanently`, { error: err.message });
-});
+  webhookWorkerInstance.on('failed', (job, err) => {
+    logger.error(`Job ${job?.id} failed permanently`, { error: err.message });
+  });
+
+  return webhookWorkerInstance;
+}
+
+export const webhookWorker =
+  process.env.DISABLE_IN_PROCESS_WORKERS !== 'true' && process.env.NODE_ENV !== 'test'
+    ? startWebhookWorker()
+    : null;

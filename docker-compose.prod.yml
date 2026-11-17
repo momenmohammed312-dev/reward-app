@@ -1,0 +1,115 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-loyalty}
+    volumes:
+      - pg_prod_data:/var/lib/postgresql/data
+      - ./DB/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./DB/migrations/001_add_tier_tables.sql:/docker-entrypoint-initdb.d/02-migration-001.sql:ro
+      - ./DB/migrations/002_add_rewards_table.sql:/docker-entrypoint-initdb.d/03-migration-002.sql:ro
+      - ./DB/migrations/003_add_tenant_branding.sql:/docker-entrypoint-initdb.d/04-migration-003.sql:ro
+      - ./DB/migrations/004_add_superadmin_role.sql:/docker-entrypoint-initdb.d/05-migration-004.sql:ro
+      - ./DB/migrations/005_admin_audit_soft_delete.sql:/docker-entrypoint-initdb.d/06-migration-005.sql:ro
+      - ./DB/migrations/006_branch_timezone_working_hours.sql:/docker-entrypoint-initdb.d/07-migration-006.sql:ro
+      - ./DB/migrations/007_cross_tenant_networks.sql:/docker-entrypoint-initdb.d/08-migration-007.sql:ro
+      - ./DB/migrations/008_wallet_ledger_idempotency.sql:/docker-entrypoint-initdb.d/09-migration-008.sql:ro
+      - ./DB/migrations/009_reversal_ledger_type.sql:/docker-entrypoint-initdb.d/10-migration-009.sql:ro
+      - ./DB/migrations/010_branch_users.sql:/docker-entrypoint-initdb.d/11-migration-010.sql:ro
+      - ./DB/migrations/011_pos_integrations.sql:/docker-entrypoint-initdb.d/12-migration-011.sql:ro
+      - ./DB/migrations/012_pos_customer_verification.sql:/docker-entrypoint-initdb.d/13-migration-012.sql:ro
+      - ./DB/migrations/013_webhook_idempotency_and_rewards_concurrency.sql:/docker-entrypoint-initdb.d/14-migration-013.sql:ro
+      - ./DB/migrations/014_outbox_events_and_schema_migrations.sql:/docker-entrypoint-initdb.d/15-migration-014.sql:ro
+      - ./DB/migrations/015_point_exchange_rates.sql:/docker-entrypoint-initdb.d/16-migration-015.sql:ro
+      - ./DB/migrations/016_network_points_ledger.sql:/docker-entrypoint-initdb.d/17-migration-016.sql:ro
+      - ./DB/migrations/017_network_settlements.sql:/docker-entrypoint-initdb.d/18-migration-017.sql:ro
+      - ./DB/migrations/018_network_customers.sql:/docker-entrypoint-initdb.d/19-migration-018.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB:-loyalty}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["node", "dist/index.js"]
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DISABLE_IN_PROCESS_WORKERS: "true"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+      SMS_PROVIDER: ${SMS_PROVIDER:-victorylink}
+      VICTORYLINK_USERNAME: ${VICTORYLINK_USERNAME:-}
+      VICTORYLINK_PASSWORD: ${VICTORYLINK_PASSWORD:-}
+      VICTORYLINK_SENDER: ${VICTORYLINK_SENDER:-MO2Loyalty}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DISABLE_IN_PROCESS_WORKERS: "false"
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      SMS_PROVIDER: ${SMS_PROVIDER:-victorylink}
+      VICTORYLINK_USERNAME: ${VICTORYLINK_USERNAME:-}
+      VICTORYLINK_PASSWORD: ${VICTORYLINK_PASSWORD:-}
+      VICTORYLINK_SENDER: ${VICTORYLINK_SENDER:-MO2Loyalty}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ui:
+    build:
+      context: ./UI
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    restart: unless-stopped
+    ports:
+      - "${APP_HTTP_PORT:-80}:80"
+    depends_on:
+      - api
+
+volumes:
+  pg_prod_data:
+  redis_prod_data:
