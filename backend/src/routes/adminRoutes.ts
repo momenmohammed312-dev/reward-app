@@ -26,5 +26,6 @@ router.get('/staff', AdminController.getStaff);
 router.patch('/users/:id/branch', validate(schemas.assignBranch), AdminController.assignBranchToUser);
 
 router.get('/stats/chart', AdminController.getStatsChart);
+router.get('/analytics/retention', AdminController.getRetentionAnalytics);
 
 export default router;

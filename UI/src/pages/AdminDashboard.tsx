@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   TrendUp, Users, Gift, Coins, Plus, CheckCircle, Storefront, 
   PencilSimple, TrashSimple, XCircle, ArrowClockwise, Star, 
-  MapPin, DeviceMobile, WarningCircle
+  MapPin, DeviceMobile, WarningCircle, QrCode
 } from '@phosphor-icons/react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
@@ -11,6 +11,8 @@ import { useApp } from '../store/AppContext';
 import { api } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { MyNetworks } from '../components/MyNetworks';
+import { RetentionAnalytics } from '../components/admin/RetentionAnalytics';
+import { BranchQrModal } from '../components/admin/BranchQrModal';
 
 const chartData = [
   { month: 'يناير', earned: 12400, redeemed: 3200 },
@@ -54,6 +56,8 @@ export const AdminDashboard: React.FC = () => {
 
   const [chartStats, setChartStats] = useState(chartData);
   const [chartLoading, setChartLoading] = useState(true);
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | undefined>(undefined);
+  const [qrModalBranch, setQrModalBranch] = useState<Branch | null>(null);
 
   const [searchByName, setSearchByName] = useState('');
   const [searchByPhone, setSearchByPhone] = useState('');
@@ -72,7 +76,7 @@ export const AdminDashboard: React.FC = () => {
       const [customersRes, branchesData, stats, rewardsData] = await Promise.all([
         api.getAdminCustomers({ name: searchByName || undefined, phone: searchByPhone || undefined, page: p, limit: 50 }),
         api.getAdminBranches(),
-        api.getAdminStats(),
+        api.getAdminStats(selectedBranchFilter),
         api.getAdminRewards(),
       ]);
       setAdminRewards(rewardsData || []);
@@ -105,7 +109,7 @@ export const AdminDashboard: React.FC = () => {
     }
     const MONTH_NAMES_AR: string[] = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
     try {
-      const chartRes = await api.getAdminChartStats();
+      const chartRes = await api.getAdminChartStats(selectedBranchFilter);
       if (chartRes.length > 0) {
         setChartStats(chartRes.map((r: any) => ({
           month: MONTH_NAMES_AR[parseInt(r.month_num) - 1] || r.month_num,
@@ -117,7 +121,7 @@ export const AdminDashboard: React.FC = () => {
     } finally {
       setChartLoading(false);
     }
-  }, [searchByName, searchByPhone, customerPage]);
+  }, [searchByName, searchByPhone, customerPage, selectedBranchFilter]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -566,6 +570,12 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <RetentionAnalytics
+              branches={branches}
+              selectedBranchId={selectedBranchFilter}
+              onSelectBranch={setSelectedBranchFilter}
+            />
           </div>
         )}
 
@@ -774,11 +784,18 @@ export const AdminDashboard: React.FC = () => {
                       <span className="flex items-center gap-1.5">{branch.openingTime} — {branch.closingTime}</span>
                     )}
                   </div>
-                  <div className="flex gap-2 mt-2 pt-3 border-t border-[var(--color-admin-border)] opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => openEditBranch(branch)} className="flex-1 bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1.5 rounded-lg transition-all cursor-pointer text-center text-[var(--color-admin-text-muted)] flex items-center justify-center gap-1">
+                  <div className="flex gap-2 mt-2 pt-3 border-t border-[var(--color-admin-border)]">
+                    <button
+                      type="button"
+                      onClick={() => setQrModalBranch(branch)}
+                      className="flex-1 bg-[var(--color-admin-primary-soft)] hover:bg-[var(--color-admin-primary)] hover:text-[var(--color-admin-bg)] border border-[var(--color-admin-primary)]/25 text-[var(--color-admin-primary)] text-[10px] font-bold py-1.5 px-2 rounded-lg transition-colors duration-150 active:scale-[0.96] cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <QrCode size={13} weight="duotone" /> كود QR للطاولات
+                    </button>
+                    <button onClick={() => openEditBranch(branch)} className="bg-[var(--color-admin-bg)] hover:bg-[var(--color-admin-border)] text-[10px] font-bold py-1.5 px-2.5 rounded-lg transition-colors cursor-pointer text-center text-[var(--color-admin-text-muted)] flex items-center justify-center gap-1 active:scale-[0.96]">
                       <PencilSimple size={12} /> تعديل
                     </button>
-                    <button onClick={() => setDeleteBranchId(branch.id)} className="bg-rose-950/30 hover:bg-rose-950/50 p-1.5 rounded-lg text-rose-500 transition-all cursor-pointer">
+                    <button onClick={() => setDeleteBranchId(branch.id)} className="bg-rose-950/30 hover:bg-rose-950/50 p-1.5 rounded-lg text-rose-500 transition-colors cursor-pointer active:scale-[0.96]">
                       <TrashSimple size={14} />
                     </button>
                   </div>
@@ -1202,6 +1219,13 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <BranchQrModal
+        branch={qrModalBranch}
+        tenantSlug={currentTenant.id}
+        tenantName={settingsForm.name || currentTenant.name}
+        onClose={() => setQrModalBranch(null)}
+      />
     </div>
   );
 };

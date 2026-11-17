@@ -127,8 +127,9 @@ class ApiService {
     return headers;
   }
 
-  async getAdminStats() {
-    const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+  async getAdminStats(branchId?: string) {
+    const qs = branchId ? `?branch_id=${encodeURIComponent(branchId)}` : '';
+    const response = await fetch(`${API_BASE_URL}/admin/stats${qs}`, {
       method: 'GET',
       headers: this.getAdminHeaders(),
     });
@@ -182,12 +183,23 @@ class ApiService {
     return response.json();
   }
 
-  async getAdminChartStats() {
-    const response = await fetch(`${API_BASE_URL}/admin/stats/chart`, {
+  async getAdminChartStats(branchId?: string) {
+    const qs = branchId ? `?branch_id=${encodeURIComponent(branchId)}` : '';
+    const response = await fetch(`${API_BASE_URL}/admin/stats/chart${qs}`, {
       method: 'GET',
       headers: this.getAdminHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch chart stats');
+    return response.json();
+  }
+
+  async getAdminRetentionAnalytics(branchId?: string) {
+    const qs = branchId ? `?branch_id=${encodeURIComponent(branchId)}` : '';
+    const response = await fetch(`${API_BASE_URL}/admin/analytics/retention${qs}`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch retention analytics');
     return response.json();
   }
 

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import db from '../config/db.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { logger } from '../services/logger.js';
+import { AnalyticsService, AnalyticsError } from '../services/analytics.js';
 
 async function logAdminAction(tenantId: string, adminUserId: string | undefined, actionType: string, targetType: string, targetId: string | undefined, oldValue?: any, newValue?: any) {
   try {
@@ -18,10 +19,24 @@ async function logAdminAction(tenantId: string, adminUserId: string | undefined,
 
 export class AdminController {
 
-  // GET /api/admin/stats
+  // GET /api/admin/stats?branch_id=
   static async getStats(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user!.tenant_id;
+      const branchId = (req.query.branch_id as string | undefined) || undefined;
+
+      if (branchId) {
+        await AnalyticsService.verifyBranchOwnership(tenantId, branchId);
+        const branchStats = await db.query(`
+          SELECT
+            (SELECT COUNT(DISTINCT customer_id) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid) AS total_customers,
+            (SELECT COUNT(DISTINCT customer_id) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at > NOW() - INTERVAL '30 days') AS active_customers,
+            (SELECT COALESCE(SUM(points_earned), 0) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at > date_trunc('month', NOW())) AS points_this_month,
+            (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at::date = CURRENT_DATE) AS redemptions_today
+        `, [tenantId, branchId]);
+        return res.json(branchStats.rows[0]);
+      }
+
       const statsQuery = await db.query(`
         SELECT 
           (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND deleted_at IS NULL) AS total_customers,
@@ -31,6 +46,9 @@ export class AdminController {
       `, [tenantId]);
       res.json(statsQuery.rows[0]);
     } catch (err: any) {
+      if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
       logger.error('Admin stats error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch stats' });
     }
@@ -414,10 +432,32 @@ export class AdminController {
     }
   }
 
-  // GET /api/admin/stats/chart — monthly points trend for charting
+  // GET /api/admin/stats/chart?branch_id= — monthly points trend for charting
   static async getStatsChart(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user!.tenant_id;
+      const branchId = (req.query.branch_id as string | undefined) || undefined;
+
+      if (branchId) {
+        await AnalyticsService.verifyBranchOwnership(tenantId, branchId);
+        const branchChart = await db.query(`
+          SELECT
+            to_char(wl.created_at, 'MM') AS month_num,
+            EXTRACT(YEAR FROM wl.created_at) AS year,
+            SUM(CASE WHEN wl.type = 'earned' AND t.branch_id = $2::uuid THEN wl.points ELSE 0 END) AS points_earned,
+            SUM(CASE WHEN wl.type = 'redeemed' AND rd.branch_id = $2::uuid THEN wl.points ELSE 0 END) AS points_redeemed
+          FROM wallet_ledger wl
+          LEFT JOIN transactions t ON wl.reference_type = 'transaction' AND wl.reference_id = t.id
+          LEFT JOIN redemptions rd ON wl.reference_type = 'redemption' AND wl.reference_id = rd.id
+          WHERE wl.tenant_id = $1::uuid
+            AND wl.created_at > NOW() - INTERVAL '6 months'
+            AND (t.branch_id = $2::uuid OR rd.branch_id = $2::uuid)
+          GROUP BY year, month_num
+          ORDER BY year, month_num
+        `, [tenantId, branchId]);
+        return res.json(branchChart.rows);
+      }
+
       const result = await db.query(`
         SELECT
           to_char(created_at, 'MM') AS month_num,
@@ -433,8 +473,27 @@ export class AdminController {
 
       res.json(result.rows);
     } catch (err: any) {
+      if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
       logger.error('Chart stats error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch chart data' });
+    }
+  }
+
+  // GET /api/admin/analytics/retention?branch_id=
+  static async getRetentionAnalytics(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user!.tenant_id;
+      const branchId = (req.query.branch_id as string | undefined) || undefined;
+      const analytics = await AnalyticsService.getRetentionAnalytics(tenantId, branchId);
+      return res.json(analytics);
+    } catch (err: any) {
+      if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Retention analytics error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch retention analytics' });
     }
   }
 }
