@@ -84,10 +84,10 @@ export const HistoryPage: React.FC = () => {
       >
         {/* Page header */}
         <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none text-right">
-          <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
+          <h1 className="text-[24px] font-extrabold text-[var(--color-text)]">
             {t('history.title')}
           </h1>
-          <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
+          <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
             {t('history.subtitle')}
           </p>
         </motion.div>
@@ -193,7 +193,7 @@ export const HistoryPage: React.FC = () => {
                             <span>{t('history.expired')}</span>
                           </Badge>
                         )}
-                        <span className="text-[11px] points-value font-mono font-bold text-[var(--color-text-muted)] mt-0.5">
+                        <span className="text-[12px] points-value font-bold text-[var(--color-text-muted)] mt-0.5">
                           {t('history.voucherPoints', { points: voucher.pointsSpent })}
                         </span>
                       </div>
@@ -226,9 +226,9 @@ export const HistoryPage: React.FC = () => {
                 selectedTx.type === 'redeem' ? 'bg-violet-50 text-violet-600' :
                 'bg-amber-50 text-amber-600'
               }`}>
-                {selectedTx.type === 'earn' ? <ShoppingBag size={20} weight="duotone" /> :
-                 selectedTx.type === 'redeem' ? <Gift size={20} weight="duotone" /> :
-                 <ArrowCounterClockwise size={20} weight="duotone" />}
+                {selectedTx.type === 'earn' ? <ShoppingBag size={20} weight="regular" /> :
+                 selectedTx.type === 'redeem' ? <Gift size={20} weight="regular" /> :
+                 <ArrowCounterClockwise size={20} weight="regular" />}
               </div>
               <div className="flex-1 text-right">
                 <p className="text-[var(--text-sm)] font-bold text-[var(--color-text)]">
@@ -239,7 +239,7 @@ export const HistoryPage: React.FC = () => {
                    selectedTx.type === 'redeem' ? t('redeem') : t('refund')}
                 </p>
               </div>
-              <div className={`shrink-0 px-3 py-2 rounded-xl font-black ${
+              <div className={`shrink-0 px-3 py-2 rounded-xl font-black number ${
                 selectedTx.type === 'earn' ? 'bg-emerald-50 text-emerald-700' :
                 selectedTx.type === 'redeem' ? 'bg-violet-50 text-violet-700' :
                 'bg-amber-50 text-amber-700'
@@ -251,16 +251,16 @@ export const HistoryPage: React.FC = () => {
 
             <div className="flex flex-col gap-[var(--space-3)]">
               <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] number">{new Date(selectedTx.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.date')}</span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{new Date(selectedTx.date).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] number">{new Date(selectedTx.date).toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                 <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.time')}</span>
               </div>
               {selectedTx.amount && selectedTx.type === 'earn' && (
                 <div className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
-                  <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] font-mono">{selectedTx.amount} {t('sr')}</span>
+                  <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] number font-bold">{selectedTx.amount} {t('sr')}</span>
                   <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{t('history.amount')}</span>
                 </div>
               )}
@@ -271,7 +271,7 @@ export const HistoryPage: React.FC = () => {
                 </div>
               )}
               <div className="flex justify-between items-center py-2">
-                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">{Math.abs(selectedTx.points)} {t('pointsLabel')}</span>
+                <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] number">{Math.abs(selectedTx.points)} {t('pointsLabel')}</span>
                 <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{selectedTx.type === 'earn' ? t('history.pointsEarned') : t('history.pointsUsed')}</span>
               </div>
             </div>

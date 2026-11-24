@@ -69,10 +69,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
     <div className="flex flex-col gap-[var(--space-5)] text-right pb-[var(--space-10)] font-body">
       {/* Page header */}
       <div className="flex flex-col gap-0.5 select-none text-right">
-        <h1 className="text-[var(--text-xl)] font-bold text-[var(--color-text)] font-sans">
+        <h1 className="text-[24px] font-extrabold text-[var(--color-text)]">
           {t('profile.title')}
         </h1>
-        <p className="text-[var(--text-xs)] text-[var(--color-text-light)]">
+        <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
           {t('profile.subtitle')}
         </p>
       </div>

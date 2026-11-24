@@ -4,19 +4,19 @@ import { Tenant, Reward, Transaction } from '../types';
 
 export const mockTenants: Tenant[] = [
   {
-    id: 'aroma',
-    name: 'أروما كافيه',
-    tagline: 'القهوة المختصة وأرقى المخبوزات الفرنسية',
-    logo: 'https://picsum.photos/seed/aromacafelogo/160',
-    coverImage: 'https://picsum.photos/seed/aromacafecover/600/300',
-    primaryColor: '#1e40af', // Deep Indigo
-    primaryColorSoft: 'rgba(30, 64, 175, 0.08)',
-    accentColor: '#f59e0b', // Radiant Amber
-    accentColorSoft: 'rgba(245, 158, 11, 0.08)',
-    bgColor: '#f8fafc',
+    id: 'mo2-loyalty',
+    name: 'MO2 Loyalty',
+    tagline: 'برنامج الولاء الذكي للعلامات والمقاهي',
+    logo: 'https://picsum.photos/seed/mo2loyaltylogo/160',
+    coverImage: 'https://picsum.photos/seed/mo2loyaltycover/600/300',
+    primaryColor: '#6b4a35', // Cafe Espresso Brown
+    primaryColorSoft: 'rgba(107, 74, 53, 0.10)',
+    accentColor: '#d99b52', // Warm Caramel Gold
+    accentColorSoft: 'rgba(217, 155, 82, 0.14)',
+    bgColor: '#f7f7f5',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Outfit',
-    fontBody: 'Geist',
+    fontDisplay: 'Rubik',
+    fontBody: 'Rubik',
   },
   {
     id: 'brew-co',
@@ -30,8 +30,8 @@ export const mockTenants: Tenant[] = [
     accentColorSoft: 'rgba(194, 65, 12, 0.08)',
     bgColor: '#fafaf9',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Outfit',
-    fontBody: 'Geist',
+    fontDisplay: 'Rubik',
+    fontBody: 'Rubik',
   },
   {
     id: 'yasmeen',
@@ -45,13 +45,13 @@ export const mockTenants: Tenant[] = [
     accentColorSoft: 'rgba(219, 39, 119, 0.08)',
     bgColor: '#f0fdf4',
     surfaceColor: '#ffffff',
-    fontDisplay: 'Outfit',
-    fontBody: 'Geist',
+    fontDisplay: 'Rubik',
+    fontBody: 'Rubik',
   }
 ];
 
 export const mockRewards: Record<string, Reward[]> = {
-  aroma: [
+  'mo2-loyalty': [
     {
       id: 'ar_r1',
       title: 'كوب كابتشينو مجاني',
@@ -160,7 +160,7 @@ export const mockRewards: Record<string, Reward[]> = {
 };
 
 export const mockTransactions: Record<string, Transaction[]> = {
-  aroma: [
+  'mo2-loyalty': [
     {
       id: 'tx_ar1',
       date: '2026-05-20T14:22:00Z',

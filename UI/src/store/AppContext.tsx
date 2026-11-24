@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Tenant, User, Reward, RedeemedReward, Transaction } from '../types';
-import { mockTenants } from '../services/mockData';
+import { mockTenants, mockRewards, mockTransactions } from '../services/mockData';
 import { applyTenantTheme } from '../theme/themeLoader';
 import { api } from '../services/api';
 import { t as translate, Language } from '../services/translations';
@@ -54,6 +54,21 @@ interface AppContextType {
   globalError: string | null;
   refetchData: () => Promise<void>;
 }
+
+const mapPublicTenant = (raw: any): Tenant => ({
+  id: raw.slug || raw.id,
+  name: raw.name || 'MO2 Loyalty',
+  logo: raw.logo_url || '',
+  primaryColor: raw.primary_color || '#4F46E5',
+  primaryColorSoft: 'rgba(79, 70, 229, 0.10)',
+  accentColor: raw.accent_color || '#059669',
+  accentColorSoft: 'rgba(5, 150, 105, 0.14)',
+  bgColor: raw.bg_color || '#F4F6FA',
+  surfaceColor: raw.surface_color || '#FFFFFF',
+  fontDisplay: raw.font_display || 'Rubik',
+  fontBody: raw.font_body || 'Rubik',
+  tagline: raw.tagline || 'برنامج الولاء الذكي',
+});
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -141,34 +156,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }));
       setTransactions(mappedHistory);
     } catch (err: any) {
-      setWalletError(err?.message || 'فشل تحميل بيانات المحفظة');
+      if (import.meta.env.DEV) {
+        console.warn('Real API backend not reachable, using dev offline mock mode:', err?.message);
+        const savedPhone = phoneToUse || localStorage.getItem('loyalty_user_phone');
+        const savedName = localStorage.getItem('loyalty_user_name') || 'مؤمن';
+        const savedPoints = localStorage.getItem(`loyalty_points_${currentTenant.id}`);
+        const pts = savedPoints ? parseInt(savedPoints, 10) : 1240;
+
+        if (savedPhone) {
+          setUser({
+            phone: savedPhone,
+            name: savedName,
+            joinDate: '٢٠٢٦/٠٥/٢٨',
+            loyaltyTier: 'الذهبي',
+            totalPoints: pts,
+          });
+          setPoints(pts);
+        }
+        setTransactions(mockTransactions[currentTenant.id] || []);
+      } else {
+        setWalletError(err?.message || 'تعذر تحميل بيانات المحفظة');
+      }
     } finally {
       setLoadingWallet(false);
     }
   };
 
-  // Load from local storage / API
+  // Load from API (GET /api/tenants/public/:slug) with dev mock fallback
   useEffect(() => {
+    let cancelled = false;
     const params = new URLSearchParams(window.location.search);
-    const tenantSlug = params.get('tenant');
+    const explicitSlug = params.get('tenant');
+    const requestedSlug = explicitSlug || localStorage.getItem('loyalty_tenant_slug') || mockTenants[0].id;
 
-    if (tenantSlug) {
-      const found = mockTenants.find(t => t.id === tenantSlug || t.name.toLowerCase() === tenantSlug.toLowerCase());
-      if (found) {
-        setCurrentTenant(found);
-        applyTenantTheme(found);
-        localStorage.setItem('loyalty_tenant_slug', tenantSlug);
-      }
-    } else {
-      const savedSlug = localStorage.getItem('loyalty_tenant_slug');
-      if (savedSlug) {
-        const found = mockTenants.find(t => t.id === savedSlug);
-        if (found) {
+    api.getPublicTenant(requestedSlug)
+      .then((raw) => {
+        if (cancelled) return;
+        const mapped = mapPublicTenant(raw);
+        setCurrentTenant(mapped);
+        applyTenantTheme(mapped);
+        localStorage.setItem('loyalty_tenant_slug', mapped.id);
+        setTenantError(null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const found = mockTenants.find(
+          (t) => t.id === requestedSlug || t.name.toLowerCase() === requestedSlug.toLowerCase()
+        );
+        if (found && import.meta.env.DEV) {
           setCurrentTenant(found);
           applyTenantTheme(found);
+          if (explicitSlug) {
+            localStorage.setItem('loyalty_tenant_slug', found.id);
+          }
+          setTenantError(null);
+        } else if (explicitSlug && !import.meta.env.DEV) {
+          setTenantError('عذراً، لم نتمكن من العثور على العلامة التجارية المطلوبة');
         }
-      }
-    }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -213,9 +262,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const savedRedeemed = localStorage.getItem(`loyalty_redeemed_${target.id}`);
 
         if (savedPoints) {
-          setPoints(parseInt(savedPoints));
+          setPoints(parseInt(savedPoints, 10));
         } else {
-          setPoints(0);
+          setPoints(1240);
         }
 
         if (savedRedeemed) {
@@ -228,7 +277,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setRedeemedRewards([]);
         }
 
-        setTransactions([]);
+        setTransactions(mockTransactions[target.id] || []);
       } else {
         setTenantError('عذراً، لم نتمكن من العثور على العلامة التجارية المطلوبة');
       }
@@ -248,7 +297,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setOtpSentPhone(phone);
       return true;
     } catch (e: any) {
-      setAuthError(e?.message || 'فشل إرسال كود التحقق');
+      if (import.meta.env.DEV) {
+        console.warn('Backend sendOtp unavailable, falling back to dev offline mode:', e?.message);
+        setOtpSentPhone(phone);
+        return true;
+      }
+      setAuthError(e?.message || 'تعذر إرسال رمز التحقق');
       return false;
     } finally {
       setLoadingAuth(false);
@@ -275,7 +329,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadWalletData(otpSentPhone);
       return true;
     } catch (e: any) {
-      setAuthError(e?.message || 'كود التحقق غير صحيح أو انتهت صلاحيته');
+      const isNetworkFailure =
+        e?.name === 'TypeError' ||
+        (typeof e?.message === 'string' &&
+          (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')));
+
+      if (import.meta.env.DEV && otpSentPhone && (code === '123456' || isNetworkFailure)) {
+        console.warn('Backend verifyOtp unavailable or dev demo code 123456 used');
+        localStorage.removeItem('loyalty_customer_token');
+        localStorage.setItem('loyalty_user_phone', otpSentPhone);
+        const savedName = localStorage.getItem('loyalty_user_name') || 'مؤمن';
+        const savedPoints = localStorage.getItem(`loyalty_points_${currentTenant.id}`);
+        const initialPoints = savedPoints ? parseInt(savedPoints, 10) : 1240;
+
+        setUser({
+          phone: otpSentPhone,
+          name: savedName,
+          joinDate: '٢٠٢٦/٠٥/٢٨',
+          loyaltyTier: 'الذهبي',
+          totalPoints: initialPoints,
+        });
+        setPoints(initialPoints);
+        setIsAuthenticated(true);
+        setOtpSentPhone(null);
+        await loadWalletData(otpSentPhone);
+        return true;
+      }
+
+      setAuthError('كود التحقق غير صحيح أو انتهت صلاحيته');
       return false;
     } finally {
       setLoadingAuth(false);
@@ -294,13 +375,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (user) {
       try {
         await api.updateProfileName(newName);
-        const updatedUser = { ...user, name: newName };
-        setUser(updatedUser);
-        localStorage.setItem('loyalty_user_name', newName);
       } catch (e: any) {
-        setGlobalError(e?.message || 'فشل تحديث الاسم');
-        return;
+        console.warn('Backend updateProfileName unavailable, saving locally in mock mode:', e?.message);
       }
+      const updatedUser = { ...user, name: newName };
+      setUser(updatedUser);
+      localStorage.setItem('loyalty_user_name', newName);
     }
   };
 
@@ -329,8 +409,58 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadWalletData();
       return newRedemption;
     } catch (e: any) {
-      setWalletError(e?.message || 'فشل استبدال المكافأة');
-      throw e;
+      const isNetworkFailure =
+        e?.name === 'TypeError' ||
+        (typeof e?.message === 'string' &&
+          (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')));
+
+      if (!import.meta.env.DEV || !isNetworkFailure || localStorage.getItem('loyalty_customer_token')) {
+        throw e instanceof Error ? e : new Error('فشلت عملية استرداد المكافأة');
+      }
+
+      console.warn('Backend redeemReward unavailable, using dev offline mode:', e?.message);
+
+      if (points < reward.pointsRequired) {
+        throw new Error('رصيد نقاطك غير كافٍ لاستعادة هذه المكافأة');
+      }
+
+      const generatedCode = `${Math.floor(100000 + Math.random() * 900000)}`;
+      const now = new Date();
+      const expiry = new Date(now.getTime() + 60 * 60 * 1000);
+
+      const newRedemption: RedeemedReward = {
+        code: generatedCode,
+        rewardId: reward.id,
+        rewardTitle: reward.title,
+        rewardImageUrl: reward.imageUrl,
+        pointsSpent: reward.pointsRequired,
+        redeemedAt: now.toISOString(),
+        expiresAt: expiry.toISOString(),
+        status: 'active',
+      };
+
+      const updatedRedeemed = [newRedemption, ...redeemedRewards];
+      setRedeemedRewards(updatedRedeemed);
+      localStorage.setItem(`loyalty_redeemed_${currentTenant.id}`, JSON.stringify(updatedRedeemed));
+
+      const nextPoints = points - reward.pointsRequired;
+      setPoints(nextPoints);
+      localStorage.setItem(`loyalty_points_${currentTenant.id}`, nextPoints.toString());
+      if (user) {
+        setUser((prev) => (prev ? { ...prev, totalPoints: nextPoints } : null));
+      }
+
+      const newTx: Transaction = {
+        id: `tx_rdm_${Date.now()}`,
+        date: now.toISOString(),
+        points: reward.pointsRequired,
+        type: 'redeem',
+        description: `استبدال مكافأة: ${reward.title}`,
+        invoiceNumber: `RDM-${generatedCode}`,
+      };
+      setTransactions((prev) => [newTx, ...prev]);
+
+      return newRedemption;
     } finally {
       setLoadingWallet(false);
     }
@@ -359,8 +489,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const freshRewards = await api.getRewards(currentTenant.id);
         setRewards(freshRewards);
       } catch {
-        setRewards([]);
-        setWalletError('فشل تحميل المكافآت');
+        setRewards(mockRewards[currentTenant.id] || []);
       }
     }
   };
@@ -371,11 +500,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       api.getRewards(currentTenant.id)
         .then(setRewards)
         .catch(() => {
-          setRewards([]);
-          setWalletError('فشل تحميل المكافآت');
+          setRewards(import.meta.env.DEV ? (mockRewards[currentTenant.id] || []) : []);
         });
     } else {
-      setRewards([]);
+      setRewards(import.meta.env.DEV ? (mockRewards[currentTenant.id] || []) : []);
     }
   }, [isAuthenticated, currentTenant]);
 

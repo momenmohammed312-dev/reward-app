@@ -354,29 +354,29 @@ export const RetentionAnalytics: React.FC<RetentionAnalyticsProps> = ({
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 10, fill: '#a89f96' }}
+                    tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fontSize: 10, fill: '#a89f96' }}
+                    tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }}
                     axisLine={false}
                     tickLine={false}
                     allowDecimals={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#14110f',
-                      border: '1px solid #332a24',
+                      backgroundColor: 'var(--color-admin-bg)',
+                      border: '1px solid var(--color-admin-border)',
                       borderRadius: 12,
                       fontSize: 12,
-                      color: '#f7f4f0',
+                      color: 'var(--color-admin-text)',
                     }}
                   />
                   <Bar
                     dataKey="ordersCount"
                     name="عدد الطلبات"
-                    fill="#d99b52"
+                    fill="var(--color-admin-primary)"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={36}
                   />

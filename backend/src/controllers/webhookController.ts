@@ -112,16 +112,24 @@ export class WebhookController {
           ? `foodics_${tenant_id}_${orderId || logId}`
           : `foodics_${tenant_id}_${eventType}_${orderId || logId}`;
 
-      await webhookQueue.add(
-        'process-webhook',
-        {
-          tenantId: tenant_id,
-          eventType,
-          payload,
-          logId,
-        },
-        { jobId }
-      );
+      try {
+        await webhookQueue.add(
+          'process-webhook',
+          {
+            tenantId: tenant_id,
+            eventType,
+            payload,
+            logId,
+          },
+          { jobId }
+        );
+      } catch (queueErr: unknown) {
+        // Delete pending dedup log so POS retries are not dropped as duplicates once Redis recovers.
+        await db.query('DELETE FROM webhook_logs WHERE id = $1::uuid', [logId]).catch(() => {});
+        const msg = queueErr instanceof Error ? queueErr.message : String(queueErr);
+        logger.error('Failed to enqueue Foodics webhook:', { error: msg, tenant_id, logId });
+        return res.status(503).json({ error: 'Webhook queue temporarily unavailable' });
+      }
 
       return res.status(200).json({ status: 'queued', log_id: logId });
     } catch (error: unknown) {

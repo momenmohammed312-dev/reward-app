@@ -150,7 +150,12 @@ describe('MO2-P4 Cross-Tenant Loyalty Networks (Phases 2–5)', () => {
         }
         if (sql.includes('FROM customers c')) {
           return Promise.resolve({
-            rows: [{ id: 'cust-A', is_verified: true, points_balance: 500 }],
+            rows: [{ id: 'cust-A', phone: '01012345678', name: 'Customer A', is_verified: true, points_balance: 500 }],
+          });
+        }
+        if (sql.includes('INSERT INTO customers')) {
+          return Promise.resolve({
+            rows: [{ id: 'cust-B' }],
           });
         }
         if (sql.includes('UPDATE rewards')) {

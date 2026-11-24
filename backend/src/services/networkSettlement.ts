@@ -1,6 +1,6 @@
 import { Queue, Worker } from 'bullmq';
 import db from '../config/db.js';
-import { isRedisReady } from '../config/redis.js';
+import { getBullMQConnection, isRedisReady } from '../config/redis.js';
 import { roundEgpAmount } from '../helpers/networkRates.js';
 import { logger } from './logger.js';
 import { NetworkError } from './network.js';
@@ -11,11 +11,6 @@ interface SettlementJobPayload {
   settlementId: string;
 }
 
-const redisConnection = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10),
-};
-
 let settlementQueueInstance: Queue<SettlementJobPayload> | null = null;
 let settlementWorkerInstance: Worker<SettlementJobPayload> | null = null;
 
@@ -23,13 +18,16 @@ export function getSettlementQueue(): Queue<SettlementJobPayload> | null {
   if (!isRedisReady()) return null;
   if (!settlementQueueInstance) {
     settlementQueueInstance = new Queue<SettlementJobPayload>('network-settlements', {
-      connection: redisConnection,
+      connection: getBullMQConnection(),
       defaultJobOptions: {
         attempts: 5,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,
         removeOnFail: false,
       },
+    });
+    settlementQueueInstance.on('error', (err) => {
+      logger.error('Settlement queue error', { error: err.message });
     });
   }
   return settlementQueueInstance;
@@ -43,10 +41,30 @@ export function startSettlementWorker(): Worker<SettlementJobPayload> | null {
       async (job) => {
         await NetworkSettlementService.processSettlementJob(job.data.settlementId);
       },
-      { connection: redisConnection }
+      { connection: getBullMQConnection() }
     );
+    settlementWorkerInstance.on('error', (err) => {
+      logger.error('Settlement worker error', { error: err.message });
+    });
+    settlementWorkerInstance.on('failed', (job, err) => {
+      logger.error(`Settlement job ${job?.id} failed`, { error: err.message });
+    });
   }
   return settlementWorkerInstance;
+}
+
+/**
+ * Gracefully stops the settlement worker and queue during shutdown.
+ */
+export async function stopSettlementWorker(): Promise<void> {
+  if (settlementWorkerInstance) {
+    await settlementWorkerInstance.close();
+    settlementWorkerInstance = null;
+  }
+  if (settlementQueueInstance) {
+    await settlementQueueInstance.close();
+    settlementQueueInstance = null;
+  }
 }
 
 export class NetworkSettlementService {
@@ -245,6 +263,7 @@ export class NetworkSettlementService {
       const updatedRes = await client.query(
         `UPDATE settlements
          SET status = 'completed',
+             error_message = NULL,
              billing_history_id = $2::uuid,
              external_reference = $3,
              settled_at = NOW(),

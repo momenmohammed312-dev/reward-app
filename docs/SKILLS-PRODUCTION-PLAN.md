@@ -184,11 +184,11 @@ Installed specifically for this phase. Each one has a concrete, verified defect 
 
 ---
 
-### P5 — Pilot with Aroma Cafe
+### P5 — Pilot with Pilot Cafe (MO2 Loyalty)
 
 | Skill | Serves | Path |
 |---|---|---|
-| `database` | A realistic seed: Aroma Cafe + branches, staff, customers, rewards, historical transactions so the analytics have something to show | `.agents/skills/database/SKILL.md` |
+| `database` | A realistic seed: Pilot Cafe (MO2 Loyalty) + branches, staff, customers, rewards, historical transactions so the analytics have something to show | `.agents/skills/database/SKILL.md` |
 | `observability-monitoring-monitor-setup` | Dashboards and alerts for the pilot (webhook failures, queue depth, settlement errors) | `.agents/skills/observability-monitoring-monitor-setup/SKILL.md` |
 | `incident-responder` | Being ready when the pilot breaks at the till | `.agents/skills/incident-responder/SKILL.md` |
 | `postmortem-writing` | Turning pilot incidents into fixes | `.agents/skills/postmortem-writing/SKILL.md` |

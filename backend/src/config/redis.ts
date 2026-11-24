@@ -81,6 +81,55 @@ export const isRedisReady = (): boolean => _redisAvailable && redisClient !== nu
  */
 export const getRedisClient = (): RedisClientType | null => redisClient;
 
+/**
+ * Disconnects the shared Redis client during graceful process shutdown.
+ */
+export const disconnectRedis = async (): Promise<void> => {
+  if (!redisClient) return;
+  try {
+    if (redisClient.isOpen) {
+      await redisClient.quit();
+    }
+  } catch {
+    try {
+      await redisClient.disconnect();
+    } catch {
+      /* ignore shutdown disconnect error */
+    }
+  } finally {
+    redisClient = null;
+    _redisAvailable = false;
+  }
+};
+
+/**
+ * Builds BullMQ-compatible Redis connection options honoring REDIS_URL when set,
+ * otherwise falling back to REDIS_HOST / REDIS_PORT.
+ */
+export const getBullMQConnection = () => {
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      const parsed = new URL(redisUrl);
+      const dbIdx = parsed.pathname && parsed.pathname.length > 1 ? parseInt(parsed.pathname.slice(1), 10) : undefined;
+      return {
+        host: parsed.hostname || '127.0.0.1',
+        port: parsed.port ? parseInt(parsed.port, 10) : 6379,
+        ...(parsed.username ? { username: decodeURIComponent(parsed.username) } : {}),
+        ...(parsed.password ? { password: decodeURIComponent(parsed.password) } : {}),
+        ...(Number.isInteger(dbIdx) ? { db: dbIdx } : {}),
+        ...(parsed.protocol === 'rediss:' ? { tls: {} } : {}),
+      };
+    } catch {
+      /* fall through to host/port below */
+    }
+  }
+  return {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  };
+};
+
 // Legacy default export kept for backward-compatibility.
 // Prefer getRedisClient() for new code so callers are forced to handle null.
 export default {

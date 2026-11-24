@@ -203,7 +203,7 @@ export class NetworkExchangeService {
 
       // 4. Lock source customer & enforce OTP verification + sufficient balance
       const custRes = await client.query(
-        `SELECT c.id, c.is_verified, COALESCE(cb.current_balance, 0) AS points_balance
+        `SELECT c.id, c.phone, c.name, c.is_verified, COALESCE(cb.current_balance, 0) AS points_balance
          FROM customers c
          LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
          WHERE c.id = $1::uuid AND c.tenant_id = $2::uuid AND c.deleted_at IS NULL
@@ -245,16 +245,36 @@ export class NetworkExchangeService {
         );
       }
 
-      // 6. Generate target redemption record
+      // 6. Generate target redemption record scoped strictly to a target-tenant customer row
       const linkedTargetRes = await client.query(
         `SELECT l2.customer_id
          FROM network_customer_links l1
+         JOIN network_customers nc ON nc.id = l1.network_customer_id
          JOIN network_customer_links l2 ON l2.network_customer_id = l1.network_customer_id
-         WHERE l1.customer_id = $1::uuid AND l2.tenant_id = $2::uuid
+         WHERE nc.network_id = $1::uuid
+           AND l1.customer_id = $2::uuid
+           AND l2.tenant_id = $3::uuid
          LIMIT 1`,
-        [sourceCustomerId, targetTenantId]
+        [networkId, sourceCustomerId, targetTenantId]
       );
-      const targetCustomerId = linkedTargetRes.rows[0]?.customer_id || sourceCustomerId;
+      let targetCustomerId: string | undefined = linkedTargetRes.rows[0]?.customer_id;
+
+      if (!targetCustomerId) {
+        if (!customer.phone) {
+          throw new NetworkError('CUSTOMER_NOT_FOUND', 'Source customer phone not found');
+        }
+        // Provision or reuse a tenant-owned customer row by phone so target redemptions never reference another tenant's PII row.
+        const targetCustRes = await client.query(
+          `INSERT INTO customers (tenant_id, phone, name, is_verified)
+           VALUES ($1::uuid, $2, $3, false)
+           ON CONFLICT (tenant_id, phone) DO UPDATE SET
+             deleted_at = NULL,
+             updated_at = NOW()
+           RETURNING id`,
+          [targetTenantId, customer.phone, customer.name || null]
+        );
+        targetCustomerId = targetCustRes.rows[0].id;
+      }
 
       const codeRes = await client.query('SELECT generate_redemption_code() AS code');
       const redemptionCode = codeRes.rows[0].code;

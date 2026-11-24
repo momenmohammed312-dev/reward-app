@@ -7,6 +7,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { CashierDashboard } from './pages/CashierDashboard';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import CustomerApp from './CustomerApp';
+import PitchPresentationPage from './pages/PitchPresentationPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -25,6 +26,9 @@ const App: React.FC = () => {
         <Route path="/admin/login" element={<AdminAuthPage role="admin" />} />
         <Route path="/cashier/login" element={<AdminAuthPage role="cashier" />} />
         <Route path="/superadmin/login" element={<AdminAuthPage role="superadmin" />} />
+
+        {/* Interactive Client Pitch Landing Page */}
+        <Route path="/pitch" element={<PitchPresentationPage />} />
 
         {/* Protected Admin Routes with Layout */}
         <Route path="/admin" element={

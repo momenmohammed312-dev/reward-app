@@ -15,7 +15,7 @@ router.post('/redeem', authenticateJWT, validate(schemas.redeemReward), LoyaltyC
 router.post(
   '/manual-earn',
   authenticateJWT,
-  requireRole(['owner', 'manager']),
+  requireRole(['owner', 'manager', 'cashier']),
   validate(schemas.manualEarn),
   LoyaltyController.adminEarnPointsManual
 );

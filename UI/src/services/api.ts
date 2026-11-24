@@ -106,6 +106,20 @@ class ApiService {
     return response.json();
   }
 
+  // --- PUBLIC TENANT DISCOVERY ---
+
+  async getPublicTenant(slug: string) {
+    const response = await fetch(`${API_BASE_URL}/tenants/public/${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'تعذر العثور على العلامة التجارية');
+    }
+    return response.json();
+  }
+
   // --- REWARDS CATALOG ---
   async getRewards(tenantId: string) {
     const response = await fetch(`${API_BASE_URL}/rewards?tenant_id=${tenantId}`, {

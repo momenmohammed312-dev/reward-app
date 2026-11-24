@@ -1,6 +1,6 @@
 // src/components/loyalty/RewardCard.tsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Reward } from '../../types';
 import { useApp } from '../../store/AppContext';
 import { Card, CardHeader, CardBody, CardFooter } from '../ui/Card';
@@ -15,8 +15,6 @@ interface RewardCardProps {
 
 export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick }) => {
   const { points, setSelectedReward, setCurrentSubPage, t } = useApp();
-  const [spotlightCoords, setSpotlightCoords] = useState({ x: 0, y: 0 });
-  const [isHovering, setIsHovering] = useState(false);
   const canAfford = points >= reward.pointsRequired;
 
   const handleDetailsClick = () => {
@@ -24,107 +22,79 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
     setCurrentSubPage('redeem-detail');
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setSpotlightCoords({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
-  };
-
   return (
     <Card 
-      className="relative flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-card)] overflow-hidden transition-all duration-300 group"
+      className="relative flex flex-col h-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-card)] overflow-hidden transition-shadow duration-200 hover:shadow-[var(--shadow-md)] group"
     >
-      {/* Spotlight Border Layer */}
-      {isHovering && (
-        <div 
-          className="absolute inset-0 pointer-events-none z-10 opacity-70 transition-opacity duration-300"
-          style={{
-            background: `radial-gradient(150px circle at ${spotlightCoords.x}px ${spotlightCoords.y}px, rgba(30, 64, 175, 0.12), transparent 75%)`
-          }}
-        />
-      )}
-
-      {/* 4.3 Explicit header: holds the visual cover card */}
+      {/* Visual cover card */}
       <CardHeader className="relative p-0 aspect-video w-full overflow-hidden border-b border-[var(--color-border)]">
         <img 
           src={reward.imageUrl} 
           alt={reward.title}
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover brightness-95 group-hover:brightness-100 transition-all duration-[var(--transition-slow)]"
+          className="w-full h-full object-cover outline-1 -outline-offset-1 outline-black/10 group-hover:scale-[1.02] transition-transform duration-300"
         />
-        <div className="absolute top-2 right-2 flex gap-1 items-center">
-          <span className="bg-white/95 backdrop-blur-sm text-slate-700 text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs border border-white/60 leading-none">
+        <div className="absolute top-3 right-3">
+          <span className="bg-white/95 backdrop-blur-sm text-[var(--color-text)] text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xs border border-black/5 leading-none">
             {reward.category}
           </span>
         </div>
       </CardHeader>
 
-      {/* Explicit standard body */}
-      <CardBody className="flex-1 flex flex-col justify-between gap-[var(--space-2)] p-[var(--space-5)] z-20">
+      {/* Body: Specific details grouped by spacing */}
+      <CardBody className="flex-1 flex flex-col justify-between gap-4 p-[var(--space-5)]">
         <div className="flex flex-col gap-1.5 text-right">
-          <span 
-            className="text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight cursor-pointer hover:text-[var(--color-primary)] transition-colors tracking-tight"
+          <button
+            type="button"
             onClick={handleDetailsClick}
+            className="text-right text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight cursor-pointer hover:text-[var(--color-primary)] transition-colors tracking-tight"
           >
             {reward.title}
-          </span>
-          <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed font-medium">
+          </button>
+          <p className="text-[12.5px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed font-medium">
             {reward.description}
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-[var(--color-border)]">
-          {/* Points required */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <CoinVertical size={14} weight="duotone" className="text-[var(--color-primary)]" />
-              <span className="text-[10px] font-bold text-[var(--color-text-light)] uppercase tracking-wider">Value</span>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="points-value text-[var(--text-md)] font-black text-[var(--color-primary)] number">
-                {reward.pointsRequired.toLocaleString()}
-              </span>
-                <span className="text-[10px] font-bold text-[var(--color-text-muted)]">
-                {t('pointsLabel')}
-              </span>
-            </div>
+        <div className="flex items-center justify-between pt-3 border-t border-[var(--color-border)]">
+          <div className="flex items-center gap-1.5">
+            <CoinVertical size={16} weight="regular" className="text-[var(--color-primary)] shrink-0" />
+            <span className="points-value text-[17px] font-black text-[var(--color-primary)] number">
+              {reward.pointsRequired.toLocaleString()}
+            </span>
+            <span className="text-[11.5px] font-bold text-[var(--color-text-muted)]">
+              {t('pointsLabel')}
+            </span>
           </div>
 
-          {/* Expiration */}
           {reward.expiryDays && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Clock size={14} weight="duotone" className="text-[var(--color-accent)]" />
-                <span className="text-[10px] font-bold text-[var(--color-text-light)] uppercase tracking-wider">Expiry</span>
-              </div>
-              <span className="text-[11px] font-bold text-[var(--color-text-muted)] number">
-                {reward.expiryDays} {t('reward.day')}
-              </span>
+            <div className="flex items-center gap-1 text-[12px] font-semibold text-[var(--color-text-muted)]">
+              <Clock size={14} weight="regular" className="shrink-0" />
+              <span className="number">{reward.expiryDays}</span>
+              <span>{t('reward.day')}</span>
             </div>
           )}
         </div>
       </CardBody>
 
-      {/* Explicit standard footer */}
-      <CardFooter className="p-[var(--space-4)] bg-[var(--color-bg)] flex gap-[var(--space-2)] justify-between items-center z-20">
+      {/* Action Footer */}
+      <CardFooter className="px-[var(--space-5)] pb-[var(--space-4)] pt-0 bg-transparent border-t-0 flex gap-[var(--space-2)] justify-between items-center">
         {canAfford ? (
           <Button
             variant="primary"
-            size="sm"
+            size="md"
             onClick={() => onRedeemClick(reward)}
-            className="flex-1 text-[var(--text-xs)] font-bold flex items-center justify-center gap-1.5 shadow-sm"
+            className="flex-1 text-[13px] font-extrabold rounded-2xl shadow-sm"
           >
             <span>{t('reward.redeemNow')}</span>
-            <Check size={14} weight="bold" />
+            <Check size={15} weight="bold" />
           </Button>
         ) : (
           <Button
             variant="ghost"
-            size="sm"
+            size="md"
             disabled
-            className="flex-1 text-[var(--text-xs)] font-bold bg-[var(--color-primary-soft)] opacity-50 text-[var(--color-primary)] border-transparent flex items-center justify-center gap-1.5"
+            className="flex-1 text-[12.5px] font-bold rounded-2xl bg-[var(--color-bg)] text-[var(--color-text-muted)] border-[var(--color-border)]"
           >
             <Lock size={14} weight="bold" />
             <span>{t('reward.remaining', { points: formatPoints(reward.pointsRequired - points) })}</span>

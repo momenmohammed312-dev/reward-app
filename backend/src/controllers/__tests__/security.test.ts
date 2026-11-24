@@ -8,6 +8,7 @@ vi.hoisted(() => {
 import bcrypt from 'bcrypt';
 import { AuthController } from '../authController.js';
 import { TenantController } from '../tenantController.js';
+import { LoyaltyController } from '../loyaltyController.js';
 import { OTPService } from '../../services/otp.js';
 import { resolveTenantId } from '../../helpers/resolveTenant.js';
 import db from '../../config/db.js';
@@ -156,6 +157,23 @@ describe('MO2-P2 Security Hardening Tests', () => {
         [expect.stringMatching(/^pk_/), 'foreign-or-deleted-branch', 'tenant-1']
       );
       expect(res.status).toHaveBeenCalledWith(404);
+    });
+  });
+
+  describe('LoyaltyController.adminEarnPointsManual Cashier Branch Isolation', () => {
+    it('should forbid a cashier with branch_id branch-A from granting points for branch-B without opening a DB connection', async () => {
+      const connectSpy = vi.fn();
+      (db.pool.connect as any) = connectSpy;
+
+      const req: any = {
+        user: { id: 'cashier-1', tenant_id: 'tenant-1', role: 'cashier', branch_id: 'branch-A' },
+        body: { customer_phone: '01012345678', points: 50, branch_id: 'branch-B' },
+      };
+
+      await LoyaltyController.adminEarnPointsManual(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(connectSpy).not.toHaveBeenCalled();
     });
   });
 });

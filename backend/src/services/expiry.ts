@@ -150,18 +150,36 @@ export class ExpiryService {
     }
   }
 
+  private static startupTimer: NodeJS.Timeout | null = null;
+  private static intervalTimer: NodeJS.Timeout | null = null;
+
   /**
    * Starts the daily expiry scheduler. Runs shortly after boot, then every 24h.
    */
   static startScheduler() {
+    if (ExpiryService.startupTimer || ExpiryService.intervalTimer) return;
     const run = () => {
       ExpiryService.expireAllTenants()
         .then(() => logger.info('Points expiry job completed'))
         .catch((err) => logger.error('Points expiry job failed', { error: (err as Error).message }));
     };
 
-    setTimeout(run, RUN_DELAY_MS);
-    setInterval(run, RUN_INTERVAL_MS);
+    ExpiryService.startupTimer = setTimeout(run, RUN_DELAY_MS);
+    ExpiryService.intervalTimer = setInterval(run, RUN_INTERVAL_MS);
     logger.info('Points expiry scheduler started (runs daily)');
+  }
+
+  /**
+   * Stops the daily expiry scheduler timers during graceful shutdown.
+   */
+  static stopScheduler() {
+    if (ExpiryService.startupTimer) {
+      clearTimeout(ExpiryService.startupTimer);
+      ExpiryService.startupTimer = null;
+    }
+    if (ExpiryService.intervalTimer) {
+      clearInterval(ExpiryService.intervalTimer);
+      ExpiryService.intervalTimer = null;
+    }
   }
 }

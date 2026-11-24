@@ -2,10 +2,10 @@
 @import "./theme/tokens.css";
 @import "tailwindcss";
 
-@theme {
-  --font-display: 'Outfit', sans-serif;
-  --font-body: 'Geist Variable', 'Geist', sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+@theme inline {
+  --font-display: 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
   --color-primary: var(--color-primary);
   --color-primary-soft: var(--color-primary-soft);
@@ -33,28 +33,52 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-card: var(--shadow-card);
 
-  --animate-fade-in: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fadeIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
   --animate-spin-slow: spin 3s linear infinite;
   --animate-dot-breath: dotBreath 2s infinite ease-in-out;
 }
 
-*, ::before, ::after {
-  box-sizing: border-box;
+@layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    direction: rtl;
+    text-align: start;
+    font-family: var(--font-body);
+  }
+
+  button, input, select, textarea {
+    direction: inherit;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
 }
 
-html, body, button, input, select, textarea {
-  direction: rtl;
-  text-align: right;
-  font-family: var(--font-body);
+.number {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
 }
 
-.number,
-.points-value,
+.points-value {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-display) !important;
+  display: inline-block;
+}
+
 .code-display {
   direction: ltr !important;
   text-align: left !important;
   font-family: var(--font-mono) !important;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   display: inline-block;
 }
 
@@ -98,7 +122,7 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -110,4 +134,21 @@ body {
 @keyframes dotBreath {
   0%, 100% { transform: scale(0.85); opacity: 0.6; }
   50%      { transform: scale(1.25); opacity: 1; }
+}
+
+@keyframes heroFloatOrb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-10px, 8px) scale(1.05); }
+}
+
+.animate-hero-orb {
+  animation: heroFloatOrb 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

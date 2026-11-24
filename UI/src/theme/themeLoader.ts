@@ -4,14 +4,15 @@ export const applyTenantTheme = (tenant: Tenant | null | undefined): void => {
   const root = document.documentElement;
 
   const defaults: Record<string, string> = {
-    '--color-primary': '#1e40af',
-    '--color-primary-soft': 'rgba(30, 64, 175, 0.08)',
-    '--color-accent': '#f59e0b',
-    '--color-accent-soft': 'rgba(245, 158, 11, 0.08)',
-    '--color-bg': '#f8fafc',
+    '--color-primary': '#6b4a35',
+    '--color-primary-dark': '#53392a',
+    '--color-primary-soft': 'rgba(107, 74, 53, 0.10)',
+    '--color-accent': '#d99b52',
+    '--color-accent-soft': 'rgba(217, 155, 82, 0.14)',
+    '--color-bg': '#f7f7f5',
     '--color-surface': '#ffffff',
-    '--font-display': "'Outfit', sans-serif",
-    '--font-body': "'Geist Variable', 'Geist', sans-serif",
+    '--font-display': "'Rubik', -apple-system, BlinkMacSystemFont, sans-serif",
+    '--font-body': "'Rubik', -apple-system, BlinkMacSystemFont, sans-serif",
   };
 
   Object.entries(defaults).forEach(([key, val]) => root.style.setProperty(key, val));

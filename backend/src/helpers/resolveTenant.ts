@@ -9,7 +9,7 @@ export const isUuid = (value: string): boolean => UUID_RE.test(value);
 
 /**
  * Resolves a `tenant_id` value that may be either a UUID or a URL-safe slug
- * (e.g. "aroma") into a real UUID by querying the `tenants` table.
+ * (e.g. "mo2-loyalty") into a real UUID by querying the `tenants` table.
  *
  * @returns The resolved UUID string, or `null` if the tenant does not exist.
  *

@@ -68,6 +68,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
 
   // Deduce categories
   const categories = ['all', ...Array.from(new Set(rewards.map(r => r.category)))];
+  const affordableCount = rewards.filter((r) => points >= r.pointsRequired).length;
 
   const filteredRewards = filterCategory === 'all' 
     ? rewards 
@@ -81,11 +82,11 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
       className="flex flex-col gap-[var(--space-5)] text-right"
     >
       {/* Page Title */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none">
-        <h1 className="text-[var(--text-2xl)] font-black text-[var(--color-text)] tracking-tight leading-none">
+      <motion.div variants={itemVariants} className="flex flex-col gap-1 select-none">
+        <h1 className="text-[24px] font-extrabold text-[var(--color-text)] tracking-tight leading-tight">
           {t('rewards.title')}
         </h1>
-        <p className="text-[10px] tracking-widest font-bold text-[var(--color-text-light)] uppercase">
+        <p className="text-[13px] font-medium text-[var(--color-text-muted)]">
           {t('rewards.subtitle')}
         </p>
       </motion.div>
@@ -93,28 +94,25 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({ onRedeemRewardTrigger 
       {/* Points Balance Card */}
       <motion.div
         variants={itemVariants}
-        className="relative p-[2px] rounded-[var(--radius-lg)] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] shadow-lg select-none"
+        className="relative rounded-[var(--radius-lg)] bg-[var(--color-primary)] text-white p-5 shadow-[var(--shadow-lg)] select-none overflow-hidden"
       >
-        <div className="rounded-[calc(var(--radius-lg)-2px)] bg-[var(--color-surface)] p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[9px] font-bold text-[var(--color-text-muted)] uppercase tracking-[0.15em]">Live Balance</span>
-              </div>
-              <motion.p 
-                key={points} 
-                initial={{ opacity: 0, y: -6 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                className="text-4xl font-black text-[var(--color-text)] tracking-tight leading-none number"
-              >
-                {points.toLocaleString('en-US')}
-              </motion.p>
-              <p className="text-[10px] font-bold text-[var(--color-text-light)]">{t('rewards.pointsAvailable')}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-[var(--color-primary-soft)] flex items-center justify-center">
-              <Gift size={24} className="text-[var(--color-primary)]" weight="duotone" />
-            </div>
+        <div className="flex items-center justify-between relative z-10">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-bold text-white/85">{t('rewards.pointsAvailable')}</span>
+            <motion.p
+              key={points}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="points-value text-[38px] font-extrabold text-white tracking-tight leading-none"
+            >
+              {points.toLocaleString('en-US')}
+            </motion.p>
+            <span className="text-[12px] font-semibold text-white/85 mt-0.5">
+              {t('rewards.availableCount', { count: affordableCount })}
+            </span>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center">
+            <Gift size={24} className="text-white" weight="regular" />
           </div>
         </div>
       </motion.div>

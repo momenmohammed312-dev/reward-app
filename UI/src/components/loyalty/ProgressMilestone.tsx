@@ -2,15 +2,13 @@
 
 import React from 'react';
 import { useApp } from '../../store/AppContext';
-import { Card, CardBody } from '../ui/Card';
-import { Trophy, Flame, ArrowLeft } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 
 export const ProgressMilestone: React.FC = () => {
   const { points, rewards, setSelectedReward, setCurrentSubPage, t } = useApp();
 
   const nextRewards = [...rewards]
-    .filter(r => r.pointsRequired > points)
+    .filter((r) => r.pointsRequired > points)
     .sort((a, b) => a.pointsRequired - b.pointsRequired);
 
   const targetReward = nextRewards[0];
@@ -20,8 +18,6 @@ export const ProgressMilestone: React.FC = () => {
 
   const activeTarget = targetReward || highestReward;
   const isCompleted = points >= activeTarget.pointsRequired;
-  const pointsRemaining = Math.max(activeTarget.pointsRequired - points, 0);
-  
   const progress = Math.min(points / activeTarget.pointsRequired, 1);
   const percentage = Math.round(progress * 100);
 
@@ -31,64 +27,31 @@ export const ProgressMilestone: React.FC = () => {
   };
 
   return (
-    <Card className="border border-[var(--color-border)] shadow-[var(--shadow-md)] bg-[var(--color-surface)] overflow-hidden">
-      <CardBody className="flex flex-col gap-[var(--space-4)]">
-        {/* Top section: icon + status + details button */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-[var(--space-3)]">
-            <div className="p-2.5 rounded-xl bg-[var(--color-accent-soft)] text-[var(--color-accent)] shrink-0">
-              <Trophy size={20} weight="duotone" />
-            </div>
-            <div className="flex flex-col text-right">
-              <span className="text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight">
-                {isCompleted ? t('progress.congrats') : t('progress.nextTarget')}
-              </span>
-              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] opacity-60 leading-tight mt-0.5">
-{isCompleted
-                    ? t('progress.eligible', { title: activeTarget.title })
-                    : t('progress.target', { title: activeTarget.title })}
-              </span>
-            </div>
-          </div>
+    <motion.div
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={handleRewardClick}
+      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] px-4 py-3.5 shadow-[var(--shadow-sm)] cursor-pointer transition-colors hover:border-[var(--color-primary)] select-none"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[14.5px] font-bold text-[var(--color-text)] truncate">
+          {isCompleted
+            ? t('progress.eligible', { title: activeTarget.title })
+            : t('progress.nextRewardLine', { title: activeTarget.title })}
+        </span>
+        <span className="number text-[15.5px] font-extrabold text-[var(--color-primary)] shrink-0">
+          {percentage}%
+        </span>
+      </div>
 
-          <motion.button
-            onClick={handleRewardClick}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1 text-[11px] font-bold text-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-1.5 rounded-lg hover:bg-[var(--color-primary)] hover:text-white transition-all shrink-0 cursor-pointer"
-          >
-            <span>{t('progress.details')}</span>
-            <ArrowLeft size={14} weight="bold" />
-          </motion.button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="flex flex-col gap-1.5">
-          <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${percentage}%` }}
-              transition={{ type: 'spring' as const, stiffness: 100, damping: 20 }}
-              className={`h-full rounded-full ${isCompleted ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-accent)]'}`}
-            />
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[var(--text-lg)] font-black text-[var(--color-text)] number">{points}</span>
-            <span className="text-[10px] font-bold text-[var(--color-text-muted)]">{percentage}%</span>
-            <span className="text-[var(--text-sm)] font-bold text-[var(--color-text-light)] number">{activeTarget.pointsRequired}</span>
-          </div>
-        </div>
-
-        {/* Points remaining callout */}
-        <div className="flex items-center justify-between bg-[var(--color-bg)] rounded-xl px-[var(--space-3)] py-[var(--space-2)]">
-          <div className="flex items-center gap-1.5">
-            <Flame size={16} weight="duotone" className="text-[var(--color-accent)]" />
-            <span className="text-[11px] font-bold text-[var(--color-text-muted)]">
-              {t('progress.remaining')}
-            </span>
-          </div>
-          <span className="text-[var(--text-md)] font-black text-[var(--color-accent)] number">{pointsRemaining.toLocaleString()}</span>
-        </div>
-      </CardBody>
-    </Card>
+      <div className="w-full h-[10px] rounded-full bg-[var(--color-track,#ece9e3)] overflow-hidden mt-2.5">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${percentage}%` }}
+          transition={{ duration: 0.9, delay: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
+          className="h-full rounded-full bg-[var(--color-primary)]"
+        />
+      </div>
+    </motion.div>
   );
 };

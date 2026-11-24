@@ -1,39 +1,41 @@
 :root {
   /* ——— Brand ——— */
-  --brand-name: "أروما كافيه";
-  --brand-logo: "https://picsum.photos/seed/aromacafe/120";
+  --brand-name: "MO2 Loyalty";
+  --brand-logo: "https://picsum.photos/seed/mo2loyalty/120";
 
-  /* ——— Colors ——— */
-  --color-primary: #1e40af;
-  --color-primary-soft: rgba(30, 64, 175, 0.08);
-  --color-accent: #f59e0b;
-  --color-accent-soft: rgba(245, 158, 11, 0.08);
-  --color-success: #059669;
-  --color-danger: #dc2626;
+  /* ——— Cafe Colors (Primary Palette) ——— */
+  --color-primary: #6b4a35;
+  --color-primary-dark: #53392a;
+  --color-primary-soft: rgba(107, 74, 53, 0.10);
+  --color-accent: #d99b52;
+  --color-accent-soft: rgba(217, 155, 82, 0.14);
+  --color-success: #2f7d5b;
+  --color-danger: #b4423a;
   --color-warning: #d97706;
 
   /* ——— Neutrals ——— */
-  --color-bg: #f8fafc;
+  --color-bg: #f7f7f5;
   --color-surface: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
-  --color-text-light: #94a3b8;
+  --color-track: #ece9e3;
+  --color-border: #e7e5e0;
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-text-light: #9ca3af;
 
   /* ——— Typography ——— */
-  --font-display: 'Outfit', sans-serif;
-  --font-body: 'Geist Variable', 'Geist', sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+  --font-display: 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
   /* ——— Font Sizes ——— */
-  --text-xs: 11px;
-  --text-sm: 13px;
+  --text-xs: 12px;
+  --text-sm: 13.5px;
   --text-base: 15px;
   --text-md: 17px;
   --text-lg: 20px;
   --text-xl: 24px;
   --text-2xl: 30px;
-  --text-3xl: 38px;
+  --text-3xl: 42px;
 
   /* ——— Spacing ——— */
   --space-1: 4px;
@@ -47,40 +49,40 @@
   --space-12: 48px;
 
   /* ——— Radius ——— */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
 
   /* ——— Shadows ——— */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
-  --shadow-card: 0 2px 12px rgba(0,0,0,0.07);
+  --shadow-sm: 0 2px 6px rgba(107, 74, 53, 0.06);
+  --shadow-md: 0 8px 20px rgba(107, 74, 53, 0.08);
+  --shadow-lg: 0 12px 30px rgba(107, 74, 53, 0.14);
+  --shadow-card: 0 4px 14px rgba(107, 74, 53, 0.06);
 
   /* ——— Transitions ——— */
-  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-normal: 250ms cubic-bezier(0.32, 0.72, 0, 1);
-  --transition-slow: 400ms cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-fast: 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-normal: 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --transition-slow: 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* ——— Layout ——— */
   --max-width: 420px;
   --nav-height: 64px;
-  --bottom-nav: 68px;
+  --bottom-nav: 72px;
 
-  /* ——— Admin Theme (dark dashboard palette) ——— */
-  --color-admin-bg: #0f172a;
-  --color-admin-surface: #1e293b;
-  --color-admin-border: #334155;
-  --color-admin-text: #f1f5f9;
-  --color-admin-text-muted: #94a3b8;
-  --color-admin-text-light: #64748b;
-  --color-admin-primary: var(--color-primary);
-  --color-admin-primary-soft: var(--color-primary-soft);
-  --color-admin-accent: var(--color-accent);
-  --color-admin-accent-soft: var(--color-accent-soft);
-  --color-admin-success: var(--color-success);
-  --color-admin-danger: var(--color-danger);
-  --color-admin-warning: var(--color-warning);
+  /* ——— Admin Theme (Warm Dark Espresso Slate) ——— */
+  --color-admin-bg: #14110f;
+  --color-admin-surface: #1f1a17;
+  --color-admin-border: #332a24;
+  --color-admin-text: #f7f4f0;
+  --color-admin-text-muted: #a89f96;
+  --color-admin-text-light: #7a7067;
+  --color-admin-primary: #d99b52;
+  --color-admin-primary-soft: rgba(217, 155, 82, 0.14);
+  --color-admin-accent: #6b4a35;
+  --color-admin-accent-soft: rgba(107, 74, 53, 0.18);
+  --color-admin-success: #34d399;
+  --color-admin-danger: #f87171;
+  --color-admin-warning: #fbbf24;
 }

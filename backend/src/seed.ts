@@ -39,8 +39,8 @@ async function seed() {
         logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING id, name, slug
-    `, ['أروما كافيه', 'aroma', 1.0, 20, 365, 'premium', true,
-        'https://picsum.photos/seed/aromacafelogo/160', '#1e40af', '#f59e0b', '#f8fafc', '#ffffff', 'Playfair Display', 'Cairo', 'القهوة المختصة وأرقى المخبوزات الفرنسية']),
+    `, ['MO2 Loyalty', 'mo2-loyalty', 1.0, 20, 365, 'premium', true,
+        'https://picsum.photos/seed/mo2loyaltylogo/160', '#1e40af', '#f59e0b', '#f8fafc', '#ffffff', 'Playfair Display', 'Cairo', 'برنامج الولاء الذكي للعلامات والمقاهي']),
     db.query(`
       INSERT INTO tenants (name, slug, points_per_egp, min_purchase_egp, points_expiry_days, plan, is_active,
         logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline)
@@ -57,8 +57,8 @@ async function seed() {
         'https://picsum.photos/seed/yasmeenlogo/160', '#065f46', '#db2777', '#f0fdf4', '#ffffff', 'Playfair Display', 'Cairo', 'من الفرن إليك.. حب في كل قطعة']),
   ]);
 
-  const [aroma, brewCo, yasmeen] = tenants.map(t => t.rows[0]);
-  console.log(`  ✅ Tenants: ${aroma.name}, ${brewCo.name}, ${yasmeen.name}`);
+  const [mo2Demo, brewCo, yasmeen] = tenants.map(t => t.rows[0]);
+  console.log(`  ✅ Tenants: ${mo2Demo.name}, ${brewCo.name}, ${yasmeen.name}`);
 
   // 4. Seed admin users (password: admin123)
   const bcrypt = await import('bcrypt');
@@ -66,7 +66,7 @@ async function seed() {
 
   await db.query(
     `INSERT INTO users (tenant_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5)`,
-    [aroma.id, 'admin@aroma.com', hash, 'مدير أروما', 'owner']
+    [mo2Demo.id, 'admin@mo2loyalty.com', hash, 'مدير MO2 Loyalty', 'owner']
   );
   await db.query(
     `INSERT INTO users (tenant_id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, $5)`,
@@ -85,10 +85,10 @@ async function seed() {
   console.log('  ✅ Admin users created (password: admin123)');
 
   // 5. Seed branches
-  const aromaBranches = await Promise.all([
-    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [aroma.id, 'فرع وسط البلد', 'القاهرة', 'foodics', true]),
-    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [aroma.id, 'فرع مصر الجديدة', 'القاهرة', 'foodics', true]),
-    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [aroma.id, 'فرع سموحة', 'الإسكندرية', 'manual', false]),
+  const mo2Branches = await Promise.all([
+    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [mo2Demo.id, 'فرع وسط البلد', 'القاهرة', 'foodics', true]),
+    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [mo2Demo.id, 'فرع مصر الجديدة', 'القاهرة', 'foodics', true]),
+    db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [mo2Demo.id, 'فرع سموحة', 'الإسكندرية', 'manual', false]),
   ]);
 
   const brewBranches = await Promise.all([
@@ -100,16 +100,16 @@ async function seed() {
     db.query(`INSERT INTO branches (tenant_id, name, city, pos_type, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id`, [yasmeen.id, 'فرع الرحاب', 'القاهرة', 'manual', true]),
   ]);
 
-  const allBranches = [...aromaBranches, ...brewBranches, ...yasmeenBranches].map(b => b.rows[0]);
+  const allBranches = [...mo2Branches, ...brewBranches, ...yasmeenBranches].map(b => b.rows[0]);
   console.log(`  ✅ ${allBranches.length} branches created`);
 
   // 6. Seed customers
-  const aromaCustomers = await Promise.all([
-    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [aroma.id, '01000000001', 'أحمد محمود', 'gold', 3500, true, '2026-05-30']),
-    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [aroma.id, '01000000002', 'سارة علي', 'platinum', 8900, true, '2026-05-31']),
-    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [aroma.id, '01000000003', 'مصطفى كامل', 'silver', 950, true, '2026-05-25']),
-    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [aroma.id, '01000000004', 'منى أحمد', 'bronze', 340, true, '2026-05-20']),
-    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [aroma.id, '01000000005', 'كريم حسن', 'gold', 4800, true, '2026-05-29']),
+  const mo2Customers = await Promise.all([
+    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [mo2Demo.id, '01000000001', 'أحمد محمود', 'gold', 3500, true, '2026-05-30']),
+    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [mo2Demo.id, '01000000002', 'سارة علي', 'platinum', 8900, true, '2026-05-31']),
+    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [mo2Demo.id, '01000000003', 'مصطفى كامل', 'silver', 950, true, '2026-05-25']),
+    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [mo2Demo.id, '01000000004', 'منى أحمد', 'bronze', 340, true, '2026-05-20']),
+    db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [mo2Demo.id, '01000000005', 'كريم حسن', 'gold', 4800, true, '2026-05-29']),
   ]);
 
   const brewCustomers = await Promise.all([
@@ -122,11 +122,11 @@ async function seed() {
     db.query(`INSERT INTO customers (tenant_id, phone, name, tier, total_earned, is_verified, last_visit) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, [yasmeen.id, '01000000009', 'هاني جمال', 'silver', 1300, true, '2026-05-26']),
   ]);
 
-  console.log(`  ✅ ${aromaCustomers.length + brewCustomers.length + yasmeenCustomers.length} customers created`);
+  console.log(`  ✅ ${mo2Customers.length + brewCustomers.length + yasmeenCustomers.length} customers created`);
 
   // 7. Seed wallet_ledger entries (so customers have balances)
   const allCustomers = [
-    ...aromaCustomers.map(c => ({ ...c.rows[0], tenant_id: aroma.id })),
+    ...mo2Customers.map(c => ({ ...c.rows[0], tenant_id: mo2Demo.id })),
     ...brewCustomers.map(c => ({ ...c.rows[0], tenant_id: brewCo.id })),
     ...yasmeenCustomers.map(c => ({ ...c.rows[0], tenant_id: yasmeen.id })),
   ];
@@ -141,11 +141,11 @@ async function seed() {
   console.log(`  ✅ Wallet ledger entries created`);
 
   // 8. Seed rewards for each tenant
-  const aromaRewards = await Promise.all([
-    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [aroma.id, 'كوب كابتشينو مجاني', 'free_item', 80, 'كوب قهوة كابتشينو غني برغوة الحليب الدافئة', 'مشروبات ساخنة', 'https://picsum.photos/seed/cappuccino/300/200', 'صالح لجميع المقاسات', 7, true]),
-    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [aroma.id, 'كرواسون زبدة فرنسي', 'free_item', 120, 'كرواسون طازج مخبوز بزبدة فرنسية فاخرة', 'مخبوزات', 'https://picsum.photos/seed/croissant/300/200', 'متاح للاستلام والطلب داخل الفرع', 5, true]),
-    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [aroma.id, 'خصم 20%', 'discount_percent', 200, 'خصم 20% على طلبك القادم', 'خصومات', 'https://picsum.photos/seed/discount/300/200', 'لا يمكن دمجه مع العروض الأخرى', 14, true]),
-    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [aroma.id, 'بوكس هدايا سبشيالتي', 'free_item', 500, 'صندوق فخم يحتوي على ربع كيلو بن كولومبي فاخر', 'منتجات', 'https://picsum.photos/seed/giftbox/300/200', 'التوصيل مجاني أو الاستلام من أقرب فرع', 30, true]),
+  const mo2Rewards = await Promise.all([
+    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [mo2Demo.id, 'كوب كابتشينو مجاني', 'free_item', 80, 'كوب قهوة كابتشينو غني برغوة الحليب الدافئة', 'مشروبات ساخنة', 'https://picsum.photos/seed/cappuccino/300/200', 'صالح لجميع المقاسات', 7, true]),
+    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [mo2Demo.id, 'كرواسون زبدة فرنسي', 'free_item', 120, 'كرواسون طازج مخبوز بزبدة فرنسية فاخرة', 'مخبوزات', 'https://picsum.photos/seed/croissant/300/200', 'متاح للاستلام والطلب داخل الفرع', 5, true]),
+    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [mo2Demo.id, 'خصم 20%', 'discount_percent', 200, 'خصم 20% على طلبك القادم', 'خصومات', 'https://picsum.photos/seed/discount/300/200', 'لا يمكن دمجه مع العروض الأخرى', 14, true]),
+    db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [mo2Demo.id, 'بوكس هدايا سبشيالتي', 'free_item', 500, 'صندوق فخم يحتوي على ربع كيلو بن كولومبي فاخر', 'منتجات', 'https://picsum.photos/seed/giftbox/300/200', 'التوصيل مجاني أو الاستلام من أقرب فرع', 30, true]),
   ]);
 
   const brewRewards = await Promise.all([
@@ -160,7 +160,7 @@ async function seed() {
     db.query(`INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, image_url, terms, expiry_days, is_active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`, [yasmeen.id, 'كيكة أعياد خاصة', 'free_item', 600, 'كيكة اسفنجية بطبقتين من الكريمة لتكفي 8 أشخاص', 'مناسبات', 'https://picsum.photos/seed/birthdaycake/300/200', 'تتطلب الحجز 24 ساعة مسبقاً', 45, true]),
   ]);
 
-  console.log(`  ✅ ${aromaRewards.length + brewRewards.length + yasmeenRewards.length} rewards created`);
+  console.log(`  ✅ ${mo2Rewards.length + brewRewards.length + yasmeenRewards.length} rewards created`);
 
   // 9. Seed trial subscriptions
   for (const t of tenants.map(r => r.rows[0])) {
@@ -173,8 +173,8 @@ async function seed() {
 
   // 10. Seed sample transactions
   const txData = [
-    { tenantId: aroma.id, customerId: aromaCustomers[0].rows[0].id, branchId: aromaBranches[0].rows[0].id, invoice: 'INV-1001', amount: 190, points: 45 },
-    { tenantId: aroma.id, customerId: aromaCustomers[1].rows[0].id, branchId: aromaBranches[1].rows[0].id, invoice: 'INV-1002', amount: 450, points: 120 },
+    { tenantId: mo2Demo.id, customerId: mo2Customers[0].rows[0].id, branchId: mo2Branches[0].rows[0].id, invoice: 'INV-1001', amount: 190, points: 45 },
+    { tenantId: mo2Demo.id, customerId: mo2Customers[1].rows[0].id, branchId: mo2Branches[1].rows[0].id, invoice: 'INV-1002', amount: 450, points: 120 },
     { tenantId: brewCo.id, customerId: brewCustomers[0].rows[0].id, branchId: brewBranches[0].rows[0].id, invoice: 'INV-2001', amount: 320, points: 75 },
   ];
 
@@ -196,7 +196,7 @@ async function seed() {
   console.log('🎉 Seed complete!');
   console.log('');
   console.log('📋 Admin logins (password: admin123):');
-  console.log('   admin@aroma.com  — أروما كافيه');
+  console.log('   admin@mo2loyalty.com  — MO2 Loyalty');
   console.log('   admin@brewco.com — برو أند كو');
   console.log('   admin@yasmeen.com — حلويات الياسمين');
   console.log('   superadmin@mo2.com — Super Admin (all tenants)');

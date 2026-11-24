@@ -1,12 +1,12 @@
 import db from './config/db.js';
-import { connectRedis } from './config/redis.js';
+import { connectRedis, disconnectRedis } from './config/redis.js';
 import { validateEnv } from './config/validateEnv.js';
 import { ExpiryService } from './services/expiry.js';
 import { logger } from './services/logger.js';
 import { OutboxService } from './services/outbox.js';
 import { ReconciliationService } from './services/reconciliation.js';
-import { startSettlementWorker } from './services/networkSettlement.js';
-import { startWebhookWorker } from './services/webhookProcessor.js';
+import { startSettlementWorker, stopSettlementWorker } from './services/networkSettlement.js';
+import { startWebhookWorker, stopWebhookWorker, webhookQueue } from './services/webhookProcessor.js';
 
 const OUTBOX_POLL_INTERVAL_MS = parseInt(process.env.OUTBOX_POLL_INTERVAL_MS || '30000', 10);
 const RECONCILIATION_INTERVAL_MS = parseInt(
@@ -65,14 +65,37 @@ const startWorker = async () => {
   }
 };
 
-const shutdown = (signal: string) => {
+let shuttingDown = false;
+
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   logger.info(`[Worker] Received ${signal}, shutting down gracefully...`);
-  if (outboxTimer) clearInterval(outboxTimer);
-  if (reconciliationTimer) clearInterval(reconciliationTimer);
-  process.exit(0);
+  if (outboxTimer) {
+    clearInterval(outboxTimer);
+    outboxTimer = null;
+  }
+  if (reconciliationTimer) {
+    clearInterval(reconciliationTimer);
+    reconciliationTimer = null;
+  }
+  ExpiryService.stopScheduler();
+
+  try {
+    await stopWebhookWorker();
+    await stopSettlementWorker();
+    await webhookQueue.close();
+    await disconnectRedis();
+    await db.pool.end();
+    logger.info('[Worker] Graceful shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error('[Worker] Error during graceful shutdown', { error: (err as Error).message });
+    process.exit(1);
+  }
 };
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
 startWorker();

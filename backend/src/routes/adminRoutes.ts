@@ -12,8 +12,8 @@ router.get('/customers', AdminController.getCustomers);
 router.get('/rewards', AdminController.getRewards);
 router.post('/rewards', validate(schemas.createReward), AdminController.createReward);
 router.get('/branches', AdminController.getBranches);
-router.post('/branches', AdminController.createBranch);
-router.patch('/branches/:id', AdminController.updateBranch);
+router.post('/branches', validate(schemas.createBranch), AdminController.createBranch);
+router.patch('/branches/:id', validate(schemas.updateBranch), AdminController.updateBranch);
 router.delete('/branches/:id', AdminController.deleteBranch);
 
 router.patch('/customers/:id', validate(schemas.updateCustomer), AdminController.updateCustomer);

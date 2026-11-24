@@ -75,11 +75,15 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
 
   useEffect(() => {
     if (!branch) return;
+    document.body.style.overflow = 'hidden';
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [branch, onClose]);
 
   const handleCopy = async () => {
@@ -102,15 +106,17 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
   };
 
   const handlePrint = () => {
-    if (!qrDataUrl || !branch) return;
+    if (!qrDataUrl || !branch || !qrDataUrl.startsWith('data:image/png;base64,')) return;
     const printWin = window.open('', '_blank', 'width=480,height=640');
     if (!printWin) return;
     const tableLabel = trimmedTable ? `طاولة رقم #${trimmedTable}` : 'مسح سريع للفرع';
-    printWin.document.write(`<!DOCTYPE html>
+    const doc = printWin.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="utf-8" />
-<title>QR - ${branch.name}</title>
+<title></title>
 <style>
   body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fff; color: #1f1a17; }
   .card { width: 320px; padding: 28px 24px; border: 2px solid #d99b52; border-radius: 24px; text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
@@ -124,17 +130,29 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
 </head>
 <body>
   <div class="card">
-    <h1 class="brand">${tenantName}</h1>
-    <p class="branch">${branch.name}</p>
-    <div class="pill">${tableLabel}</div>
-    <img src="${qrDataUrl}" alt="QR Code" />
+    <h1 class="brand" id="qr-brand"></h1>
+    <p class="branch" id="qr-branch"></p>
+    <div class="pill" id="qr-pill"></div>
+    <img id="qr-img" alt="QR Code" />
     <p class="cta">امسح الكود بالكاميرا واجمع نقاطك فوراً</p>
     <p class="sub">بدون تحميل تطبيق · تسجيل برقم الهاتف</p>
   </div>
-  <script>window.onload = function(){ window.print(); };</script>
 </body>
 </html>`);
-    printWin.document.close();
+    doc.close();
+    doc.title = `QR - ${branch.name}`;
+    const brandEl = doc.getElementById('qr-brand');
+    const branchEl = doc.getElementById('qr-branch');
+    const pillEl = doc.getElementById('qr-pill');
+    const imgEl = doc.getElementById('qr-img') as HTMLImageElement | null;
+    if (brandEl) brandEl.textContent = tenantName;
+    if (branchEl) branchEl.textContent = branch.name;
+    if (pillEl) pillEl.textContent = tableLabel;
+    if (imgEl) imgEl.src = qrDataUrl;
+    printWin.addEventListener('load', () => printWin.print(), { once: true });
+    if (doc.readyState === 'complete') {
+      setTimeout(() => printWin.print(), 50);
+    }
   };
 
   return (
@@ -151,6 +169,9 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
         >
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="qr-modal-title"
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -12 }}
@@ -165,7 +186,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                   <QrCode size={20} weight="duotone" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-[var(--color-admin-text)]">
+                  <h2 id="qr-modal-title" className="text-sm font-black text-[var(--color-admin-text)]">
                     استوديو QR للطاولات والفروع
                   </h2>
                   <p className="text-[11px] text-[var(--color-admin-text-muted)] flex items-center gap-1 mt-0.5">
@@ -189,7 +210,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
             <div className="p-6 max-h-[80vh] overflow-y-auto overscroll-contain flex flex-col gap-5">
               {/* Table Number Controls */}
               <div className="flex flex-col gap-2.5">
-                <label className="text-xs font-bold text-[var(--color-admin-text-muted)]">
+                <label htmlFor="qr-table-input" className="text-xs font-bold text-[var(--color-admin-text-muted)]">
                   تخصيص رقم الطاولة (اختياري)
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -200,7 +221,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                         key={preset || 'general'}
                         type="button"
                         onClick={() => setTableNumber(preset)}
-                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors duration-150 active:scale-[0.96] cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors duration-150 enabled:active:scale-[0.96] cursor-pointer ${
                           active
                             ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] border-transparent'
                             : 'bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] border-[var(--color-admin-border)] hover:text-[var(--color-admin-text)]'
@@ -212,6 +233,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                   })}
                 </div>
                 <input
+                  id="qr-table-input"
                   type="text"
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}

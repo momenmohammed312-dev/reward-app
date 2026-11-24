@@ -14,17 +14,10 @@ import { MyNetworks } from '../components/MyNetworks';
 import { RetentionAnalytics } from '../components/admin/RetentionAnalytics';
 import { BranchQrModal } from '../components/admin/BranchQrModal';
 
-const chartData = [
-  { month: 'يناير', earned: 12400, redeemed: 3200 },
-  { month: 'فبراير', earned: 14800, redeemed: 4100 },
-  { month: 'مارس', earned: 11200, redeemed: 3800 },
-  { month: 'أبريل', earned: 18900, redeemed: 5200 },
-  { month: 'مايو', earned: 16200, redeemed: 4900 },
-  { month: 'يونيو', earned: 20500, redeemed: 6100 },
-];
-
 interface Customer { id: string; name: string; phone: string; tier: string; balance: number; totalEarned: number; status: string; lastVisit: string | null; }
 interface Branch { id: string; name: string; location: string; posType: string; active: boolean; key: string; timezone: string; openingTime: string | null; closingTime: string | null; }
+
+const EMPTY_ADMIN_STATS = { totalCustomers: 0, activeLoyalists: 0, pointsIssuedThisMonth: 0, redemptionsToday: 0 };
 
 export const AdminDashboard: React.FC = () => {
   const location = useLocation();
@@ -42,19 +35,13 @@ export const AdminDashboard: React.FC = () => {
   const [newReward, setNewReward] = useState({ title: '', description: '', pointsRequired: '', category: 'مشروبات', expiryDays: '30' });
   const [isCreatingReward, setIsCreatingReward] = useState(false);
 
-  const mockAdminStats = { totalCustomers: 1240, activeLoyalists: 843, pointsIssuedThisMonth: 45200, redemptionsToday: 18 };
-  const [adminStats, setAdminStats] = useState(mockAdminStats);
+  const [adminStats, setAdminStats] = useState(EMPTY_ADMIN_STATS);
   const [statsLoading, setStatsLoading] = useState(true);
 
   const [cafeCustomers, setCafeCustomers] = useState<Customer[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
 
-  const [branches, setBranches] = useState<Branch[]>([
-    { id: 'b1', name: 'فرع وسط البلد', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_balad', timezone: 'Africa/Cairo', openingTime: '09:00', closingTime: '22:00' },
-    { id: 'b2', name: 'فرع مصر الجديدة', location: 'القاهرة', posType: 'Foodics', active: true, key: 'api_key_****_heliopolis', timezone: 'Africa/Cairo', openingTime: '09:00', closingTime: '23:00' },
-    { id: 'b3', name: 'فرع سموحة', location: 'الإسكندرية', posType: 'Manual', active: false, key: 'api_key_****_alex', timezone: 'Africa/Cairo', openingTime: null, closingTime: null },
-  ]);
-
-  const [chartStats, setChartStats] = useState(chartData);
+  const [chartStats, setChartStats] = useState<Array<{ month: string; earned: number; redeemed: number }>>([]);
   const [chartLoading, setChartLoading] = useState(true);
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | undefined>(undefined);
   const [qrModalBranch, setQrModalBranch] = useState<Branch | null>(null);
@@ -110,12 +97,13 @@ export const AdminDashboard: React.FC = () => {
     const MONTH_NAMES_AR: string[] = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
     try {
       const chartRes = await api.getAdminChartStats(selectedBranchFilter);
-      if (chartRes.length > 0) {
-        setChartStats(chartRes.map((r: any) => ({
+      setChartStats(
+        (chartRes || []).map((r: any) => ({
           month: MONTH_NAMES_AR[parseInt(r.month_num) - 1] || r.month_num,
-          earned: Number(r.points_earned), redeemed: Number(r.points_redeemed),
-        })));
-      }
+          earned: Number(r.points_earned),
+          redeemed: Number(r.points_redeemed),
+        }))
+      );
     } catch {
       setChartStats([]);
     } finally {
@@ -134,6 +122,7 @@ export const AdminDashboard: React.FC = () => {
       try {
         const t = await api.getTenantSettings();
         setSettingsForm({
+          slug: t.slug || '',
           name: t.name || '',
           points_per_egp: String(t.points_per_egp || '1.0'),
           min_purchase_egp: String(t.min_purchase_egp || '0'),
@@ -205,7 +194,7 @@ export const AdminDashboard: React.FC = () => {
   const [newBranch, setNewBranch] = useState({ name: '', city: '', posType: 'Manual', timezone: 'Africa/Cairo', openingTime: '', closingTime: '' });
 
   const [settingsForm, setSettingsForm] = useState({
-    name: '', points_per_egp: '1.0', min_purchase_egp: '0',
+    slug: '', name: '', points_per_egp: '1.0', min_purchase_egp: '0',
     points_expiry_days: '365', primary_color: '#1e40af', accent_color: '#f59e0b',
     bg_color: '#f8fafc', surface_color: '#ffffff', font_display: 'Playfair Display',
     font_body: 'Cairo', logo_url: '', tagline: '',
@@ -443,20 +432,20 @@ export const AdminDashboard: React.FC = () => {
                       <AreaChart data={chartStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <defs>
                           <linearGradient id="earnedGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.3} />
-                            <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                            <stop offset="0%" stopColor="var(--color-admin-success)" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="var(--color-admin-success)" stopOpacity={0} />
                           </linearGradient>
                           <linearGradient id="redeemedGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.3} />
-                            <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                            <stop offset="0%" stopColor="var(--color-admin-primary)" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="var(--color-admin-primary)" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, fontSize: 12 }} />
-                        <Area type="monotone" dataKey="earned" stroke="var(--color-primary)" fill="url(#earnedGrad)" strokeWidth={2} name="النقاط المكتسبة" />
-                        <Area type="monotone" dataKey="redeemed" stroke="#f59e0b" fill="url(#redeemedGrad)" strokeWidth={2} name="النقاط المستردة" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)', borderRadius: 12, fontSize: 12, color: 'var(--color-admin-text)' }} />
+                        <Area type="monotone" dataKey="earned" stroke="var(--color-admin-success)" fill="url(#earnedGrad)" strokeWidth={2} name="النقاط المكتسبة" />
+                        <Area type="monotone" dataKey="redeemed" stroke="var(--color-admin-primary)" fill="url(#redeemedGrad)" strokeWidth={2} name="النقاط المستردة" />
                       </AreaChart>
                     </ResponsiveContainer>
                   )}
@@ -465,7 +454,7 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl">
                 <div className="flex items-center gap-2 border-b border-[var(--color-admin-border)] pb-3 mb-4">
-                  <Gift size={20} className="text-amber-500" />
+                  <Gift size={20} className="text-[var(--color-admin-primary)]" />
                   <h2 className="text-sm font-bold">النقاط الشهرية</h2>
                 </div>
                 <div className="h-64" dir="ltr">
@@ -474,12 +463,12 @@ export const AdminDashboard: React.FC = () => {
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
-                        <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, fontSize: 12 }} />
-                        <Bar dataKey="earned" fill="var(--color-primary)" radius={[4, 4, 0, 0]} name="النقاط المكتسبة" />
-                        <Bar dataKey="redeemed" fill="#f59e0b" radius={[4, 4, 0, 0]} name="النقاط المستردة" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-admin-text-muted)' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--color-admin-bg)', border: '1px solid var(--color-admin-border)', borderRadius: 12, fontSize: 12, color: 'var(--color-admin-text)' }} />
+                        <Bar dataKey="earned" fill="var(--color-admin-success)" radius={[4, 4, 0, 0]} name="النقاط المكتسبة" />
+                        <Bar dataKey="redeemed" fill="var(--color-admin-primary)" radius={[4, 4, 0, 0]} name="النقاط المستردة" />
                       </BarChart>
                     </ResponsiveContainer>
                   )}
@@ -491,7 +480,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl flex flex-col gap-4">
                 <div className="flex items-center gap-2 border-b border-[var(--color-admin-border)] pb-3">
-                  <Coins size={22} className="text-amber-500" />
+                  <Coins size={22} className="text-[var(--color-admin-primary)]" />
                   <h2 className="text-sm font-bold">تعديل وإضافة النقاط يدوياً</h2>
                 </div>
                 <form onSubmit={handleAdjustPoints} className="flex flex-col gap-3">
@@ -508,20 +497,20 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-[var(--color-text-muted)] dark:text-slate-400 font-bold">النقاط</label>
+                      <label className="text-[11px] text-[var(--color-admin-text-muted)] font-bold">النقاط</label>
                        <input type="number" placeholder="100" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)}
                          className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl text-xs text-[var(--color-admin-text)] outline-none focus:border-[var(--color-admin-primary)]"
                        />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-[var(--color-text-muted)] dark:text-slate-400 font-bold">السبب</label>
+                      <label className="text-[11px] text-[var(--color-admin-text-muted)] font-bold">السبب</label>
                        <input type="text" placeholder="بونص..." value={adjustmentNote} onChange={(e) => setAdjustmentNote(e.target.value)}
                          className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl text-xs text-[var(--color-admin-text)] outline-none focus:border-[var(--color-admin-primary)]"
                        />
                     </div>
                   </div>
                   <button type="submit" disabled={isSubmittingAdjustment}
-                    className="w-full bg-[var(--color-primary)] text-white text-xs font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+                    className="w-full bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] text-xs font-black py-3 rounded-xl hover:opacity-95 enabled:active:scale-[0.96] transition-opacity flex items-center justify-center gap-2 cursor-pointer mt-1 disabled:opacity-50"
                   >
                     {isSubmittingAdjustment ? <ArrowClockwise className="animate-spin" size={16} /> : <Plus size={16} />}
                     تأكيد منح النقاط
@@ -532,41 +521,29 @@ export const AdminDashboard: React.FC = () => {
               <div className="bg-[var(--color-admin-surface)] backdrop-blur-xl border border-[var(--color-admin-border)] p-6 rounded-2xl flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-[var(--color-admin-border)] pb-3">
                   <div className="flex items-center gap-2">
-                    <TrendUp size={22} className="text-emerald-500" />
-                    <h2 className="text-sm font-bold">آخر العمليات</h2>
+                    <TrendUp size={22} className="text-emerald-400" />
+                    <h2 className="text-sm font-bold">أحدث العملاء النشطين</h2>
                   </div>
+                  <span className="text-[10px] font-bold text-[var(--color-admin-text-muted)] tabular-nums">{cafeCustomers.length}</span>
                 </div>
-                <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto">
-                  <div className="flex items-center justify-between p-2.5 bg-[var(--color-admin-bg)] rounded-xl border border-[var(--color-admin-border)]">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-[var(--color-text)] dark:text-slate-200">طلب ناجح #INV-9201</span>
-                      <span className="text-[9px] text-[var(--color-text-muted)] dark:text-slate-400">فرع مصر الجديدة | Foodics</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-emerald-500">+150 نقطة</span>
-                      <CheckCircle size={16} className="text-emerald-500" />
-                    </div>
-                  </div>
-                   <div className="flex items-center justify-between p-2.5 bg-[var(--color-admin-bg)] rounded-xl border border-[var(--color-admin-border)]">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-[var(--color-admin-text)]">طلب ناجح #INV-9192</span>
-                        <span className="text-[9px] text-[var(--color-admin-text-muted)]">فرع وسط البلد | Foodics</span>
+                <div className="flex flex-col gap-2.5 max-h-[250px] overflow-y-auto overscroll-contain">
+                  {cafeCustomers.slice(0, 5).map((cust) => (
+                    <div key={cust.id} className="flex items-center justify-between p-2.5 bg-[var(--color-admin-bg)] rounded-xl border border-[var(--color-admin-border)]">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-[var(--color-admin-text)] truncate">{cust.name}</span>
+                        <span className="text-[10px] font-mono text-[var(--color-admin-text-muted)]" dir="ltr">{cust.phone}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-emerald-500">+45 نقطة</span>
-                        <CheckCircle size={16} className="text-emerald-500" />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-black text-[var(--color-admin-primary)] tabular-nums">{cust.balance.toLocaleString()} نقطة</span>
+                        <CheckCircle size={15} className="text-emerald-400" />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between p-2.5 bg-[var(--color-admin-bg)] rounded-xl border border-[var(--color-admin-border)]">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-[var(--color-admin-text)]">استرداد #RDM-8822</span>
-                        <span className="text-[9px] text-[var(--color-admin-text-muted)]">تطبيق العميل</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-amber-500">-80 نقطة</span>
-                        <CheckCircle size={16} className="text-amber-500" />
-                      </div>
+                  ))}
+                  {cafeCustomers.length === 0 && (
+                    <div className="py-10 text-center text-xs text-[var(--color-admin-text-muted)]">
+                      لا يوجد عملاء مسجلون بعد
                     </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -596,7 +573,7 @@ export const AdminDashboard: React.FC = () => {
                   className="flex-1 bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2 rounded-xl text-xs outline-none focus:border-[var(--color-admin-primary)]"
                 />
                 <button onClick={handleSearch}
-                  className="bg-[var(--color-admin-primary)] text-white px-3 py-2 rounded-xl text-xs font-bold cursor-pointer hover:opacity-90"
+                  className="bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] px-3 py-2 rounded-xl text-xs font-black cursor-pointer hover:opacity-95"
                 >بحث</button>
               </div>
             </div>
@@ -669,7 +646,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-[var(--color-admin-border)] pb-3 mb-4">
                   <h2 className="text-sm font-bold">المكافآت النشطة</h2>
                   <button onClick={() => setShowCreateRewardForm(!showCreateRewardForm)}
-                    className="bg-[var(--color-admin-primary)] text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all"
+                    className="bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] text-xs font-black px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer hover:opacity-95 transition-opacity"
                   >
                     <Plus size={14} /> إضافة مكافأة
                   </button>
@@ -678,18 +655,18 @@ export const AdminDashboard: React.FC = () => {
                   {adminRewards.map((reward) => (
                     <div key={reward.id} className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-4 rounded-xl flex gap-3 relative overflow-hidden group">
                       <img src={reward.imageUrl} alt={reward.title}
-                        className="w-16 h-16 rounded-lg object-cover border border-[var(--color-admin-border)] shrink-0"
+                        className="w-16 h-16 rounded-lg object-cover outline-1 -outline-offset-1 outline-white/10 shrink-0"
                       />
                       <div className="flex flex-col gap-1 text-right flex-1 min-w-0">
                         <span className="text-xs font-bold text-[var(--color-admin-text)]">{reward.title}</span>
                         <span className="text-[10px] text-[var(--color-admin-text-muted)] line-clamp-2">{reward.description}</span>
                         <span className="text-[10px] font-black" style={{ color: 'var(--color-admin-primary)' }}>{reward.pointsRequired} نقطة</span>
                       </div>
-                      <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEditReward(reward)} className="p-1.5 rounded-lg bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)] hover:text-[var(--color-admin-primary)] transition-all cursor-pointer">
+                      <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100 transition-opacity">
+                        <button type="button" aria-label={`تعديل ${reward.title}`} onClick={() => openEditReward(reward)} className="p-1.5 rounded-lg bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)] hover:text-[var(--color-admin-primary)] transition-colors cursor-pointer">
                           <PencilSimple size={12} />
                         </button>
-                        <button onClick={() => setDeleteRewardId(reward.id)} className="p-1.5 rounded-lg bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)] hover:text-rose-500 transition-all cursor-pointer">
+                        <button type="button" aria-label={`حذف ${reward.title}`} onClick={() => setDeleteRewardId(reward.id)} className="p-1.5 rounded-lg bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)] hover:text-rose-500 transition-colors cursor-pointer">
                           <TrashSimple size={12} />
                         </button>
                       </div>
@@ -745,7 +722,7 @@ export const AdminDashboard: React.FC = () => {
                   />
                 </div>
                 <button type="submit" disabled={isCreatingReward}
-                  className="w-full bg-[var(--color-admin-primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  className="w-full bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-3 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
                 >
                   {isCreatingReward ? <ArrowClockwise className="animate-spin" size={16} /> : 'إنشاء المكافأة'}
                 </button>
@@ -762,7 +739,7 @@ export const AdminDashboard: React.FC = () => {
                 <h2 className="text-sm font-bold">إدارة الفروع</h2>
               </div>
               <button onClick={() => setCreateBranchOpen(true)}
-                className="bg-[var(--color-admin-primary)] text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all"
+                className="bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] text-xs font-black px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all"
               >
                 <Plus size={14} /> تسجيل فرع جديد
               </button>
@@ -832,7 +809,7 @@ export const AdminDashboard: React.FC = () => {
                     onChange={e => setSettingsForm(p => ({ ...p, points_expiry_days: e.target.value }))}
                     className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
                 </div>
-                <button type="submit" className="bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
+                <button type="submit" className="bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
                   حفظ الإعدادات
                 </button>
               </form>
@@ -915,7 +892,7 @@ export const AdminDashboard: React.FC = () => {
                     placeholder="شعار الكافيه"
                     className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none" />
                 </div>
-                <button type="submit" className="bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
+                <button type="submit" className="bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
                   حفظ العلامة التجارية
                 </button>
               </form>
@@ -964,7 +941,7 @@ export const AdminDashboard: React.FC = () => {
             <label htmlFor="cust_verified" className="text-xs font-bold">حساب نشط</label>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={handleEditCustomer} className="flex-1 bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
+            <button onClick={handleEditCustomer} className="flex-1 bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
               حفظ التغييرات
             </button>
             <button onClick={() => setEditCustomer(null)} className="px-4 py-2.5 rounded-xl border border-[var(--color-admin-border)] text-xs font-bold cursor-pointer hover:bg-[var(--color-admin-bg)] transition-all">
@@ -1038,7 +1015,7 @@ export const AdminDashboard: React.FC = () => {
             <label htmlFor="reward_active" className="text-xs font-bold">مكافأة نشطة</label>
           </div>
           <div className="flex gap-2 mt-2">
-            <button onClick={handleEditReward} className="flex-1 bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
+            <button onClick={handleEditReward} className="flex-1 bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
               حفظ التغييرات
             </button>
             <button onClick={() => setEditReward(null)} className="px-4 py-2.5 rounded-xl border border-[var(--color-admin-border)] text-xs font-bold cursor-pointer hover:bg-[var(--color-admin-bg)] transition-all">
@@ -1122,7 +1099,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2 mt-2">
-              <button type="submit" className="flex-1 bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
+              <button type="submit" className="flex-1 bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all">
                 إنشاء الفرع
               </button>
               <button type="button" onClick={() => setCreateBranchOpen(false)} className="px-4 py-2.5 rounded-xl border border-[var(--color-admin-border)] text-xs font-bold cursor-pointer hover:bg-[var(--color-admin-bg)] transition-all">
@@ -1192,7 +1169,7 @@ export const AdminDashboard: React.FC = () => {
             <label htmlFor="branch_active" className="text-xs font-bold">فرع نشط</label>
           </div>
           <div className="flex gap-2 mt-2">
-            <button onClick={handleEditBranch} className="flex-1 bg-[var(--color-admin-primary)] text-white font-bold py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
+            <button onClick={handleEditBranch} className="flex-1 bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 transition-all text-xs">
               حفظ التغييرات
             </button>
             <button onClick={() => setEditBranch(null)} className="px-4 py-2.5 rounded-xl border border-[var(--color-admin-border)] text-xs font-bold cursor-pointer hover:bg-[var(--color-admin-bg)] transition-all">
@@ -1222,7 +1199,7 @@ export const AdminDashboard: React.FC = () => {
 
       <BranchQrModal
         branch={qrModalBranch}
-        tenantSlug={currentTenant.id}
+        tenantSlug={settingsForm.slug || currentTenant.id}
         tenantName={settingsForm.name || currentTenant.name}
         onClose={() => setQrModalBranch(null)}
       />

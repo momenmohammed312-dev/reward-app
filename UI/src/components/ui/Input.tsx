@@ -1,6 +1,6 @@
 // src/components/ui/Input.tsx
 
-import React, { InputHTMLAttributes } from 'react';
+import React, { InputHTMLAttributes, useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -16,33 +16,40 @@ export const Input: React.FC<InputProps> = ({
   id,
   ...props
 }) => {
+  const generatedId = useId();
+  const inputId = id || generatedId;
+
   return (
-    <div id={id ? `${id}-wrapper` : undefined} className="flex flex-col gap-2 w-full text-right">
+    <div id={id ? `${id}-wrapper` : undefined} className="flex flex-col gap-2 w-full text-start">
       {label && (
-        <label className="text-[var(--text-sm)] font-medium text-[var(--color-text)]">
+        <label htmlFor={inputId} className="text-[13px] font-bold text-[var(--color-text)]">
           {label}
         </label>
       )}
-      <div className="relative flex items-center w-full">
+      <div
+        className={`
+          flex items-center gap-2.5 w-full
+          bg-[var(--color-bg)]/60 border-2 border-[var(--color-border)]
+          rounded-2xl px-4 py-3.5
+          transition-[background-color,border-color,box-shadow] duration-200
+          focus-within:bg-[var(--color-surface)] focus-within:border-[var(--color-primary)] focus-within:ring-4 focus-within:ring-[var(--color-primary-soft)]
+          has-[input:disabled]:opacity-50 has-[input:disabled]:bg-[var(--color-bg)]
+          ${error ? 'border-[var(--color-danger)] focus-within:border-[var(--color-danger)] focus-within:ring-red-500/10' : ''}
+        `}
+      >
         <input
-          id={id}
+          id={inputId}
           className={`
-            w-full bg-[var(--color-surface)] border border-[var(--color-border)]
-            rounded-[var(--radius-md)] text-[var(--text-base)] text-[var(--color-text)]
-            py-[var(--space-3)] px-[var(--space-4)]
-            rtl text-right outline-none
-            placeholder-[var(--color-text-light)]
-            transition-all duration-[var(--transition-fast)]
-            focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]
-            disabled:opacity-50 disabled:bg-[var(--color-bg)]
-            ${icon ? 'pl-10 pr-4' : 'px-4'}
-            ${error ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)]' : ''}
+            flex-1 min-w-0 bg-transparent border-0 p-0
+            text-[15px] font-bold text-[var(--color-text)]
+            outline-none
+            placeholder-[var(--color-text-light)] placeholder:font-medium
             ${className}
           `}
           {...props}
         />
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none text-[var(--color-text-muted)]">
+          <div className="shrink-0 flex items-center pointer-events-none text-[var(--color-text-muted)]">
             {icon}
           </div>
         )}

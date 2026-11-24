@@ -4,6 +4,7 @@ import { LoyaltyService } from '../services/loyalty.js';
 import { LedgerService } from '../services/ledger.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { logger } from '../services/logger.js';
+import { normalizePhone } from '../helpers/phone.js';
 
 async function logAdminAction(tenantId: string, adminUserId: string | undefined, actionType: string, targetType: string, targetId: string | undefined, newValue?: any) {
   try {
@@ -138,9 +139,14 @@ export class LoyaltyController {
       let resolvedCustomerId = customer_id;
 
       if (!resolvedCustomerId && customer_phone) {
+        const normalizedPhone = normalizePhone(String(customer_phone));
+        if (!normalizedPhone) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'Invalid phone', message: 'Invalid Egyptian phone number' });
+        }
         const custRes = await client.query(
           'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
-          [tenantId, customer_phone]
+          [tenantId, normalizedPhone]
         );
         if (custRes.rows.length === 0) {
           await client.query('ROLLBACK');

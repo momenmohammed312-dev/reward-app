@@ -5,6 +5,7 @@ import {
   Network,
   Users,
   ArrowLeft,
+  ArrowRight,
   Warning,
   CheckCircle,
   Coins,
@@ -195,10 +196,11 @@ export const MyNetworks: React.FC = () => {
     return (
       <div className="flex flex-col gap-4" style={{ direction: 'rtl' }}>
         <button
+          type="button"
           onClick={() => setSelectedNetwork(null)}
-          className="flex items-center gap-2 text-[var(--color-admin-text-muted)] hover:text-[var(--color-admin-text)] text-xs font-bold transition-colors self-start cursor-pointer"
+          className="flex items-center gap-2 text-[var(--color-admin-text-muted)] hover:text-[var(--color-admin-text)] text-xs font-bold transition-colors self-start cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-admin-primary)] rounded-lg px-1"
         >
-          <ArrowLeft size={16} />
+          <ArrowRight size={16} />
           العودة للشبكات
         </button>
 
@@ -476,12 +478,13 @@ export const MyNetworks: React.FC = () => {
               const netStatus = statusConfig[stKey] || { label: stKey, bg: '' };
               const targetNetworkId = net.network_id || net.id;
               return (
-                <motion.div
+                <motion.button
+                  type="button"
                   key={net.membership_id || net.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className={`${adminCard} p-4 rounded-2xl cursor-pointer hover:border-[var(--color-admin-primary)]/40 transition-all`}
+                  className={`w-full text-right ${adminCard} p-4 rounded-2xl cursor-pointer hover:border-[var(--color-admin-primary)]/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-admin-primary)]`}
                   onClick={() => loadNetworkDetails(targetNetworkId)}
                 >
                   <div className="flex items-center justify-between">
@@ -504,7 +507,7 @@ export const MyNetworks: React.FC = () => {
                   {net.network_description && (
                     <p className={`text-[10px] ${adminTextMuted} mt-2 pr-11`}>{net.network_description}</p>
                   )}
-                </motion.div>
+                </motion.button>
               );
             })}
           </AnimatePresence>

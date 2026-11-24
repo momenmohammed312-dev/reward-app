@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq';
 
 import { LoyaltyService } from './loyalty.js';
 import db from '../config/db.js';
+import { getBullMQConnection, isRedisReady } from '../config/redis.js';
 import { logger } from './logger.js';
 import { getAdapter } from './pos/adapterRegistry.js';
 
@@ -13,31 +14,56 @@ interface WebhookJobPayload {
   logId: string;
 }
 
-// Initialize the Webhook Queue
-const connectionOptions = {
-  host: process.env.REDIS_HOST || '127.0.0.1',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-};
-
-export const webhookQueue = new Queue<WebhookJobPayload, any, string>('foodics-webhooks', {
-  connection: connectionOptions,
-  defaultJobOptions: {
-    attempts: 5,
-    backoff: {
-      type: 'exponential',
-      delay: 5000, // 5s, 10s, 20s, 40s...
-    },
-    removeOnComplete: true, // Keep clean
-    removeOnFail: false, // Keep for inspection
-  },
-});
-
+let webhookQueueInstance: Queue<WebhookJobPayload, any, string> | null = null;
 let webhookWorkerInstance: Worker<WebhookJobPayload> | null = null;
 
 /**
- * Starts the BullMQ Foodics webhook worker (invoked by worker.ts).
+ * Returns the lazy BullMQ webhook queue when Redis is connected.
  */
-export function startWebhookWorker(): Worker<WebhookJobPayload> {
+export function getWebhookQueue(): Queue<WebhookJobPayload, any, string> | null {
+  if (!isRedisReady()) return null;
+  if (!webhookQueueInstance) {
+    webhookQueueInstance = new Queue<WebhookJobPayload, any, string>('foodics-webhooks', {
+      connection: getBullMQConnection(),
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // 5s, 10s, 20s, 40s...
+        },
+        removeOnComplete: true, // Keep clean
+        removeOnFail: false, // Keep for inspection
+      },
+    });
+    webhookQueueInstance.on('error', (err) => {
+      logger.error('Webhook queue error', { error: err.message });
+    });
+  }
+  return webhookQueueInstance;
+}
+
+// Lazy proxy preserved for existing callers and unit-test mocks.
+export const webhookQueue = {
+  async add(name: string, data: WebhookJobPayload, opts?: { jobId?: string }) {
+    const queue = getWebhookQueue();
+    if (!queue) {
+      throw new Error('Redis queue unavailable');
+    }
+    return queue.add(name, data, opts);
+  },
+  async close() {
+    if (webhookQueueInstance) {
+      await webhookQueueInstance.close();
+      webhookQueueInstance = null;
+    }
+  },
+};
+
+/**
+ * Starts the BullMQ Foodics webhook worker (called explicitly after connectRedis()).
+ */
+export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
+  if (!isRedisReady()) return null;
   if (webhookWorkerInstance) return webhookWorkerInstance;
 
   webhookWorkerInstance = new Worker<WebhookJobPayload>(
@@ -139,8 +165,12 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> {
       throw error;
     }
   },
-  { connection: connectionOptions }
+  { connection: getBullMQConnection() }
   );
+
+  webhookWorkerInstance.on('error', (err) => {
+    logger.error('Webhook worker error', { error: err.message });
+  });
 
   webhookWorkerInstance.on('failed', (job, err) => {
     logger.error(`Job ${job?.id} failed permanently`, { error: err.message });
@@ -149,7 +179,12 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> {
   return webhookWorkerInstance;
 }
 
-export const webhookWorker =
-  process.env.DISABLE_IN_PROCESS_WORKERS !== 'true' && process.env.NODE_ENV !== 'test'
-    ? startWebhookWorker()
-    : null;
+/**
+ * Gracefully stops the webhook worker if running.
+ */
+export async function stopWebhookWorker(): Promise<void> {
+  if (webhookWorkerInstance) {
+    await webhookWorkerInstance.close();
+    webhookWorkerInstance = null;
+  }
+}

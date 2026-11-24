@@ -90,7 +90,7 @@ export const SuperAdminDashboard: React.FC = () => {
   });
 
   const [tenants, setTenants] = useState<TenantItem[]>([
-    { id: 't1', name: 'أروما كافيه', slug: 'aroma', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
+    { id: 't1', name: 'MO2 Loyalty', slug: 'mo2-loyalty', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
     { id: 't2', name: 'برو أند كو', slug: 'brew-co', plan: 'Premium', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/١٢' },
     { id: 't3', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠1' },
     { id: 't4', name: 'سينابون زون', slug: 'cinnabon-zone', plan: 'Starter', status: 'past_due', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠٤/١٥' },
@@ -98,11 +98,11 @@ export const SuperAdminDashboard: React.FC = () => {
   ]);
 
   const [webhooks, setWebhooks] = useState<WebhookLog[]>([
-    { id: 'w1', tenant: 'أروما كافيه', event: 'order.paid', status: 'success', time: '13:54:12', message: 'Points processed successfully (+150 pts)' },
+    { id: 'w1', tenant: 'MO2 Loyalty', event: 'order.paid', status: 'success', time: '13:54:12', message: 'Points processed successfully (+150 pts)' },
     { id: 'w2', tenant: 'حلويات الياسمين', event: 'order.closed', status: 'success', time: '13:52:05', message: 'Points processed successfully (+320 pts)' },
     { id: 'w3', tenant: 'برو أند كو', event: 'order.paid', status: 'failed', time: '13:50:00', message: 'Customer not registered under tenant. Phone created.' },
     { id: 'w4', tenant: 'سينابون زون', event: 'order.paid', status: 'success', time: '13:45:10', message: 'Points processed successfully (+90 pts)' },
-    { id: 'w5', tenant: 'أروما كافيه', event: 'customer.created', status: 'success', time: '13:40:22', message: 'New customer account created' }
+    { id: 'w5', tenant: 'MO2 Loyalty', event: 'customer.created', status: 'success', time: '13:40:22', message: 'New customer account created' }
   ]);
 
   useEffect(() => {
@@ -308,25 +308,25 @@ export const SuperAdminDashboard: React.FC = () => {
       <div className="flex gap-2 border-b border-[var(--color-admin-border)] pb-2">
         <button 
           onClick={() => setActiveTab('tenants')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'tenants' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'tenants' ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
           الكافيهات المشتركة
         </button>
         <button 
           onClick={() => setActiveTab('subscriptions')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'subscriptions' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'subscriptions' ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
           خطط الأسعار
         </button>
         <button 
           onClick={() => setActiveTab('logs')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'logs' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'logs' ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
           شاشة مراقبة الـ Webhooks
         </button>
         <button 
           onClick={() => setActiveTab('networks')}
-          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'networks' ? 'bg-[var(--color-admin-primary)] text-white shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
+          className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'networks' ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
           الشبكات (Networks)
         </button>

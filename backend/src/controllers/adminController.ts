@@ -86,9 +86,10 @@ export class AdminController {
       const result = await db.query(`
         SELECT c.id, c.phone, c.name, c.tier,
                COALESCE(cb.current_balance, 0) AS balance,
-               c.total_earned, c.is_verified, c.last_visit, c.created_at
+               COALESCE(cb.total_earned, 0) AS total_earned,
+               c.is_verified, c.last_visit, c.created_at
         FROM customers c
-        LEFT JOIN customer_balances cb ON c.id = cb.customer_id
+        LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
         ${whereClause}
         ORDER BY c.created_at DESC
         LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
@@ -201,7 +202,7 @@ export class AdminController {
       const result = await db.query(`
         UPDATE customers
         ${sets}
-        WHERE id = $1::uuid AND tenant_id = $${setIdx}::uuid
+        WHERE id = $1::uuid AND tenant_id = $${setIdx}::uuid AND deleted_at IS NULL
         RETURNING id, phone, name, tier, is_verified, last_visit, created_at
       `, [id, ...setParams, tenantId]);
 
@@ -260,7 +261,7 @@ export class AdminController {
             reward_type = COALESCE($9::reward_type, reward_type),
             discount_value = COALESCE($10, discount_value),
             max_redemptions = COALESCE($11, max_redemptions)
-        WHERE id = $1::uuid AND tenant_id = $2::uuid
+        WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL
         RETURNING id, name AS title, reward_type, required_points AS "pointsRequired",
                   description, category, image_url AS "imageUrl", terms,
                   expiry_days AS "expiryDays", is_active, discount_value, max_redemptions, created_at
@@ -337,12 +338,12 @@ export class AdminController {
         UPDATE branches
         SET name = COALESCE($3, name),
             city = COALESCE($4, city),
-            pos_type = COALESCE($5, pos_type),
+            pos_type = COALESCE($5::pos_type, pos_type),
             is_active = COALESCE($6, is_active),
             timezone = COALESCE($7, timezone),
             opening_time = COALESCE($8::time, opening_time),
             closing_time = COALESCE($9::time, closing_time)
-        WHERE id = $1::uuid AND tenant_id = $2::uuid
+        WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL
         RETURNING id, name, city, pos_type, is_active, timezone, opening_time, closing_time, created_at
       `, [id, tenantId, name || null, city ?? null, pos_type || null, is_active ?? null, timezone || null, opening_time || null, closing_time || null]);
 

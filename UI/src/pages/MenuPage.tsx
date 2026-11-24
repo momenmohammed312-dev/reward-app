@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useApp } from '../store/AppContext';
-import { Coffee, Drop, Hamburger, Cake, Star, CurrencyCircleDollar, Info, ShoppingBag, X } from '@phosphor-icons/react';
+import { Coffee, Drop, Hamburger, Cake, Star, CurrencyCircleDollar, Info, ShoppingBag } from '@phosphor-icons/react';
 import { BottomSheet } from '../components/ui/BottomSheet';
 
 interface MenuItem {
@@ -38,18 +38,18 @@ const itemVariants = {
 };
 
 const categoryIcons: Record<string, React.ReactNode> = {
-  'مشروبات ساخنة': <Coffee size={16} weight="duotone" />,
-  'مشروبات باردة': <Drop size={16} weight="duotone" />,
-  'مخبوزات': <Hamburger size={16} weight="duotone" />,
-  'حلويات': <Cake size={16} weight="duotone" />,
-  'وجبات خفيفة': <Hamburger size={16} weight="duotone" />,
+  'مشروبات ساخنة': <Coffee size={15} weight="regular" />,
+  'مشروبات باردة': <Drop size={15} weight="regular" />,
+  'مخبوزات': <Hamburger size={15} weight="regular" />,
+  'حلويات': <Cake size={15} weight="regular" />,
+  'وجبات خفيفة': <Hamburger size={15} weight="regular" />,
 };
 
 export const MenuPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const { points, t } = useApp();
+  const { points, language, t } = useApp();
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 400);
@@ -84,19 +84,19 @@ export const MenuPage: React.FC = () => {
       className="flex flex-col gap-[var(--space-5)] text-right"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-0.5 select-none">
-        <h1 className="text-[var(--text-2xl)] font-black text-[var(--color-text)] tracking-tight leading-none">
+      <motion.div variants={itemVariants} className="flex flex-col gap-1 select-none">
+        <h1 className="text-[24px] font-extrabold text-[var(--color-text)] tracking-tight leading-tight">
           {t('menu.title')}
         </h1>
-        <p className="text-[10px] tracking-widest font-bold text-[var(--color-text-light)] uppercase">
+        <p className="text-[13px] font-medium text-[var(--color-text-muted)]">
           {t('menu.subtitle')}
         </p>
       </motion.div>
 
       {/* Points badge */}
       <motion.div variants={itemVariants} className="flex items-center gap-2 bg-[var(--color-primary-soft)] rounded-xl px-[var(--space-3)] py-[var(--space-2)] self-start">
-        <CurrencyCircleDollar size={16} weight="duotone" className="text-[var(--color-primary)]" />
-        <span className="text-[11px] font-bold text-[var(--color-text)]">
+        <CurrencyCircleDollar size={16} weight="regular" className="text-[var(--color-primary)]" />
+        <span className="text-[12px] font-bold text-[var(--color-text)]">
           {t('menu.yourPoints')} <span className="number text-[var(--color-primary)]">{points.toLocaleString()}</span>
         </span>
       </motion.div>
@@ -134,35 +134,36 @@ export const MenuPage: React.FC = () => {
         {filtered.length > 0 ? (
           filtered.map(item => (
             <motion.div key={item.id} variants={itemVariants} layout>
-              <div onClick={() => setSelectedItem(item)} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all group cursor-pointer">
-                <div className="flex">
-                  <div className="w-28 h-28 shrink-0 overflow-hidden">
+              <div onClick={() => setSelectedItem(item)} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[22px] p-2 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-shadow duration-200 group cursor-pointer">
+                <div className="flex gap-3">
+                  {/* Outer rounded-[22px] - p-2 (8px) = Inner rounded-[14px] */}
+                  <div className="w-24 h-24 rounded-[14px] shrink-0 overflow-hidden bg-[var(--color-bg)]">
                     <img
                       src={item.image}
                       alt={item.name}
-                      className="w-full h-full object-cover brightness-95 group-hover:brightness-100 transition-all duration-300"
+                      className="w-full h-full object-cover outline-1 -outline-offset-1 outline-black/10 group-hover:scale-[1.03] transition-transform duration-300"
                     />
                   </div>
-                  <div className="flex-1 p-[var(--space-3)] flex flex-col justify-between min-w-0">
-                    <div className="flex flex-col gap-0.5">
+                  <div className="flex-1 py-1 pl-1 flex flex-col justify-between min-w-0">
+                    <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[var(--text-sm)] font-black text-[var(--color-text)] leading-tight truncate">
                           {item.name}
                         </span>
                         {item.popular && (
-                          <Star size={12} weight="fill" className="text-amber-500 shrink-0" />
+                          <Star size={12} weight="fill" className="text-[var(--color-accent)] shrink-0" />
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed">
+                      <p className="text-[12px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed">
                         {item.description}
                       </p>
                     </div>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-[10px] font-bold text-[var(--color-text-light)] bg-[var(--color-bg)] px-2 py-0.5 rounded">
+                      <span className="text-[11px] font-semibold text-[var(--color-text-muted)]">
                         {item.category}
                       </span>
                       <span className="text-[var(--text-md)] font-black text-[var(--color-primary)] number">
-                        {item.price} EGP
+                        {item.price} {language === 'ar' ? 'ج.م' : 'EGP'}
                       </span>
                     </div>
                   </div>
@@ -191,12 +192,12 @@ export const MenuPage: React.FC = () => {
               <img
                 src={selectedItem.image}
                 alt={selectedItem.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover outline-1 -outline-offset-1 outline-black/10"
               />
             </div>
             <div className="flex items-start justify-between">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-[var(--color-text-light)] bg-[var(--color-bg)] px-2 py-0.5 rounded self-start">
+                <span className="text-[11px] font-bold text-[var(--color-text-muted)] bg-[var(--color-bg)] px-2.5 py-0.5 rounded-lg self-start">
                   {selectedItem.category}
                 </span>
                 <h3 className="text-[var(--text-lg)] font-black text-[var(--color-text)] leading-tight">
@@ -205,7 +206,7 @@ export const MenuPage: React.FC = () => {
               </div>
               <div className="text-left">
                 <span className="text-xl font-black text-[var(--color-primary)] number">
-                  {selectedItem.price} EGP
+                  {selectedItem.price} {language === 'ar' ? 'ج.م' : 'EGP'}
                 </span>
               </div>
             </div>
@@ -213,7 +214,7 @@ export const MenuPage: React.FC = () => {
               {selectedItem.description}
             </p>
             <div className="bg-[var(--color-primary-soft)] rounded-[var(--radius-md)] p-[var(--space-3)] flex items-center gap-3">
-              <ShoppingBag size={20} weight="duotone" className="text-[var(--color-primary)] shrink-0" />
+              <ShoppingBag size={20} weight="regular" className="text-[var(--color-primary)] shrink-0" />
               <div>
                 <p className="text-[11px] font-bold text-[var(--color-text)]">
                   {t('menu.youEarn', { points: Math.round(selectedItem.price * 1) })}

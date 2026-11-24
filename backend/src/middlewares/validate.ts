@@ -109,9 +109,22 @@ export const schemas = {
 
   createBranch: z.object({
     name: z.string().min(1, 'Name is required'),
-    city: z.string().optional(),
+    city: z.string().optional().nullable(),
     pos_type: z.enum(['foodics', 'square', 'toast', 'custom_api', 'manual']).optional(),
     pos_location_id: z.string().optional(),
+    timezone: z.string().max(64).optional(),
+    opening_time: z.string().optional().nullable(),
+    closing_time: z.string().optional().nullable(),
+  }),
+
+  updateBranch: z.object({
+    name: z.string().min(1).optional(),
+    city: z.string().optional().nullable(),
+    pos_type: z.enum(['foodics', 'square', 'toast', 'custom_api', 'manual']).optional(),
+    is_active: z.boolean().optional(),
+    timezone: z.string().max(64).optional(),
+    opening_time: z.string().optional().nullable(),
+    closing_time: z.string().optional().nullable(),
   }),
 
   checkPhone: z.object({

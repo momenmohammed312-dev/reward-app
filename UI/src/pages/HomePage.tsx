@@ -13,47 +13,45 @@ const containerVariants = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.07,
-      delayChildren: 0.05
-    }
-  }
+      staggerChildren: 0.08,
+      delayChildren: 0.04,
+    },
+  },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { 
-    opacity: 1, 
-    y: 0, 
-    transition: { 
-      type: 'spring' as const, 
-      stiffness: 100, 
-      damping: 20 
-    } 
-  }
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: [0.2, 0.8, 0.2, 1] as const,
+    },
+  },
 };
 
 export const HomePage: React.FC = () => {
-  const { 
-    transactions, 
-    loadingWallet, 
-    walletError, 
-    refetchData, 
-    setActiveTab, 
-    currentTenant, 
-    globalError, 
+  const {
+    transactions,
+    loadingWallet,
+    walletError,
+    refetchData,
+    setActiveTab,
+    currentTenant,
+    globalError,
     simulateErrorState,
     setSelectedTransaction,
-    t
+    t,
   } = useApp();
 
   const [loading, setLoading] = useState(true);
   const [errorSimulated, setErrorSimulated] = useState<string | null>(null);
 
-  // Load screen with simulation skeleton as mandated in Design Tokens Page 9
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 600);
+    }, 450);
     return () => clearTimeout(timer);
   }, [currentTenant.id]);
 
@@ -65,34 +63,32 @@ export const HomePage: React.FC = () => {
     setLoading(false);
   };
 
-  // 11. Custom PageSkeleton (mandated by page 9)
   if (loading || loadingWallet) {
     return (
       <div className="flex flex-col gap-[var(--space-5)] animate-pulse">
-        {/* Points wallet skeleton */}
-        <div className="h-[210px] bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
-        {/* Milestone skeleton */}
-        <div className="h-[120px] bg-[var(--color-border)] rounded-[var(--radius-lg)]" />
-        {/* List skeleton */}
-        <div className="flex flex-col gap-2 mt-2 text-right">
-          <div className="h-4 bg-[var(--color-border)] rounded w-28 mb-2" />
-          <div className="h-14 bg-[var(--color-border)] rounded-[var(--radius-md)]" />
-          <div className="h-14 bg-[var(--color-border)] rounded-[var(--radius-md)] border-t border-transparent" />
-          <div className="h-14 bg-[var(--color-border)] rounded-[var(--radius-md)] border-t border-transparent" />
+        <div className="h-[260px] bg-[var(--color-border)] rounded-b-[36px]" />
+        <div className="px-[var(--space-5)] flex flex-col gap-4 -mt-12">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="h-[92px] bg-[var(--color-border)] rounded-[20px]" />
+            <div className="h-[92px] bg-[var(--color-border)] rounded-[20px]" />
+            <div className="h-[92px] bg-[var(--color-border)] rounded-[20px]" />
+          </div>
+          <div className="h-[78px] bg-[var(--color-border)] rounded-[20px]" />
+          <div className="h-14 bg-[var(--color-border)] rounded-[14px]" />
+          <div className="h-14 bg-[var(--color-border)] rounded-[14px]" />
         </div>
       </div>
     );
   }
 
-  // 11. Custom ErrorState (mandated by page 9)
   if (globalError || errorSimulated || walletError) {
     const activeErrorMsg = globalError || errorSimulated || walletError || t('error.unexpected');
     return (
-      <div className="py-12 px-6 text-center flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)] border border-[var(--color-danger)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] mt-12">
-        <div className="p-3 bg-[rgba(220,38,38,0.08)] text-[var(--color-danger)] rounded-full">
+      <div className="mx-[var(--space-5)] py-12 px-6 text-center flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)] border border-[var(--color-danger)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] mt-12">
+        <div className="p-3 bg-[rgba(180,66,58,0.1)] text-[var(--color-danger)] rounded-full">
           <ShieldWarning size={40} />
         </div>
-        <h3 className="text-[var(--text-lg)] font-bold text-[var(--color-text)] font-sans">{t('error.fetchFailed')}</h3>
+        <h3 className="text-[var(--text-lg)] font-extrabold text-[var(--color-text)]">{t('error.fetchFailed')}</h3>
         <p className="text-[var(--text-xs)] text-[var(--color-text-muted)] max-w-sm leading-relaxed">
           {activeErrorMsg}
         </p>
@@ -106,54 +102,58 @@ export const HomePage: React.FC = () => {
     );
   }
 
-  // Display top 3 recent transactions
   const topTransactions = transactions.slice(0, 3);
 
   return (
-    <motion.div 
+    <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="flex flex-col gap-[var(--space-6)]"
+      className="flex flex-col gap-[var(--space-4)] pb-6"
     >
-      {/* 1. Main Points Wallet */}
+      {/* 1. Curved Cafe Hero + 3 Overlapping Action Tiles */}
       <motion.div variants={itemVariants}>
         <PointsWallet />
       </motion.div>
 
-      {/* 3. Progress Milestones towards next closest discount coupon */}
-      <motion.div variants={itemVariants}>
+      {/* 2. Next Reward Milestone Bar */}
+      <motion.div variants={itemVariants} className="px-[var(--space-5)]">
         <ProgressMilestone />
       </motion.div>
 
-      {/* 4. Transactions summary logs */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-[var(--space-3)] text-right mt-0">
-        <div className="flex justify-between items-start select-none">
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-[var(--text-lg)] font-black text-[var(--color-text)] tracking-tight">
-              {t('home.title')}
-            </h2>
-            <p className="text-[10px] text-[var(--color-text-muted)] opacity-70">
-              {t('home.subtitle', { count: topTransactions.length })}
-            </p>
-          </div>
+      {/* 3. Recent Transactions List */}
+      <motion.div variants={itemVariants} className="px-[var(--space-5)] flex flex-col gap-1.5 text-right mt-1">
+        <div className="flex justify-between items-center select-none mb-1">
+          <h2 className="text-[18px] font-extrabold text-[var(--color-text)] tracking-tight">
+            {t('home.title')}
+          </h2>
           <button
             onClick={() => setActiveTab('history')}
-            className="text-[10px] font-bold text-[var(--color-primary)] hover:opacity-80 cursor-pointer transition-opacity mt-0.5"
+            className="text-[13px] font-bold text-[var(--color-primary)] bg-[var(--color-primary-soft)] px-3 py-1 rounded-full hover:opacity-85 cursor-pointer transition-opacity"
           >
-            {t('home.viewAll')} ←
+            {t('home.viewAll')}
           </button>
         </div>
 
         <div className="flex flex-col">
           {topTransactions.length > 0 ? (
             topTransactions.map((tx, i) => (
-              <TransactionRow key={tx.id} transaction={tx} index={i} onClick={(t) => { setSelectedTransaction(t); setActiveTab('history'); }} />
+              <TransactionRow
+                key={tx.id}
+                transaction={tx}
+                index={i}
+                onClick={() => {
+                  setSelectedTransaction(tx);
+                  setActiveTab('history');
+                }}
+              />
             ))
           ) : (
-            <div className="py-8 px-4 text-center text-[var(--color-text-light)] text-[var(--text-xs)] border border-dashed border-[var(--color-border)] rounded-[var(--radius-md)] flex flex-col items-center gap-2">
-              <Smiley size={24} />
-              <span>{t('home.empty')}</span>
+            <div className="py-8 flex flex-col items-center justify-center gap-2 text-center bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)]">
+              <Smiley size={26} weight="duotone" className="text-[var(--color-text-light)]" />
+              <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+                {t('home.empty')}
+              </p>
             </div>
           )}
         </div>
@@ -161,4 +161,3 @@ export const HomePage: React.FC = () => {
     </motion.div>
   );
 };
-export default HomePage;
