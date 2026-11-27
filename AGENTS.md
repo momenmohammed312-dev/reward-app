@@ -6,6 +6,42 @@
 
 ---
 
+## 0. Mandatory Agent Auto-Workflow (Run Automatically on Every Task)
+
+Every AI agent working on **MO2 Loyalty App** MUST execute this 3-phase loop automatically on every conversation turn—without waiting for the user to ask for SOPs, tickets, skills, or sync:
+
+### Phase 1 — Auto-Intake & Classification (FIRST action on any user request)
+1. Check `MO2/INTEGRATION_LOCK.md` and `git status -sb` before editing any file.
+2. Classify the incoming request automatically using `MO2/SOP/SOP-01-task-intake-triage.md` (Types `A–G`, Priorities `P0–P4`):
+   - **Type F (pure question / research / audit report):** answer directly with verified evidence; no ticket file and no code edits.
+   - **Type A/B (bug, crash, wrong points balance, tenant leak, webhook failure, UI/RTL defect):** create or update `MO2/issues/MO2-BUG-XXXX-<slug>.md` from `MO2/issues/_template-bug.md`, then follow `MO2/SOP/SOP-02-bug-investigation.md` + `.agents/skills/mo2-bug-hunt/SKILL.md`.
+   - **Type C/D/E/G (new feature, behavior change, refactor, client scope):** create or update `MO2/issues/MO2-FEAT-XXXX-<slug>.md` from `MO2/issues/_template-feature.md`. For complex multi-file or multi-model work, use `MO2/delegation/MO2-DELEG-XXXX-<slug>.md` + `.agents/skills/mo2-delegation/SKILL.md`.
+3. **Sensitive Zone Stop Rule:** If the task modifies `wallet_ledger`, `FOR UPDATE` concurrency, `tenant_id` isolation, `branch_id`/Auth/OTP, Webhook HMAC, cross-tenant networks/settlements, or `DB/migrations/`, perform read-only diagnosis first and confirm with the owner before changing behavior or data (unless the user already explicitly approved execution).
+
+### Phase 2 — Automatic Multi-Skill Stacking (`.agents/skills/`)
+- **Never rely on a single generic skill** when complementary skills exist in `.agents/skills/`.
+- Before writing code, tests, or UI, inspect **Section 7 (Multi-Skill Stacks)** and **Part B** below, and load **2–4 complementary skills** covering: **(1) Domain/Architecture**, **(2) Testing Stack**, **(3) Security/Isolation**, and **(4) Verification**.
+- **Mandatory Multi-Skill Testing Stacks** (stack all applicable skills for the layer you touch):
+  - *Backend unit & service math / ledger:* `vitest` + `tdd-workflow` / `test-driven-development` + `javascript-testing-patterns` + `unit-testing-test-generate` + `pypict-skill` (pairwise edge cases) + `mutation-testing` (ensure assertions actually kill logic bugs).
+  - *API & multi-tenant security:* `api-security-testing` + `idor-testing` + `sql-injection-testing` + `web-security-testing` + `api-testing-observability-api-mock`.
+  - *UI, components & E2E:* `react-testing` + `playwright-best-practices` + `e2e-testing-patterns` + `webapp-testing` + `screen-reader-testing` + `state-machine` + `break`.
+  - *Load & test triage:* `k6-load-testing` + `test-fixing` + `test-automator`.
+
+### Phase 3 — Automatic Verification & GitHub / Notion Sync (ON COMPLETION)
+1. Load `verification-before-completion` + `lint-and-validate`.
+2. Run and observe the real verification gates (never claim pass without output after the final edit):
+   ```powershell
+   cd backend; npm run build; if ($LASTEXITCODE -eq 0) { npm test }
+   cd ../UI; npm run lint; if ($LASTEXITCODE -eq 0) { npm run build }
+   ```
+3. Update the ticket file (`MO2/issues/MO2-BUG-*.md`, `MO2-FEAT-*.md`, or `MO2/delegation/MO2-DELEG-*.md`) with observed test/build outputs, modified files, and status (`review` or `done`).
+4. Automatically sync the ticket to GitHub (`momenmohammed312-dev/reward-app`) and Notion (`Project: MO2 Loyalty App` — Tasks DB `1ab4c829-3bd9-47e6-a2cd-55a65d7a2dcb` / Bugs DB `a63061e4-eebe-4040-a057-a9dbd4454dc9`):
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File "MO2/scripts/sync_to_github_and_notion.ps1" -File "<ticket-path>"
+   ```
+
+---
+
 ## 1. Project Overview
 
 MO2 Loyalty is a **multi-tenant SaaS loyalty & rewards platform** for cafés/restaurants. Each tenant (café) runs its own customer base, rewards catalogue, branches and POS integration. The platform is being extended with **cross-tenant loyalty networks** (5 phases; Phase 1 complete).
@@ -64,10 +100,16 @@ UI/                       React 19 + Vite 6 + Tailwind v4 frontend
     theme/                tokens.css (CSS variables), fonts.css, themeLoader.ts (per-tenant theme)
 DB/
   schema.sql              **bootstrap only** (initial tables/views/triggers)
-  migrations/001..010     **source of truth** for schema changes (numbered, idempotent)
+  migrations/001..021+    **source of truth** for schema changes (numbered, idempotent)
   db-diagram.tsx          ER diagram (React artifact)
+MO2/                      MO2 Loyalty App engineering ops system (auto-intake, SOPs, sync)
+  SOP/                    SOP-01-task-intake-triage.md, SOP-02-bug-investigation.md
+  issues/                 _template-bug.md (MO2-BUG-*), _template-feature.md (MO2-FEAT-*)
+  delegation/             README.md, _template-delegated-feature.md (MO2-DELEG-*)
+  scripts/                sync_to_github_and_notion.ps1 (GitHub + Notion Project: MO2 Loyalty App)
+  INTEGRATION_LOCK.md     multi-agent branch lock status
 docker-compose.yml        postgres:16 (5433) + redis:7 (6379) + backend (4000)
-.agents/skills/           local skill library (1 448 skills) — **git-ignored**
+.agents/skills/           local skill library (1,480+ skills incl. mo2-*, vitest, playwright-best-practices, mutation-testing, react-testing) — **git-ignored**
 ```
 
 ---
@@ -253,7 +295,8 @@ page → component → services/api.ts (fetch) → backend
   - Any new ledger write path → an idempotency test (call twice, assert one row).
   - Any new SQL filter on `tenant_id` → a test that a foreign tenant's id returns 404.
   - Any new adapter → payload-mapping tests including the missing-field fallbacks.
-- **Frontend**: there is currently **no test runner** in `UI/package.json` and no UI tests. Do not claim UI behaviour is verified by tests. If UI tests are added, `webapp-testing` (Playwright) is the chosen approach.
+- **Multi-Skill Testing Stack**: always combine complementary testing skills per `## 0` and `## 7` (e.g., `vitest` + `tdd-workflow` + `pypict-skill` + `mutation-testing` for backend logic; `api-security-testing` + `idor-testing` for tenant/API boundaries; `react-testing` + `playwright-best-practices` + `e2e-testing-patterns` for UI/E2E).
+- **Frontend**: there is currently **no test runner** in `UI/package.json` and no UI tests. Do not claim UI behaviour is verified by tests. If UI tests are added, stack `react-testing` + `playwright-best-practices` + `webapp-testing`.
 - **Backend lint** (`npm run lint` → `eslint src/**/*.ts`) is **currently broken** — `eslint` is not installed. Until it is fixed, rely on `npm run build` (which type-checks) as the correctness gate, and do not report "lint passed".
 - **Before claiming any work is complete**, run and pass:
   ```bash
@@ -462,13 +505,21 @@ grep -rl "multi-tenan" "G:\development\Loyality Project\.agents\skills" --includ
 | `threat-modeling-expert` | STRIDE/PASTA, attack trees, security requirements | Before Phase 3/4 (money moves across tenants) | `.agents/skills/threat-modeling-expert/SKILL.md` |
 | `security-bluebook-builder` | Minimal, real security policy with MUST/SHOULD language | Codifying the §4.5 rules into a team policy | `.agents/skills/security-bluebook-builder/SKILL.md` |
 
-### Testing & QA
+### Testing & QA (Multi-Skill Testing Stack)
 | Skill | What it does | Use it when | Path |
 |---|---|---|---|
-| `tdd-workflow` | RED → GREEN → REFACTOR discipline | Any new backend behaviour | `.agents/skills/tdd-workflow/SKILL.md` |
-| `javascript-testing-patterns` | Testing strategy and patterns for TS/JS | Extending the vitest suite | `.agents/skills/javascript-testing-patterns/SKILL.md` |
-| `unit-testing-test-generate` | Generates maintainable unit tests with edge-case focus | Writing tests for new pure functions | `.agents/skills/unit-testing-test-generate/SKILL.md` |
-| `webapp-testing` | Playwright scripts against a running local app | E2E verification of the customer PWA or admin flows | `.agents/skills/webapp-testing/SKILL.md` |
+| `vitest` | Official Vitest skill (`antfu/skills`): ESM-native mocking, concurrency, agent-minimal reporters | Writing or tuning any backend unit/service test in `backend/src/**/__tests__/` | `.agents/skills/vitest/SKILL.md` |
+| `tdd-workflow` / `test-driven-development` / `tdd-orchestrator` | Strict RED → GREEN → REFACTOR discipline & multi-agent TDD orchestration | Every new backend rule, bug regression test, or ledger path | `.agents/skills/tdd-workflow/SKILL.md`, `.agents/skills/test-driven-development/SKILL.md`, `.agents/skills/tdd-orchestrator/SKILL.md` |
+| `javascript-testing-patterns` / `testing-patterns` | TS/JS factory functions, mocking strategies, test isolation | Structuring Vitest suites cleanly | `.agents/skills/javascript-testing-patterns/SKILL.md`, `.agents/skills/testing-patterns/SKILL.md` |
+| `unit-testing-test-generate` / `testing-qa` / `test-automator` | Unit/integration/E2E strategy & edge-case coverage generation | Building comprehensive test coverage for new modules | `.agents/skills/unit-testing-test-generate/SKILL.md`, `.agents/skills/testing-qa/SKILL.md`, `.agents/skills/test-automator/SKILL.md` |
+| `pypict-skill` | Pairwise combinatorial test-case generation | Multi-parameter rules (tiers, campaigns, earning rules, redemption limits) | `.agents/skills/pypict-skill/SKILL.md` |
+| `mutation-testing` | Evaluates suite strength against mutated logic (`trailofbits/skills`) | Hardening critical points math, expiry FIFO, settlement & isolation tests | `.agents/skills/mutation-testing/SKILL.md` |
+| `test-fixing` | Smart grouping and systematic repair of failing test suites | Fixing regressions or broken Vitest suites after refactors | `.agents/skills/test-fixing/SKILL.md` |
+| `api-security-testing` / `api-testing-observability-api-mock` | REST auth/authz, rate-limit, Zod validation & realistic API mocks | Testing Express endpoints, webhooks, and external POS adapters | `.agents/skills/api-security-testing/SKILL.md`, `.agents/skills/api-testing-observability-api-mock/SKILL.md` |
+| `idor-testing` / `sql-injection-testing` / `web-security-testing` | Tenant IDOR, SQLi, XSS, and OWASP Top 10 verification | Proving tenant A cannot access tenant B and raw SQL stays injection-safe | `.agents/skills/idor-testing/SKILL.md`, `.agents/skills/sql-injection-testing/SKILL.md`, `.agents/skills/web-security-testing/SKILL.md` |
+| `react-testing` | React component, hook, and UI interaction testing (`affaan-m/ecc`) | Adding component/hook tests for `UI/src/` | `.agents/skills/react-testing/SKILL.md` |
+| `playwright-best-practices` / `e2e-testing` / `e2e-testing-patterns` | Production-grade TypeScript Playwright E2E, locators, isolation & visual checks | End-to-end verification of Customer PWA, Cashier, and Admin flows | `.agents/skills/playwright-best-practices/SKILL.md`, `.agents/skills/e2e-testing/SKILL.md`, `.agents/skills/e2e-testing-patterns/SKILL.md` |
+| `webapp-testing` / `screen-reader-testing` | Python Playwright verification & accessibility screen-reader testing | Quick local browser verification & WCAG/RTL validation | `.agents/skills/webapp-testing/SKILL.md`, `.agents/skills/screen-reader-testing/SKILL.md` |
 
 ### Performance
 | Skill | What it does | Use it when | Path |
@@ -530,49 +581,56 @@ grep -rl "multi-tenan" "G:\development\Loyality Project\.agents\skills" --includ
 ### Workflow, Quality & Agent Process
 | Skill | What it does | Use it when | Path |
 |---|---|---|---|
-| `phase-gated-debugging` | 5-phase protocol; no code edits before root cause is confirmed | Debugging anything in this phased repo | `.agents/skills/phase-gated-debugging/SKILL.md` |
-| `systematic-debugging` | Evidence-driven debugging | Any unexpected behaviour | `.agents/skills/systematic-debugging/SKILL.md` |
-| `verification-before-completion` | Requires proof before claiming "done" | Before reporting any task complete | `.agents/skills/verification-before-completion/SKILL.md` |
-| `lint-and-validate` | Run the project's validation tools after every change | Every code change | `.agents/skills/lint-and-validate/SKILL.md` |
-| `code-review-checklist` | Functional, security, performance, maintainability review | Reviewing your own or someone else's diff | `.agents/skills/code-review-checklist/SKILL.md` |
-| `code-reviewer` | AI code review specialist | Structured review pass before merge | `.agents/skills/code-reviewer/SKILL.md` |
+| `mo2-bug-hunt` | MO2-specific evidence-first debugging + `MO2/issues/` + GitHub/Notion sync | Every Type A/B bug report (`SOP-02`) | `.agents/skills/mo2-bug-hunt/SKILL.md` |
+| `mo2-delegation` / `opencode-delegate` | Multi-model delegation, OpenCode Zen free fleet (`relay.mjs`), Delta-Only review, GitHub/Notion sync | Complex or multi-file features (`MO2-DELEG-*`) and parallel test generation | `.agents/skills/mo2-delegation/SKILL.md`, `.agents/skills/opencode-delegate/SKILL.md` |
+| `ask-questions-if-underspecified` / `concise-planning` | Clarify ambiguous requirements & generate atomic checklists before coding | Intake & planning (`SOP-01`) | `.agents/skills/ask-questions-if-underspecified/SKILL.md`, `.agents/skills/concise-planning/SKILL.md` |
+| `phase-gated-debugging` / `systematic-debugging` / `debugging-strategies` | 5-phase protocol & evidence-driven root-cause tracing | Any bug, crash, or intermittent failure | `.agents/skills/phase-gated-debugging/SKILL.md`, `.agents/skills/systematic-debugging/SKILL.md`, `.agents/skills/debugging-strategies/SKILL.md` |
+| `bug-hunter` / `find-bugs` / `error-debugging-error-analysis` | Systematic branch bug hunting & error trace analysis | Auditing branch diffs or diagnosing runtime traces | `.agents/skills/bug-hunter/SKILL.md`, `.agents/skills/find-bugs/SKILL.md`, `.agents/skills/error-debugging-error-analysis/SKILL.md` |
+| `differential-review` / `fix-review` | Security-focused diff review & verifying fixes introduce no regressions | Delta-Only reviews before merging fixes or features | `.agents/skills/differential-review/SKILL.md`, `.agents/skills/fix-review/SKILL.md` |
+| `verification-before-completion` | Requires observed command proof before claiming "done" | Before reporting any task complete | `.agents/skills/verification-before-completion/SKILL.md` |
+| `lint-and-validate` | Run `tsc`, `vitest`, and `UI` checks after every change | Every code change | `.agents/skills/lint-and-validate/SKILL.md` |
+| `code-review-checklist` / `code-reviewer` | Functional, security, performance, maintainability review | Reviewing your own or someone else's diff | `.agents/skills/code-review-checklist/SKILL.md`, `.agents/skills/code-reviewer/SKILL.md` |
 | `clean-code` / `uncle-bob-craft` | Clean-code principles, design smells | While refactoring — not for wholesale rewrites | `.agents/skills/clean-code/SKILL.md`, `.agents/skills/uncle-bob-craft/SKILL.md` |
 | `writing-plans` / `plan-writing` | Structured, dependency-aware plans with verification criteria | Planning a phase before coding | `.agents/skills/writing-plans/SKILL.md`, `.agents/skills/plan-writing/SKILL.md` |
-| `mock-hunter` | Audits a page for mock data, hardcoded values, broken endpoints | **The customer app currently falls back to mock data** — use this to find every occurrence | `.agents/skills/mock-hunter/SKILL.md` |
-| `production-audit` | Production-readiness gaps: RLS, webhooks, secrets, idempotency, deployment | Pre-release readiness check | `.agents/skills/production-audit/SKILL.md` |
-| `vibe-code-auditor` | Structural flaws and fragility in AI-generated code | Auditing a freshly generated phase | `.agents/skills/vibe-code-auditor/SKILL.md` |
+| `mock-hunter` | Audits a page for mock data, hardcoded values, broken endpoints | Ensuring UI never silently falls back to `mockData.ts` | `.agents/skills/mock-hunter/SKILL.md` |
+| `production-audit` / `vibe-code-auditor` / `codebase-audit-pre-push` | Pre-ship & pre-push security, secret, dead-code, and structural audits | Pre-release checks and before pushing major changes | `.agents/skills/production-audit/SKILL.md`, `.agents/skills/vibe-code-auditor/SKILL.md`, `.agents/skills/codebase-audit-pre-push/SKILL.md` |
 | `technical-change-tracker` | Structured change records and state machine | Long multi-phase work spanning sessions | `.agents/skills/technical-change-tracker/SKILL.md` |
-| `commit` / `pr-writer` | Conventional commits; PR descriptions | Shipping a phase | `.agents/skills/commit/SKILL.md`, `.agents/skills/pr-writer/SKILL.md` |
-| `agents-md` | Keep `AGENTS.md` concise and high-signal | Updating this file | `.agents/skills/agents-md/SKILL.md` |
-| `project-skill-audit` | Audits the project against recurring workflows and proposes skill updates | Periodically re-tuning the skill selection | `.agents/skills/project-skill-audit/SKILL.md` |
+| `using-git-worktrees` / `subagent-orchestrator` | Isolated parallel worktrees & quota-aware multi-agent orchestration | Multi-agent tasks & isolated bug reproduction | `.agents/skills/using-git-worktrees/SKILL.md`, `.agents/skills/subagent-orchestrator/SKILL.md` |
+| `commit` / `git-pushing` / `pr-writer` | Conventional commits, safe staging/pushing, PR descriptions | Shipping verified changes | `.agents/skills/commit/SKILL.md`, `.agents/skills/git-pushing/SKILL.md`, `.agents/skills/pr-writer/SKILL.md` |
+| `agents-md` / `project-skill-audit` | Keep `AGENTS.md` high-signal & re-tune installed skills periodically | Maintaining this file and `.agents/skills/` | `.agents/skills/agents-md/SKILL.md`, `.agents/skills/project-skill-audit/SKILL.md` |
 | `skill-router` / `manage-skills` / `skill-installer` | Discover, install, toggle and organise skills | Managing `.agents/skills/` | `.agents/skills/skill-router/SKILL.md`, `.agents/skills/manage-skills/SKILL.md`, `.agents/skills/skill-installer/SKILL.md` |
 
 ---
 
-## 7. Skill → Task quick map
+## 7. Multi-Skill Stacks (Task → Complementary Skill Stack)
 
-| I am about to… | Load first |
+> **Rule:** Never load only one skill when multiple complementary skills cover different angles of the task (architecture + security + multi-angle testing + verification).
+
+| I am about to… | Load & stack these skills together |
 |---|---|
-| Write a DB migration | `database-migrations-sql-migrations`, `postgresql` |
-| Add or change a tenant-scoped query | `saas-multi-tenant`, `postgres-best-practices` |
-| Add an endpoint | `api-endpoint-builder`, `api-design-principles`, `zod-validation-expert` |
-| Touch auth / roles / OTP | `auth-implementation-patterns`, `backend-security-coder`, `007` |
-| Write points / expiry / settlement logic | `tdd-workflow`, `event-sourcing-architect`, `saga-orchestration` |
-| Change the BullMQ worker or add a job | `bullmq-specialist` |
-| Build a customer-facing screen | `mobile-design`, `react-ui-patterns`, `i18n-localization`, `product-design` |
-| Animate anything (Motion / CSS) | `motion` — the official skill; `motion/react` is the only animation library in this repo |
-| Audit or fix animation performance | `motion` (MotionScore + Performance Doctor), `better-ui`, `better-accessibility` |
-| Review a whole screen or flow | `better-interface` (one ranked report) → then `better-ui` / `better-layout` / `better-writing` as needed |
-| Review a UI diff before merge | `interface-review` |
-| Work on colours / type / layout | `better-colors`, `better-typography`, `better-layout` |
-| Enumerate every state of a component | `state-machine`, `break` |
-| Run a full design pass on a screen | `impeccable` (umbrella) → `polish` / `critique` / `audit` / `harden`; or `better-interface` for the ranked report |
-| Get UX principles into the session before coding | `vibe-coding-advisor`, then `uxui-evaluator` / `interface-auditor` |
-| Touch the admin dashboards | `react-component-performance`, `react-best-practices` |
-| Add charts / analytics | `kpi-dashboard-design` |
-| Set up CI or deployment | `github-actions-templates`, `docker-expert`, `devops-deploy` |
-| Something is broken | `phase-gated-debugging`, `systematic-debugging` |
-| Before saying "done" | `verification-before-completion`, `lint-and-validate` |
+| **Intake / triage any new request** | `MO2/SOP/SOP-01-task-intake-triage.md` + `ask-questions-if-underspecified` + `concise-planning` |
+| **Investigate & fix any bug** | `MO2/SOP/SOP-02-bug-investigation.md` + `mo2-bug-hunt` + `systematic-debugging` + `phase-gated-debugging` + `bug-hunter` + `vitest` + `fix-review` |
+| **Write backend unit / service tests** | `vitest` + `tdd-workflow` + `test-driven-development` + `javascript-testing-patterns` + `unit-testing-test-generate` |
+| **Stress-test math / rules / ledger edge cases** | `pypict-skill` + `mutation-testing` + `vitest` + `tdd-orchestrator` |
+| **Test multi-tenant API & security boundaries** | `api-security-testing` + `idor-testing` + `sql-injection-testing` + `web-security-testing` + `api-testing-observability-api-mock` |
+| **Test UI components & full E2E user flows** | `react-testing` + `playwright-best-practices` + `e2e-testing-patterns` + `webapp-testing` + `screen-reader-testing` |
+| **Fix failing / flaky test suites** | `test-fixing` + `test-automator` + `vitest` |
+| **Load / throughput testing** | `k6-load-testing` + `performance-engineer` |
+| **Write a DB migration** | `database-migrations-sql-migrations` + `postgresql` + `postgres-best-practices` |
+| **Add or change a tenant-scoped query** | `saas-multi-tenant` + `postgres-best-practices` + `idor-testing` |
+| **Add an API endpoint** | `api-endpoint-builder` + `api-design-principles` + `zod-validation-expert` + `openapi-spec-generation` + `api-security-best-practices` |
+| **Touch auth / roles / OTP / JWT** | `auth-implementation-patterns` + `backend-security-coder` + `007` + `api-security-testing` |
+| **Write points / expiry / settlement logic** | `tdd-workflow` + `vitest` + `mutation-testing` + `event-sourcing-architect` + `saga-orchestration` |
+| **Change the BullMQ worker or add a job** | `bullmq-specialist` + `vitest` |
+| **Build a customer-facing screen** | `mobile-design` + `react-ui-patterns` + `i18n-localization` + `product-design` + `better-layout` |
+| **Animate anything (Motion / CSS)** | `motion` + `better-ui` + `better-accessibility` |
+| **Review a whole screen or UI diff** | `better-interface` + `interface-review` + `better-layout` + `mock-hunter` |
+| **Enumerate every state of a UI component** | `state-machine` + `break` + `react-testing` |
+| **Run a full design pass on a screen** | `impeccable` + `vibe-coding-advisor` + `uxui-evaluator` |
+| **Touch the admin dashboards / analytics** | `react-component-performance` + `react-best-practices` + `kpi-dashboard-design` |
+| **Delegate complex work to OpenCode / multi-model** | `mo2-delegation` + `opencode-delegate` + `differential-review` + `using-git-worktrees` |
+| **Set up CI or deployment** | `github-actions-templates` + `cicd-automation-workflow-automate` + `docker-expert` + `devops-deploy` |
+| **Verify, sync & push when done** | `verification-before-completion` + `lint-and-validate` + `codebase-audit-pre-push` + `commit` + `git-pushing` + `MO2/scripts/sync_to_github_and_notion.ps1` |
 
 ---
 
@@ -589,4 +647,4 @@ Phases 2–5 of the cross-tenant loyalty network are **plans, not code**. Treat 
 
 ---
 
-*Last verified against the codebase: 2026-11-15. If code and this file disagree, the code is authoritative — update this file.*
+*Last verified against the codebase: 2026-11-27. If code and this file disagree, the code is authoritative — update this file.*

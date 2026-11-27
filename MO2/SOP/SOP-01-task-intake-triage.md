@@ -117,19 +117,23 @@
 
 ---
 
-## G. خريطة التوجيه للـ Skills الموجودة (Thin Router)
+## G. خريطة التوجيه للـ Skills الموجودة (Multi-Skill Stacking)
 
-بدل تكرار التعليمات، يوجّه هذا الإجراء كل نوع عمل إلى المهارات المثبّتة أصلًا في `.agents/skills/`:
+> **قاعدة التجميع (Stacking Rule):** لا تعتمد على skill واحدة عامة إذا كان هناك مهارات متكاملة في `.agents/skills/`. اجمع **2–4 مهارات** تغطي: (1) النطاق/المعمارية، (2) حزمة الاختبار، (3) الأمان والعزل، و(4) التحقق.
 
-| نوع العمل | الـ Skills المعتمدة |
+| نوع العمل | حزمة الـ Skills المعتمدة (Stack) |
 |---|---|
-| **الفرز وتحديد النطاق** | `ask-questions-if-underspecified` · `concise-planning` · `writing-plans` · `product-design` |
-| **تتبع الأخطاء (SOP-02)** | `mo2-bug-hunt` · `systematic-debugging` · `phase-gated-debugging` · `mock-hunter` |
-| **قواعد البيانات والـ Multi-Tenancy** | `database-migrations-sql-migrations` · `postgres-best-practices` · `saas-multi-tenant` |
-| **الباك إند والأمان والـ API** | `api-design-principles` · `zod-validation-expert` · `backend-security-coder` · `auth-implementation-patterns` · `007` |
-| **التفويض وتقليل التوكنز** | `mo2-delegation` · `opencode-delegate` · `differential-review` · `code-review-checklist` · `using-git-worktrees` |
-| **الواجهة والـ RTL والأنيميشن** | `better-interface` · `better-ui` · `better-layout` · `motion` · `i18n-localization` · `impeccable` |
-| **الاختبار والتحقق والرفع** | `tdd-workflow` · `verification-before-completion` · `lint-and-validate` · `codebase-audit-pre-push` · `commit` · `git-pushing` |
+| **الفرز والتخطيط** | `ask-questions-if-underspecified` · `concise-planning` · `writing-plans` · `product-design` |
+| **تتبع الأخطاء (SOP-02)** | `mo2-bug-hunt` + `systematic-debugging` + `phase-gated-debugging` + `bug-hunter` + `find-bugs` + `mock-hunter` |
+| **اختبار الباك إند والمنطق (Unit/TDD)** | `vitest` + `tdd-workflow` + `test-driven-development` + `javascript-testing-patterns` + `unit-testing-test-generate` + `pypict-skill` + `mutation-testing` |
+| **اختبار الأمان والعزل (Security/API)** | `api-security-testing` + `idor-testing` + `sql-injection-testing` + `web-security-testing` + `api-testing-observability-api-mock` |
+| **اختبار الواجهة و E2E والأداء** | `react-testing` + `playwright-best-practices` + `e2e-testing-patterns` + `webapp-testing` + `screen-reader-testing` + `state-machine` + `break` + `k6-load-testing` |
+| **إصلاح الاختبارات المكسورة** | `test-fixing` + `test-automator` + `tdd-orchestrator` |
+| **قواعد البيانات والـ Multi-Tenancy** | `database-migrations-sql-migrations` + `postgres-best-practices` + `postgresql` + `saas-multi-tenant` |
+| **الباك إند والأمان والـ API** | `api-design-principles` + `api-endpoint-builder` + `zod-validation-expert` + `backend-security-coder` + `auth-implementation-patterns` + `007` |
+| **التفويض والمراجعة وتقليل التوكنز** | `mo2-delegation` + `opencode-delegate` + `differential-review` + `fix-review` + `code-review-checklist` + `using-git-worktrees` + `subagent-orchestrator` |
+| **الواجهة والـ RTL والأنيميشن** | `better-interface` + `better-ui` + `better-layout` + `motion` + `i18n-localization` + `impeccable` |
+| **التحقق والرفع** | `verification-before-completion` + `lint-and-validate` + `codebase-audit-pre-push` + `commit` + `git-pushing` |
 | **إدارة وتدقيق المهارات** | `skill-router` · `project-skill-audit` |
 
 ---
