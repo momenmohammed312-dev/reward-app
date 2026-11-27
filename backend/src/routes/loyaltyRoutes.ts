@@ -12,6 +12,28 @@ router.get('/history', authenticateJWT, LoyaltyController.getLedgerHistory);
 router.post('/redeem', authenticateJWT, validate(schemas.redeemReward), LoyaltyController.customerRedeemReward);
 
 // Admin / Cashier specific loyalty routes
+/**
+ * @swagger
+ * /api/loyalty/cashier-earn:
+ *   post:
+ *     summary: Calculate and award points at checkout from invoice total (EGP)
+ *     tags: [Loyalty]
+ *     responses:
+ *       200:
+ *         description: Points calculated and awarded
+ *       400:
+ *         description: Validation or minimum purchase error
+ *       409:
+ *         description: Duplicate invoice
+ */
+router.post(
+  '/cashier-earn',
+  authenticateJWT,
+  requireRole(['owner', 'manager', 'cashier']),
+  validate(schemas.cashierEarn),
+  LoyaltyController.cashierEarnByInvoice
+);
+
 router.post(
   '/manual-earn',
   authenticateJWT,

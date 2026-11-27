@@ -213,14 +213,86 @@ export class LoyaltyController {
   }
 
   /**
-   * Allows admins to refund a transaction and claw back the awarded points.
+   * Cashier checkout endpoint: calculates points from invoice total in EGP,
+   * auto-registers walk-in customers by phone, and prevents duplicate invoices.
+   */
+  static async cashierEarnByInvoice(req: AuthenticatedRequest, res: Response) {
+    const tenantId = req.user?.tenant_id;
+    const adminUserId = req.user?.id;
+    const { customer_phone, amount_egp, invoice_id, branch_id, note } = req.body;
+
+    if (!tenantId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (req.user?.role === 'cashier' && req.user?.branch_id && branch_id && req.user.branch_id !== branch_id) {
+      return res.status(403).json({ error: 'Cashier cannot perform actions for a different branch' });
+    }
+
+    const effectiveBranchId = branch_id || req.user?.branch_id || undefined;
+
+    try {
+      const result = await LoyaltyService.earnFromCashierInvoice({
+        tenantId,
+        customerPhone: String(customer_phone),
+        amountEgp: Number(amount_egp),
+        invoiceId: invoice_id,
+        branchId: effectiveBranchId,
+        note,
+        actorRole: req.user?.role,
+      });
+
+      if (result.duplicate) {
+        return res.status(409).json({
+          error: 'Duplicate Invoice',
+          message: 'تم تسجيل نقاط هذه الفاتورة مسبقاً',
+          invoiceId: result.invoiceId,
+        });
+      }
+
+      await logAdminAction(tenantId, adminUserId, 'cashier_invoice_earn', 'customer', result.customerId, {
+        invoiceId: result.invoiceId,
+        amountEgp: result.amountEgp,
+        pointsEarned: result.pointsEarned,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Points calculated and awarded',
+        ...result,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('exceeds cashier limit')) {
+        return res.status(403).json({ error: 'Forbidden', message: msg });
+      }
+      const isClientError =
+        msg.includes('Invalid Egyptian') ||
+        msg.includes('minimum purchase') ||
+        msg.includes('Branch not found') ||
+        msg.includes('No active branch');
+      if (isClientError) {
+        return res.status(400).json({ error: 'Validation Error', message: msg });
+      }
+      logger.error('Cashier invoice earn error', { error: msg });
+      return res.status(500).json({ error: 'Internal Server Error', message: msg });
+    }
+  }
+
+  /**
+   * Allows admins to refund a transaction (full or partial) and claw back the awarded points.
    */
   static async adminRefundTransaction(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user?.tenant_id;
-      const { invoice_id } = req.body;
+      const { invoice_id, partial_amount, note } = req.body;
 
-      const result = await LoyaltyService.refundPoints(tenantId!, invoice_id);
+      const result = await LoyaltyService.refundPoints(tenantId!, invoice_id, note, partial_amount);
+      await logAdminAction(tenantId!, req.user?.id, 'refund_transaction', 'transaction', undefined, {
+        invoice_id,
+        partial_amount: partial_amount ?? null,
+        note: note ?? null,
+      });
       res.json(result);
     } catch (error: any) {
       logger.error('Admin refund error', { error: (error as Error).message });
@@ -312,7 +384,7 @@ export class LoyaltyController {
       await client.query('BEGIN');
 
       const result = await client.query(
-        `SELECT r.*, rw.name as reward_name, rw.reward_type, rw.discount_value, c.name as customer_name, c.phone as customer_phone
+        `SELECT r.*, rw.name as reward_name, rw.reward_type, rw.discount_value, rw.min_order_egp, c.name as customer_name, c.phone as customer_phone
          FROM redemptions r
          JOIN rewards rw ON r.reward_id = rw.id
          JOIN customers c ON r.customer_id = c.id
@@ -363,6 +435,7 @@ export class LoyaltyController {
           name: redemption.reward_name,
           type: redemption.reward_type,
           discount_value: redemption.discount_value,
+          min_order_egp: redemption.min_order_egp,
         },
         customer: {
           name: redemption.customer_name,

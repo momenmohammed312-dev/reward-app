@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Coffee, Translate } from '@phosphor-icons/react';
+import { Coffee, ShoppingCart, Storefront, Translate } from '@phosphor-icons/react';
 import { useApp } from '../store/AppContext';
 
 interface AuthLayoutProps {
@@ -27,7 +27,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         <header
           className="relative text-white rounded-b-[36px] px-6 pt-5 pb-12 overflow-hidden shadow-[var(--shadow-lg)] select-none"
           style={{
-            background: 'linear-gradient(145deg, var(--color-primary) 0%, #53392a 65%, #3d291e 100%)',
+            background: 'linear-gradient(145deg, var(--color-primary) 0%, var(--color-primary-dark, var(--color-primary)) 100%)',
           }}
         >
           {/* Floating Ambient Light Orb */}
@@ -65,7 +65,13 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
                 />
               ) : (
                 <div className="w-full h-full rounded-[20px] bg-white/15 flex items-center justify-center text-white">
-                  <Coffee size={34} weight="regular" />
+                  {currentTenant.businessType === 'supermarket' ? (
+                    <ShoppingCart size={34} weight="regular" />
+                  ) : currentTenant.businessType === 'retail' ? (
+                    <Storefront size={34} weight="regular" />
+                  ) : (
+                    <Coffee size={34} weight="regular" />
+                  )}
                 </div>
               )}
             </motion.div>

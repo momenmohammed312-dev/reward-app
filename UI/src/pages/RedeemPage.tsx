@@ -70,10 +70,19 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover opacity-90"
           />
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 flex items-center gap-2">
             <Badge variant="accent">
               {t('redeem.badge')}
             </Badge>
+            {reward.rewardType === 'discount_fixed' && reward.discountValue ? (
+              <span className="bg-[var(--color-primary)] text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow">
+                خصم {reward.discountValue} ج.م
+              </span>
+            ) : reward.rewardType === 'discount_percent' && reward.discountValue ? (
+              <span className="bg-[var(--color-primary)] text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow">
+                خصم {reward.discountValue}%
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -114,8 +123,13 @@ export const RedeemPage: React.FC<RedeemPageProps> = ({
             </div>
             
             <ul className="flex flex-col gap-1.5 text-[11px] text-[var(--color-text-muted)] leading-normal pr-5 list-disc mt-1 select-none">
-              <li>{reward.terms}</li>
-              <li>الرمز الرقمي صالح للاستخدام لمرة واحدة فقط بمطابقتها لطلب العميل بالفرع.</li>
+              {reward.terms ? <li>{reward.terms}</li> : null}
+              {reward.minOrderEgp ? (
+                <li className="font-bold text-[var(--color-primary)]">
+                  {t('reward.minOrder', { amount: reward.minOrderEgp })}
+                </li>
+              ) : null}
+              <li>الرمز الرقمي صالح للاستخدام لمرة واحدة فقط بمطابقته لطلب العميل بالفرع.</li>
               <li>الرموز الرقمية المصدّرة لا يمكن استراجع قيمتها مرة أخرى لمحفظتكم بعد الحجز.</li>
               <li>يرجى إبراز الرمز الفوري للكاونتر قبل تسجيل الفاتورة بنظام الكاشير.</li>
             </ul>

@@ -1,11 +1,13 @@
 // src/components/loyalty/RedemptionCode.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
+import QRCodeLib from 'qrcode';
 import { RedeemedReward } from '../../types';
 import { useApp } from '../../store/AppContext';
 import { Clock, Check, ArrowsCounterClockwise, Phone, Copy } from '@phosphor-icons/react';
 import { Card, CardBody, CardFooter } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { Barcode128 } from '../ui/Barcode128';
 import { motion } from 'motion/react';
 
 interface QRCanvasProps {
@@ -22,55 +24,21 @@ export const QRCanvas: React.FC<QRCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    try {
-      const qr = (window as any).qrcode;
-      if (!qr) {
-        console.warn('qrcode-generator is not loaded yet');
-        return;
-      }
-      
-      const q = qr(0, 'M');
-      q.addData(value);
-      q.make();
-
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const moduleCount = q.getModuleCount();
-      const cellSize = size / moduleCount;
-      
-      canvas.width = size;
-      canvas.height = size;
-      
-      ctx.clearRect(0, 0, size, size);
-      
-      let strokeColor = fgColor;
-      if (fgColor.startsWith('var(')) {
-        strokeColor = getComputedStyle(canvas).getPropertyValue(fgColor.slice(4, -1)).trim() || '#000000';
-      }
-      
-      ctx.fillStyle = strokeColor;
-      
-      for (let r = 0; r < moduleCount; r++) {
-        for (let c = 0; c < moduleCount; c++) {
-          if (q.isDark(r, c)) {
-            ctx.fillRect(
-              Math.floor(c * cellSize), 
-              Math.floor(r * cellSize), 
-              Math.ceil(cellSize), 
-              Math.ceil(cellSize)
-            );
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to render QR Code', err);
+    if (!canvasRef.current || !value) return;
+    let strokeColor = fgColor;
+    if (fgColor.startsWith('var(')) {
+      strokeColor = getComputedStyle(document.documentElement).getPropertyValue(fgColor.slice(4, -1)).trim() || '#000000';
     }
+    QRCodeLib.toCanvas(canvasRef.current, value, {
+      width: size,
+      color: { dark: strokeColor, light: '#ffffff' },
+      margin: 1,
+    }).catch((err) => {
+      console.error('Failed to render QR Code', err);
+    });
   }, [value, size, fgColor]);
 
-  return <canvas ref={canvasRef} className="mx-auto rounded-md block" style={{ width: size, height: size }} />;
+  return <canvas ref={canvasRef} className="mx-auto rounded-md block" width={size} height={size} />;
 };
 
 interface RedemptionCodeProps {
@@ -186,9 +154,14 @@ export const RedemptionCode: React.FC<RedemptionCodeProps> = ({
 
               {/* Huge redemption visual Code block */}
               <div className="flex flex-col items-center gap-3 w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-5 rounded-[var(--radius-lg)] shadow-inner">
-                {/* Visual QR Code canvas instead of barcode */}
-                <div className="py-2.5">
+                {/* Visual QR Code canvas */}
+                <div className="py-1.5">
                   <QRCanvas value={redemption.code} size={150} fgColor="var(--color-primary)" />
+                </div>
+
+                {/* 1D Barcode for USB supermarket laser scanners */}
+                <div className="w-full flex justify-center border-t border-[var(--color-border)] pt-3">
+                  <Barcode128 value={redemption.code} height={44} showLabel={false} />
                 </div>
 
                 {/* Readable numbers layout */}

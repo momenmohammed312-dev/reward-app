@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export const AuthPage: React.FC = () => {
-  const { sendOtp, verifyOtp, loadingAuth, authError, language, t } = useApp();
+  const { sendOtp, verifyOtp, loadingAuth, authError, currentTenant, language, t } = useApp();
 
   // Auth navigation step: 'phone' or 'otp'
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -39,7 +39,7 @@ export const AuthPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const branchParam = params.get('branch');
-    const tableParam = params.get('table');
+    const tableParam = params.get('station') || params.get('table');
     if (branchParam) {
       localStorage.setItem('loyalty_branch_id', branchParam);
       setQrBranchId(branchParam);
@@ -126,7 +126,9 @@ export const AuthPage: React.FC = () => {
                   <QrCode size={16} weight="regular" className="shrink-0" />
                   <span>
                     {qrTableNumber
-                      ? t('auth.qrTableCheckIn', { table: qrTableNumber })
+                      ? currentTenant.businessType === 'supermarket' || currentTenant.businessType === 'retail'
+                        ? t('auth.qrStationCheckIn', { station: qrTableNumber })
+                        : t('auth.qrTableCheckIn', { table: qrTableNumber })
                       : t('auth.qrBranchCheckIn')}
                   </span>
                 </div>

@@ -4,6 +4,7 @@ import db from '../config/db.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import { logger } from '../services/logger.js';
 import { AnalyticsService, AnalyticsError } from '../services/analytics.js';
+import { AdminOpsService, AdminOpsError } from '../services/adminOps.js';
 
 async function logAdminAction(tenantId: string, adminUserId: string | undefined, actionType: string, targetType: string, targetId: string | undefined, oldValue?: any, newValue?: any) {
   try {
@@ -24,27 +25,8 @@ export class AdminController {
     try {
       const tenantId = req.user!.tenant_id;
       const branchId = (req.query.branch_id as string | undefined) || undefined;
-
-      if (branchId) {
-        await AnalyticsService.verifyBranchOwnership(tenantId, branchId);
-        const branchStats = await db.query(`
-          SELECT
-            (SELECT COUNT(DISTINCT customer_id) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid) AS total_customers,
-            (SELECT COUNT(DISTINCT customer_id) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at > NOW() - INTERVAL '30 days') AS active_customers,
-            (SELECT COALESCE(SUM(points_earned), 0) FROM transactions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at > date_trunc('month', NOW())) AS points_this_month,
-            (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1::uuid AND branch_id = $2::uuid AND created_at::date = CURRENT_DATE) AS redemptions_today
-        `, [tenantId, branchId]);
-        return res.json(branchStats.rows[0]);
-      }
-
-      const statsQuery = await db.query(`
-        SELECT 
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND deleted_at IS NULL) AS total_customers,
-          (SELECT COUNT(*) FROM customers WHERE tenant_id = $1::uuid AND deleted_at IS NULL AND last_visit > NOW() - INTERVAL '30 days') AS active_customers,
-          (SELECT COALESCE(SUM(points), 0) FROM wallet_ledger WHERE tenant_id = $1::uuid AND type = 'earned' AND created_at > date_trunc('month', NOW())) AS points_this_month,
-          (SELECT COUNT(*) FROM redemptions WHERE tenant_id = $1::uuid AND created_at::date = CURRENT_DATE) AS redemptions_today
-      `, [tenantId]);
-      res.json(statsQuery.rows[0]);
+      const stats = await AdminOpsService.getFinancialStats(tenantId, branchId);
+      return res.json(stats);
     } catch (err: any) {
       if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
         return res.status(404).json({ error: 'Not Found', message: err.message });
@@ -54,56 +36,68 @@ export class AdminController {
     }
   }
 
-  // GET /api/admin/customers?name=&phone=&page=&limit=
+  // GET /api/admin/customers?name=&phone=&tier=&inactive_days=&page=&limit=
   static async getCustomers(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user!.tenant_id;
       const name = req.query.name as string | undefined;
       const phone = req.query.phone as string | undefined;
+      const tier = req.query.tier as string | undefined;
+      const inactiveDays = req.query.inactive_days ? parseInt(req.query.inactive_days as string, 10) : undefined;
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
-      const offset = (page - 1) * limit;
 
-      let whereClause = 'WHERE c.tenant_id = $1::uuid AND c.deleted_at IS NULL';
-      const params: any[] = [tenantId];
-      let paramIdx = 2;
-
-      if (name) {
-        whereClause += ` AND c.name ILIKE $${paramIdx}::text`;
-        params.push(`%${name}%`);
-        paramIdx++;
-      }
-      if (phone) {
-        whereClause += ` AND c.phone ILIKE $${paramIdx}::text`;
-        params.push(`%${phone}%`);
-        paramIdx++;
-      }
-
-      const countResult = await db.query(`
-        SELECT COUNT(*) AS total FROM customers c ${whereClause}
-      `, params);
-
-      const result = await db.query(`
-        SELECT c.id, c.phone, c.name, c.tier,
-               COALESCE(cb.current_balance, 0) AS balance,
-               COALESCE(cb.total_earned, 0) AS total_earned,
-               c.is_verified, c.last_visit, c.created_at
-        FROM customers c
-        LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
-        ${whereClause}
-        ORDER BY c.created_at DESC
-        LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
-      `, [...params, limit, offset]);
-
-      res.json({
-        customers: result.rows,
-        total: parseInt(countResult.rows[0]?.total || '0'),
+      const data = await AdminOpsService.getCustomersFiltered(tenantId, {
+        name,
+        phone,
+        tier,
+        inactiveDays: inactiveDays && inactiveDays > 0 ? inactiveDays : undefined,
         page,
         limit,
       });
+      res.json(data);
     } catch (err: any) {
       logger.error('Admin customers error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch customers' });
+    }
+  }
+
+  // GET /api/admin/customers/export
+  static async exportCustomers(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user!.tenant_id;
+      const name = req.query.name as string | undefined;
+      const phone = req.query.phone as string | undefined;
+      const tier = req.query.tier as string | undefined;
+      const inactiveDays = req.query.inactive_days ? parseInt(req.query.inactive_days as string, 10) : undefined;
+
+      const csv = await AdminOpsService.exportCustomersCsv(tenantId, {
+        name,
+        phone,
+        tier,
+        inactiveDays: inactiveDays && inactiveDays > 0 ? inactiveDays : undefined,
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"');
+      return res.send(csv);
+    } catch (err: any) {
+      logger.error('Export customers error:', { error: (err as Error).message });
+      res.status(500).json({ error: 'Failed to export customers' });
+    }
+  }
+
+  // GET /api/admin/customers/:id/ledger
+  static async getCustomerLedger(req: AuthenticatedRequest, res: Response) {
+    try {
+      const data = await AdminOpsService.getCustomerLedger(req.user!.tenant_id, req.params.id);
+      return res.json(data);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError && err.code === 'NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Customer ledger error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch customer ledger' });
     }
   }
 
@@ -116,6 +110,9 @@ export class AdminController {
                name AS title,
                reward_type,
                required_points AS "pointsRequired",
+               discount_value AS "discountValue",
+               max_redemptions AS "maxRedemptions",
+               min_order_egp AS "minOrderEgp",
                description,
                category,
                image_url AS "imageUrl",
@@ -138,17 +135,17 @@ export class AdminController {
   static async createReward(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user!.tenant_id;
-      const { title, description, points_required, category, expiry_days, reward_type, discount_value, max_redemptions } = req.body;
+      const { title, description, points_required, category, expiry_days, reward_type, discount_value, min_order_egp, max_redemptions } = req.body;
       
       if (!title || !points_required) {
         return res.status(400).json({ error: 'title and points_required are required' });
       }
 
       const result = await db.query(`
-        INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, expiry_days, discount_value, max_redemptions)
-        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO rewards (tenant_id, name, reward_type, required_points, description, category, expiry_days, discount_value, min_order_egp, max_redemptions)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
-      `, [tenantId, title, reward_type || 'free_item', points_required, description || null, category || 'مشروبات', expiry_days || 30, discount_value || null, max_redemptions || null]);
+      `, [tenantId, title, reward_type || 'free_item', points_required, description || null, category || 'عام', expiry_days || 30, discount_value || null, min_order_egp || null, max_redemptions || null]);
 
       await logAdminAction(tenantId, req.user?.id, 'create_reward', 'reward', result.rows[0]?.id, undefined, { title: req.body.title, points_required: req.body.points_required, reward_type: reward_type || 'free_item' });
       res.status(201).json(result.rows[0]);
@@ -248,7 +245,7 @@ export class AdminController {
     try {
       const tenantId = req.user!.tenant_id;
       const { id } = req.params;
-      const { title, description, points_required, category, expiry_days, is_active, reward_type, discount_value, max_redemptions } = req.body;
+      const { title, description, points_required, category, expiry_days, is_active, reward_type, discount_value, min_order_egp, max_redemptions } = req.body;
 
       const result = await db.query(`
         UPDATE rewards
@@ -260,12 +257,15 @@ export class AdminController {
             is_active = COALESCE($8, is_active),
             reward_type = COALESCE($9::reward_type, reward_type),
             discount_value = COALESCE($10, discount_value),
-            max_redemptions = COALESCE($11, max_redemptions)
+            min_order_egp = COALESCE($11, min_order_egp),
+            max_redemptions = COALESCE($12, max_redemptions)
         WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL
         RETURNING id, name AS title, reward_type, required_points AS "pointsRequired",
                   description, category, image_url AS "imageUrl", terms,
-                  expiry_days AS "expiryDays", is_active, discount_value, max_redemptions, created_at
-      `, [id, tenantId, title || null, description ?? null, points_required ? Number(points_required) : null, category || null, expiry_days ? Number(expiry_days) : null, is_active ?? null, reward_type || null, discount_value ?? null, max_redemptions ?? null]);
+                  expiry_days AS "expiryDays", is_active,
+                  discount_value AS "discountValue", min_order_egp AS "minOrderEgp",
+                  max_redemptions AS "maxRedemptions", created_at
+      `, [id, tenantId, title || null, description ?? null, points_required ? Number(points_required) : null, category || null, expiry_days ? Number(expiry_days) : null, is_active ?? null, reward_type || null, discount_value ?? null, min_order_egp ?? null, max_redemptions ?? null]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Reward not found' });
@@ -384,17 +384,131 @@ export class AdminController {
   // GET /api/admin/staff
   static async getStaff(req: AuthenticatedRequest, res: Response) {
     try {
-      const tenantId = req.user!.tenant_id;
-      const result = await db.query(`
-        SELECT id, name, email, role, branch_id, created_at
-        FROM users
-        WHERE tenant_id = $1::uuid AND is_active = true
-        ORDER BY created_at DESC
-      `, [tenantId]);
-      res.json(result.rows);
+      const staff = await AdminOpsService.listStaff(req.user!.tenant_id);
+      res.json(staff);
     } catch (err: any) {
       logger.error('Admin staff error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch staff' });
+    }
+  }
+
+  // POST /api/admin/staff
+  static async createStaff(req: AuthenticatedRequest, res: Response) {
+    try {
+      const created = await AdminOpsService.createStaff(req.user!.tenant_id, req.user?.id, req.body);
+      return res.status(201).json(created);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError) {
+        if (err.code === 'NOT_FOUND') return res.status(404).json({ error: 'Not Found', message: err.message });
+        if (err.code === 'CONFLICT') return res.status(409).json({ error: 'Conflict', message: err.message });
+        if (err.code === 'FORBIDDEN') return res.status(403).json({ error: 'Forbidden', message: err.message });
+      }
+      logger.error('Create staff error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to create staff member' });
+    }
+  }
+
+  // PATCH /api/admin/staff/:id
+  static async updateStaff(req: AuthenticatedRequest, res: Response) {
+    try {
+      const updated = await AdminOpsService.updateStaff(
+        req.user!.tenant_id,
+        req.user?.id,
+        req.params.id,
+        req.body
+      );
+      return res.json(updated);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError) {
+        if (err.code === 'NOT_FOUND') return res.status(404).json({ error: 'Not Found', message: err.message });
+        if (err.code === 'FORBIDDEN') return res.status(403).json({ error: 'Forbidden', message: err.message });
+      }
+      logger.error('Update staff error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to update staff member' });
+    }
+  }
+
+  // GET /api/admin/transactions
+  static async getTransactions(req: AuthenticatedRequest, res: Response) {
+    try {
+      const branchId = (req.query.branch_id as string | undefined) || undefined;
+      const search = (req.query.search as string | undefined) || undefined;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+
+      const data = await AdminOpsService.getTransactions(req.user!.tenant_id, { branchId, search, page, limit });
+      return res.json(data);
+    } catch (err: any) {
+      if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Admin transactions error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch transactions' });
+    }
+  }
+
+  // GET /api/admin/redemptions
+  static async getRedemptions(req: AuthenticatedRequest, res: Response) {
+    try {
+      const branchId = (req.query.branch_id as string | undefined) || undefined;
+      const status = (req.query.status as string | undefined) || undefined;
+      const search = (req.query.search as string | undefined) || undefined;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+
+      const data = await AdminOpsService.getRedemptions(req.user!.tenant_id, { branchId, status, search, page, limit });
+      return res.json(data);
+    } catch (err: any) {
+      if (err instanceof AnalyticsError && err.code === 'BRANCH_NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Admin redemptions error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch redemptions' });
+    }
+  }
+
+  // GET /api/admin/audit-log
+  static async getAuditLog(req: AuthenticatedRequest, res: Response) {
+    try {
+      const actionType = (req.query.action_type as string | undefined) || undefined;
+      const userId = (req.query.user_id as string | undefined) || undefined;
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+
+      const data = await AdminOpsService.getAuditLog(req.user!.tenant_id, { actionType, userId, page, limit });
+      return res.json(data);
+    } catch (err: any) {
+      logger.error('Admin audit log error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch audit log' });
+    }
+  }
+
+  // GET /api/admin/pos/config
+  static async getPosConfig(req: AuthenticatedRequest, res: Response) {
+    try {
+      const data = await AdminOpsService.getPosConfig(req.user!.tenant_id);
+      return res.json(data);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError && err.code === 'NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Get POS config error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to fetch POS config' });
+    }
+  }
+
+  // POST /api/admin/pos/test-webhook
+  static async testPosWebhook(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { payload, customer_tier } = req.body;
+      const result = await AdminOpsService.simulatePosWebhook(req.user!.tenant_id, payload, customer_tier);
+      return res.json(result);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError && err.code === 'NOT_FOUND') {
+        return res.status(404).json({ error: 'Not Found', message: err.message });
+      }
+      logger.error('Test POS webhook error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to simulate webhook' });
     }
   }
 
@@ -479,6 +593,82 @@ export class AdminController {
       }
       logger.error('Chart stats error:', { error: (err as Error).message });
       res.status(500).json({ error: 'Failed to fetch chart data' });
+    }
+  }
+
+  // GET /api/admin/tiers — tenant-specific tiers (falling back to system defaults)
+  static async getTierBenefits(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user!.tenant_id;
+      const result = await db.query(`
+        SELECT tier_name, multiplier::float8 AS multiplier, hierarchy_rank, min_earned_points
+        FROM (
+          SELECT DISTINCT ON (tier_name)
+                 tier_name, multiplier, hierarchy_rank, min_earned_points
+          FROM tier_benefits
+          WHERE tenant_id = $1::uuid OR tenant_id IS NULL
+          ORDER BY tier_name, tenant_id NULLS LAST
+        ) resolved
+        ORDER BY hierarchy_rank ASC
+      `, [tenantId]);
+      res.json(result.rows);
+    } catch (err: any) {
+      logger.error('Get tier benefits error:', { error: (err as Error).message });
+      res.status(500).json({ error: 'Failed to fetch tier settings' });
+    }
+  }
+
+  // PUT /api/admin/tiers — upsert tenant-specific tier multipliers and thresholds
+  static async updateTierBenefits(req: AuthenticatedRequest, res: Response) {
+    const tenantId = req.user!.tenant_id;
+    const { tiers } = req.body as {
+      tiers: Array<{ tier_name: 'bronze' | 'silver' | 'gold' | 'platinum'; multiplier: number; min_earned_points: number }>;
+    };
+    const TIER_RANK_MAP: Record<string, number> = {
+      bronze: 1,
+      silver: 2,
+      gold: 3,
+      platinum: 4,
+    };
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      for (const tier of tiers) {
+        const rank = TIER_RANK_MAP[tier.tier_name];
+        await client.query(`
+          INSERT INTO tier_benefits (tenant_id, tier_name, multiplier, hierarchy_rank, min_earned_points)
+          VALUES ($1::uuid, $2::tier_type, $3, $4, $5)
+          ON CONFLICT (tenant_id, tier_name) DO UPDATE SET
+            multiplier = EXCLUDED.multiplier,
+            hierarchy_rank = EXCLUDED.hierarchy_rank,
+            min_earned_points = EXCLUDED.min_earned_points,
+            updated_at = NOW()
+        `, [tenantId, tier.tier_name, tier.multiplier, rank, tier.min_earned_points]);
+      }
+
+      await client.query('COMMIT');
+      await logAdminAction(tenantId, req.user?.id, 'update_tiers', 'tenant', tenantId, undefined, { tiers });
+
+      const updated = await db.query(`
+        SELECT tier_name, multiplier::float8 AS multiplier, hierarchy_rank, min_earned_points
+        FROM (
+          SELECT DISTINCT ON (tier_name)
+                 tier_name, multiplier, hierarchy_rank, min_earned_points
+          FROM tier_benefits
+          WHERE tenant_id = $1::uuid OR tenant_id IS NULL
+          ORDER BY tier_name, tenant_id NULLS LAST
+        ) resolved
+        ORDER BY hierarchy_rank ASC
+      `, [tenantId]);
+      res.json(updated.rows);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      logger.error('Update tier benefits error:', { error: (err as Error).message });
+      res.status(500).json({ error: 'Failed to update tier settings' });
+    } finally {
+      client.release();
     }
   }
 

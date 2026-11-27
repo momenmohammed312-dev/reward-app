@@ -21,12 +21,16 @@ export const schemas = {
   sendOtp: z.object({
     tenant_id: z.string().min(1, 'tenant_id is required'),
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
+    branch_id: z.string().uuid().optional().or(z.literal('')),
+    station: z.string().max(80).optional(),
   }),
 
   verifyOtp: z.object({
     tenant_id: z.string().min(1, 'tenant_id is required'),
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
     code: z.string().length(6, 'Code must be 6 digits'),
+    branch_id: z.string().uuid().optional().or(z.literal('')),
+    station: z.string().max(80).optional(),
   }),
 
   login: z.object({
@@ -52,6 +56,7 @@ export const schemas = {
     expiry_days: z.number().int().positive().optional(),
     reward_type: z.enum(['free_item', 'discount_fixed', 'discount_percent', 'free_upgrade']).optional(),
     discount_value: z.number().positive().optional(),
+    min_order_egp: z.number().positive().nullable().optional(),
     max_redemptions: z.number().int().positive().optional(),
   }),
 
@@ -64,11 +69,30 @@ export const schemas = {
     is_active: z.boolean().optional(),
     reward_type: z.enum(['free_item', 'discount_fixed', 'discount_percent', 'free_upgrade']).optional(),
     discount_value: z.number().positive().nullable().optional(),
+    min_order_egp: z.number().positive().nullable().optional(),
     max_redemptions: z.number().int().positive().nullable().optional(),
   }),
 
   refundTransaction: z.object({
     invoice_id: z.string().min(1, 'invoice_id is required'),
+    partial_amount: z.number().positive('partial_amount must be positive').optional(),
+    note: z.string().max(200).optional(),
+  }),
+
+  cashierEarn: z.object({
+    customer_phone: z.string().min(8, 'Customer phone is required'),
+    amount_egp: z.number().positive('Invoice amount must be positive'),
+    invoice_id: z.string().min(1).max(100).optional(),
+    branch_id: z.string().uuid('Invalid branch ID').optional(),
+    note: z.string().max(200).optional(),
+  }),
+
+  updateTiers: z.object({
+    tiers: z.array(z.object({
+      tier_name: z.enum(['bronze', 'silver', 'gold', 'platinum']),
+      multiplier: z.number().min(0.1).max(10),
+      min_earned_points: z.number().int().min(0),
+    })).min(1).max(4),
   }),
 
   adjustPoints: z.object({
@@ -188,5 +212,106 @@ export const schemas = {
   networkLinkVerifyOtp: z.object({
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
     code: z.string().length(6, 'Code must be 6 digits'),
+  }),
+
+  // ─── Manager Suite, Offers, Campaigns & POS Bridge ─────────
+  createStaff: z.object({
+    name: z.string().min(1, 'Name is required').max(100),
+    email: z.string().email('Invalid email'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    role: z.enum(['manager', 'cashier']),
+    branch_id: z.string().uuid('Invalid branch ID').nullable().optional(),
+  }),
+
+  updateStaff: z.object({
+    name: z.string().min(1).max(100).optional(),
+    role: z.enum(['manager', 'cashier']).optional(),
+    branch_id: z.string().uuid('Invalid branch ID').nullable().optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  createOffer: z.object({
+    title: z.string().min(1, 'Title is required').max(120),
+    description: z.string().max(500).optional(),
+    category: z.string().min(1).max(60).optional(),
+    original_price: z.number().positive().nullable().optional(),
+    offer_price: z.number().positive('Offer price must be positive'),
+    image_url: z.string().url('Invalid image URL').optional().or(z.literal('')),
+    is_popular: z.boolean().optional(),
+    is_active: z.boolean().optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+  }),
+
+  updateOffer: z.object({
+    title: z.string().min(1).max(120).optional(),
+    description: z.string().max(500).nullable().optional(),
+    category: z.string().min(1).max(60).optional(),
+    original_price: z.number().positive().nullable().optional(),
+    offer_price: z.number().positive().optional(),
+    image_url: z.string().url('Invalid image URL').nullable().optional().or(z.literal('')),
+    is_popular: z.boolean().optional(),
+    is_active: z.boolean().optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+  }),
+
+  createCampaign: z.object({
+    name: z.string().min(1, 'Name is required').max(120),
+    description: z.string().max(500).optional(),
+    campaign_type: z.enum(['happy_hour', 'multiplier', 'double_points']).optional(),
+    multiplier: z.number().min(1).max(10),
+    days_of_week: z.array(z.number().int().min(0).max(6)).nullable().optional(),
+    start_hour: z.number().int().min(0).max(23).nullable().optional(),
+    end_hour: z.number().int().min(0).max(23).nullable().optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  updateCampaign: z.object({
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().max(500).nullable().optional(),
+    campaign_type: z.enum(['happy_hour', 'multiplier', 'double_points']).optional(),
+    multiplier: z.number().min(1).max(10).optional(),
+    days_of_week: z.array(z.number().int().min(0).max(6)).nullable().optional(),
+    start_hour: z.number().int().min(0).max(23).nullable().optional(),
+    end_hour: z.number().int().min(0).max(23).nullable().optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  posTestWebhook: z.object({
+    payload: z.record(z.any()),
+    customer_tier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
+  }),
+
+  logReminder: z.object({
+    customer_id: z.string().uuid('Invalid customer ID'),
+    channel: z.enum(['whatsapp', 'sms']).optional(),
+    reminder_type: z.enum(['inactive', 'expiring']),
+  }),
+
+  updateTenant: z.object({
+    name: z.string().min(1).max(100).optional(),
+    points_per_egp: z.number().min(0.01).max(100).optional(),
+    min_purchase_egp: z.number().min(0).max(100000).optional(),
+    points_expiry_days: z.number().int().min(1).max(3650).nullable().optional(),
+    logo_url: z.string().max(500).nullable().optional(),
+    primary_color: z.string().max(30).optional(),
+    accent_color: z.string().max(30).optional(),
+    bg_color: z.string().max(30).optional(),
+    surface_color: z.string().max(30).optional(),
+    font_display: z.string().max(60).optional(),
+    font_body: z.string().max(60).optional(),
+    tagline: z.string().max(200).nullable().optional(),
+    business_type: z.enum(['cafe', 'supermarket', 'retail']).optional(),
+    code_prefix: z.string().min(1).max(10).optional(),
+    show_menu: z.boolean().optional(),
+    cashier_max_invoice_egp: z.number().positive().nullable().optional(),
+    point_value_egp: z.number().positive().max(100).optional(),
+    welcome_bonus_points: z.number().int().min(0).max(100000).optional(),
+    excluded_item_keywords: z.array(z.string().min(1).max(60)).max(100).optional(),
   }),
 };

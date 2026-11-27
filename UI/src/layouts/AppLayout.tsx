@@ -24,7 +24,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const navItems = [
     { id: 'home' as const, label: t('nav.home'), icon: House },
-    { id: 'menu' as const, label: t('nav.menu'), icon: List },
+    ...(currentTenant.showMenu !== false
+      ? [
+          {
+            id: 'menu' as const,
+            label:
+              currentTenant.businessType === 'supermarket' || currentTenant.businessType === 'retail'
+                ? t('nav.offers')
+                : t('nav.menu'),
+            icon: List,
+          },
+        ]
+      : []),
     { id: 'rewards' as const, label: t('nav.rewards'), icon: Gift },
     { id: 'history' as const, label: t('nav.history'), icon: Receipt },
     { id: 'profile' as const, label: t('nav.profile'), icon: User },

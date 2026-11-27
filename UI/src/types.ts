@@ -1,5 +1,8 @@
 // src/types.ts
 
+export type BusinessType = 'cafe' | 'supermarket' | 'retail';
+export type RewardType = 'free_item' | 'discount_fixed' | 'discount_percent' | 'free_upgrade';
+
 export interface Tenant {
   id: string;
   name: string;
@@ -14,6 +17,11 @@ export interface Tenant {
   fontBody: string;
   tagline: string;
   coverImage?: string;
+  businessType?: BusinessType;
+  codePrefix?: string;
+  showMenu?: boolean;
+  pointsPerEgp?: number;
+  minPurchaseEgp?: number;
 }
 
 export interface User {
@@ -34,6 +42,10 @@ export interface Reward {
   category: string;
   terms: string;
   expiryDays: number;
+  rewardType?: RewardType;
+  discountValue?: number | null;
+  minOrderEgp?: number | null;
+  maxRedemptions?: number | null;
 }
 
 export interface RedeemedReward {

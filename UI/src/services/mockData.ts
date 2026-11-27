@@ -47,6 +47,26 @@ export const mockTenants: Tenant[] = [
     surfaceColor: '#ffffff',
     fontDisplay: 'Rubik',
     fontBody: 'Rubik',
+  },
+  {
+    id: 'albaraka-market',
+    name: 'البركة ماركت',
+    tagline: 'كل احتياجات بيتك.. ونقاط كاش باك على كل فاتورة',
+    logo: 'https://picsum.photos/seed/albarakamarket/160',
+    coverImage: 'https://picsum.photos/seed/albarakacover/600/300',
+    primaryColor: '#047857',
+    primaryColorSoft: 'rgba(4, 120, 87, 0.10)',
+    accentColor: '#f59e0b',
+    accentColorSoft: 'rgba(245, 158, 11, 0.14)',
+    bgColor: '#f0fdf4',
+    surfaceColor: '#ffffff',
+    fontDisplay: 'Rubik',
+    fontBody: 'Rubik',
+    businessType: 'supermarket',
+    codePrefix: 'MKT',
+    showMenu: false,
+    pointsPerEgp: 0.2,
+    minPurchaseEgp: 50,
   }
 ];
 
@@ -156,6 +176,58 @@ export const mockRewards: Record<string, Reward[]> = {
       terms: 'تتطلب الحجز بحد أدنى ٢٤ ساعة مسبقاً من تطبيق الفرع أو الاتصال.',
       expiryDays: 45
     }
+  ],
+  'albaraka-market': [
+    {
+      id: 'mkt_r1',
+      title: 'قسيمة خصم 25 ج.م',
+      description: 'خصم فوري 25 جنيه على فاتورة مشترياتك في السوبر ماركت.',
+      pointsRequired: 150,
+      imageUrl: 'https://picsum.photos/seed/voucher25/300/200',
+      category: 'قسائم خصم',
+      terms: 'بحد أدنى 200 ج.م للفاتورة. صالحة في جميع الفروع.',
+      expiryDays: 14,
+      rewardType: 'discount_fixed',
+      discountValue: 25,
+      minOrderEgp: 200,
+    },
+    {
+      id: 'mkt_r2',
+      title: 'قسيمة خصم 50 ج.م',
+      description: 'خصم مباشر 50 جنيه على إجمالي سلة المشتريات.',
+      pointsRequired: 300,
+      imageUrl: 'https://picsum.photos/seed/voucher50/300/200',
+      category: 'قسائم خصم',
+      terms: 'بحد أدنى 400 ج.م للفاتورة.',
+      expiryDays: 30,
+      rewardType: 'discount_fixed',
+      discountValue: 50,
+      minOrderEgp: 400,
+    },
+    {
+      id: 'mkt_r3',
+      title: 'خصم 10% على الفاتورة',
+      description: 'خصم 10% على مشتريات البقالة والألبان والمنظفات.',
+      pointsRequired: 400,
+      imageUrl: 'https://picsum.photos/seed/discount10/300/200',
+      category: 'قسائم خصم',
+      terms: 'بحد أدنى 300 ج.م (لا يشمل السجائر وكروت الشحن).',
+      expiryDays: 14,
+      rewardType: 'discount_percent',
+      discountValue: 10,
+      minOrderEgp: 300,
+    },
+    {
+      id: 'mkt_r4',
+      title: 'زجاجة زيت طعام 1 لتر مجاناً',
+      description: 'هدية مجانية من قسم البقالة عند الاستلام من الكاشير.',
+      pointsRequired: 220,
+      imageUrl: 'https://picsum.photos/seed/cookingoil/300/200',
+      category: 'بقالة',
+      terms: 'حسب التوفر في الفرع.',
+      expiryDays: 7,
+      rewardType: 'free_item',
+    }
   ]
 };
 
@@ -234,6 +306,25 @@ export const mockTransactions: Record<string, Transaction[]> = {
       description: 'شراء خبز بالبذور الكاملة وتوست حلو',
       amount: 160,
       invoiceNumber: 'YS-81200'
+    }
+  ],
+  'albaraka-market': [
+    {
+      id: 'tx_mkt1',
+      date: '2026-05-24T17:40:00Z',
+      points: 170,
+      type: 'earn',
+      description: 'فاتورة مشتريات بقالة وألبان (#MKT-9012)',
+      amount: 850,
+      invoiceNumber: 'MKT-9012'
+    },
+    {
+      id: 'tx_mkt2',
+      date: '2026-05-18T14:10:00Z',
+      points: 150,
+      type: 'redeem',
+      description: 'استبدال قسيمة خصم 25 ج.م',
+      invoiceNumber: 'MKT-RDM-25'
     }
   ]
 };

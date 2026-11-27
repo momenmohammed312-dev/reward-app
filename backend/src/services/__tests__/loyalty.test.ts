@@ -418,7 +418,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
             ],
           });
         }
-        if (sql.includes('SELECT generate_redemption_code()')) {
+        if (sql.includes('SELECT generate_redemption_code(')) {
           return Promise.resolve({
             rows: [{ code: 'REW-999888' }],
           });

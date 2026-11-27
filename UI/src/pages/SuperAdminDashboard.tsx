@@ -30,6 +30,7 @@ interface TenantItem {
   name: string;
   slug: string;
   plan: string;
+  business_type?: string;
   status: string;
   monthlyFee: number;
   joinedDate: string;
@@ -90,11 +91,11 @@ export const SuperAdminDashboard: React.FC = () => {
   });
 
   const [tenants, setTenants] = useState<TenantItem[]>([
-    { id: 't1', name: 'MO2 Loyalty', slug: 'mo2-loyalty', plan: 'Starter', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
-    { id: 't2', name: 'برو أند كو', slug: 'brew-co', plan: 'Premium', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/١٢' },
-    { id: 't3', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠1' },
-    { id: 't4', name: 'سينابون زون', slug: 'cinnabon-zone', plan: 'Starter', status: 'past_due', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠٤/١٥' },
-    { id: 't5', name: 'كافيين هاب', slug: 'caffeine-hub', plan: 'Premium', status: 'canceled', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠١/٠٥' }
+    { id: 't1', name: 'MO2 Loyalty', slug: 'mo2-loyalty', plan: 'Starter', business_type: 'cafe', status: 'active', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠١/١٠' },
+    { id: 't2', name: 'برو أند كو', slug: 'brew-co', plan: 'Premium', business_type: 'cafe', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/١٢' },
+    { id: 't3', name: 'البركة ماركت', slug: 'albaraka-market', plan: 'Premium', business_type: 'supermarket', status: 'active', monthlyFee: 2500, joinedDate: '٢٠٢٥/٠٢/٢٠' },
+    { id: 't4', name: 'حلويات الياسمين', slug: 'yasmeen', plan: 'Enterprise', business_type: 'cafe', status: 'active', monthlyFee: 6000, joinedDate: '٢٠٢٥/٠٣/٠1' },
+    { id: 't5', name: 'سينابون زون', slug: 'cinnabon-zone', plan: 'Starter', business_type: 'cafe', status: 'past_due', monthlyFee: 1200, joinedDate: '٢٠٢٥/٠٤/١٥' },
   ]);
 
   const [webhooks, setWebhooks] = useState<WebhookLog[]>([
@@ -204,7 +205,7 @@ export const SuperAdminDashboard: React.FC = () => {
           <Gear size={32} className="text-amber-500 animate-spin-slow" />
           <div>
             <h1 className="text-xl font-black">لوحة التحكم الفائقة (Super Admin)</h1>
-            <p className="text-xs text-[var(--color-admin-text-muted)]">إدارة البنية التحتية، الفواتير، ومراقبة الكافيهات المشتركة</p>
+            <p className="text-xs text-[var(--color-admin-text-muted)]">إدارة البنية التحتية، الفواتير، ومراقبة المتاجر والعلامات المشتركة</p>
             <p className="text-[9px] tracking-widest uppercase text-[var(--color-admin-text-light)] opacity-60 mt-1">
               MO2 — Platform Infrastructure
             </p>
@@ -310,7 +311,7 @@ export const SuperAdminDashboard: React.FC = () => {
           onClick={() => setActiveTab('tenants')}
           className={`px-4 py-2 rounded-lg font-bold text-sm transition-all duration-300 ${activeTab === 'tenants' ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black shadow-lg' : 'text-[var(--color-admin-text-muted)] hover:bg-[var(--color-admin-bg)]'}`}
         >
-          الكافيهات المشتركة
+          المتاجر المشتركة
         </button>
         <button 
           onClick={() => setActiveTab('subscriptions')}
@@ -345,16 +346,17 @@ export const SuperAdminDashboard: React.FC = () => {
         {activeTab === 'tenants' && (
           <div className={`${adminCard} overflow-hidden`}>
             <div className="p-5 border-b border-[var(--color-admin-border)] flex justify-between items-center">
-              <h2 className="text-sm font-bold">كل العلامات التجارية (Tenants)</h2>
+              <h2 className="text-sm font-bold">كل العلامات التجارية والمتاجر (Tenants)</h2>
               <button className="bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer hover:bg-amber-500">
-                تسجيل كافيه جديد بالنظام
+                تسجيل متجر جديد بالنظام
               </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead className="bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] uppercase text-[10px] font-bold border-b border-[var(--color-admin-border)]">
                   <tr>
-                    <th className="p-4">اسم الكافيه</th>
+                    <th className="p-4">اسم المتجر / العلامة</th>
+                    <th className="p-4">النشاط</th>
                     <th className="p-4">Slug المسار</th>
                     <th className="p-4">الباقة</th>
                     <th className="p-4">القيمة الشهرية</th>
@@ -369,6 +371,11 @@ export const SuperAdminDashboard: React.FC = () => {
                     return (
                       <tr key={t.id} className="hover:bg-[var(--color-admin-bg)] transition-all">
                         <td className="p-4 font-bold">{t.name}</td>
+                        <td className="p-4">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] border border-[var(--color-admin-border)]">
+                            {t.business_type === 'supermarket' ? 'سوبر ماركت' : t.business_type === 'retail' ? 'تجزئة' : 'كافيه'}
+                          </span>
+                        </td>
                         <td className="p-4 font-mono text-[var(--color-admin-text-muted)]">/{t.slug}</td>
                         <td className="p-4">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -408,12 +415,12 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className={`${adminCard} p-6 rounded-2xl flex flex-col gap-4 relative`}>
               <span className="text-[10px] bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)] px-2 py-0.5 rounded font-bold self-start">الباقة الأساسية</span>
               <h3 className="text-lg font-black text-[var(--color-admin-text)]">Starter Plan</h3>
-              <p className="text-xs text-[var(--color-admin-text-muted)]">مناسبة للكافيهات الصغيرة وعربات القهوة المبتدئة.</p>
+              <p className="text-xs text-[var(--color-admin-text-muted)]">مناسبة للمتاجر والميني ماركت والكافيهات المبتدئة.</p>
               <div className="text-2xl font-black text-[var(--color-admin-text)] my-2">1,200 EGP <span className="text-xs text-[var(--color-admin-text-muted)]">/ شهرياً</span></div>
               <ul className="text-xs text-[var(--color-admin-text)] flex flex-col gap-2 border-t border-[var(--color-admin-border)] pt-4">
                 <li>• حتى 1000 عميل نشط</li>
                 <li>• فرع واحد فقط</li>
-                <li>• ربط POS كامل (Foodics)</li>
+                <li>• ربط POS كامل (Foodics / Custom API)</li>
                 <li>• دعم فني عبر البريد الإلكتروني</li>
               </ul>
             </div>
@@ -421,7 +428,7 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className={`${adminCard} border border-indigo-500/50 p-6 rounded-2xl flex flex-col gap-4 relative`}>
               <span className="text-[10px] bg-indigo-950 border border-indigo-900 text-indigo-400 px-2 py-0.5 rounded font-bold self-start">الأكثر شيوعاً</span>
               <h3 className="text-lg font-black text-[var(--color-admin-text)]">Premium Plan</h3>
-              <p className="text-xs text-[var(--color-admin-text-muted)]">مثالية للكافيهات والمطاعم ذات الفروع المتعددة.</p>
+              <p className="text-xs text-[var(--color-admin-text-muted)]">مثالية للسوبر ماركت وسلاسل التجزئة والكافيهات ذات الفروع المتعددة.</p>
               <div className="text-2xl font-black text-[var(--color-admin-text)] my-2">2,500 EGP <span className="text-xs text-[var(--color-admin-text-muted)]">/ شهرياً</span></div>
               <ul className="text-xs text-[var(--color-admin-text)] flex flex-col gap-2 border-t border-[var(--color-admin-border)] pt-4">
                 <li>• عملاء بلا حدود</li>

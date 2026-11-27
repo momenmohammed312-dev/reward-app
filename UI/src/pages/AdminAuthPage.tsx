@@ -155,7 +155,7 @@ const AdminAuthPage: React.FC<AdminAuthPageProps> = ({ role }) => {
               {cfg.icon}
             </div>
             <span className="mt-1 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] text-[10px] font-bold text-[var(--color-admin-text-muted)]">
-              <Coffee size={12} weight="duotone" className="text-[var(--color-admin-primary)]" />
+              <Storefront size={12} weight="duotone" className="text-[var(--color-admin-primary)]" />
               {cfg.badge}
             </span>
             <h1 className="text-xl font-black text-[var(--color-admin-text)] mt-1">{cfg.title}</h1>

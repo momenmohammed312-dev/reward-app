@@ -12,7 +12,9 @@ export class TenantController {
     try {
       const { slug } = req.params;
       const result = await db.query(
-        `SELECT id, name, slug, logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline, points_per_egp, min_purchase_egp
+        `SELECT id, name, slug, logo_url, primary_color, accent_color, bg_color, surface_color,
+                font_display, font_body, tagline, points_per_egp, min_purchase_egp,
+                business_type, code_prefix, show_menu
          FROM tenants WHERE slug = $1 AND is_active = true`,
         [slug]
       );
@@ -32,17 +34,21 @@ export class TenantController {
    */
   static async createTenant(req: AuthenticatedRequest, res: Response) {
     try {
-      const { name, slug, plan } = req.body;
+      const { name, slug, plan, business_type, code_prefix, show_menu } = req.body;
 
       if (!name || !slug) {
         return res.status(400).json({ error: 'Missing fields', message: 'name and slug are required' });
       }
 
+      const resolvedBusinessType = ['cafe', 'supermarket', 'retail'].includes(business_type) ? business_type : 'cafe';
+      const resolvedCodePrefix = (code_prefix ? String(code_prefix).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) : '') || 'MO2';
+      const resolvedShowMenu = typeof show_menu === 'boolean' ? show_menu : resolvedBusinessType !== 'supermarket';
+
       const result = await db.query(
-        `INSERT INTO tenants (name, slug, plan)
-         VALUES ($1, $2, $3)
+        `INSERT INTO tenants (name, slug, plan, business_type, code_prefix, show_menu)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [name, slug, plan || 'starter']
+        [name, slug, plan || 'starter', resolvedBusinessType, resolvedCodePrefix, resolvedShowMenu]
       );
 
       // Create a default subscription for the tenant (14-day trial)
@@ -59,7 +65,7 @@ export class TenantController {
       res.status(201).json({ message: 'Tenant created successfully with 14-day trial', tenant });
     } catch (error: any) {
       if (error.code === '23505') { // Unique slug violation
-        return res.status(409).json({ error: 'Conflict', message: 'A cafe with this slug already exists' });
+        return res.status(409).json({ error: 'Conflict', message: 'A store with this slug already exists' });
       }
       logger.error('Create tenant error', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -99,7 +105,22 @@ export class TenantController {
   static async updateTenant(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user?.tenant_id;
-      const { name, points_per_egp, min_purchase_egp, points_expiry_days, logo_url, primary_color, accent_color, bg_color, surface_color, font_display, font_body, tagline } = req.body;
+      const {
+        name, points_per_egp, min_purchase_egp, points_expiry_days,
+        logo_url, primary_color, accent_color, bg_color, surface_color,
+        font_display, font_body, tagline,
+        business_type, code_prefix, show_menu,
+        cashier_max_invoice_egp, point_value_egp, welcome_bonus_points, excluded_item_keywords,
+      } = req.body;
+
+      const resolvedBusinessType = business_type && ['cafe', 'supermarket', 'retail'].includes(business_type)
+        ? business_type
+        : null;
+      const resolvedCodePrefix = code_prefix
+        ? (String(code_prefix).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || null)
+        : null;
+      const hasCashierMax = Object.prototype.hasOwnProperty.call(req.body, 'cashier_max_invoice_egp');
+      const hasExcluded = Array.isArray(excluded_item_keywords);
 
       const result = await db.query(
         `UPDATE tenants SET
@@ -114,10 +135,28 @@ export class TenantController {
           surface_color = COALESCE($9, surface_color),
           font_display = COALESCE($10, font_display),
           font_body = COALESCE($11, font_body),
-          tagline = COALESCE($12, tagline)
-         WHERE id = $13::uuid
+          tagline = COALESCE($12, tagline),
+          business_type = COALESCE($13, business_type),
+          code_prefix = COALESCE($14, code_prefix),
+          show_menu = COALESCE($15, show_menu),
+          cashier_max_invoice_egp = CASE WHEN $16::boolean THEN $17::numeric ELSE cashier_max_invoice_egp END,
+          point_value_egp = COALESCE($18, point_value_egp),
+          welcome_bonus_points = COALESCE($19, welcome_bonus_points),
+          excluded_item_keywords = CASE WHEN $20::boolean THEN $21::text[] ELSE excluded_item_keywords END
+         WHERE id = $22::uuid
          RETURNING *`,
-        [name ?? null, points_per_egp ?? null, min_purchase_egp ?? null, points_expiry_days ?? null, logo_url ?? null, primary_color ?? null, accent_color ?? null, bg_color ?? null, surface_color ?? null, font_display ?? null, font_body ?? null, tagline ?? null, tenantId]
+        [
+          name ?? null, points_per_egp ?? null, min_purchase_egp ?? null, points_expiry_days ?? null,
+          logo_url ?? null, primary_color ?? null, accent_color ?? null, bg_color ?? null,
+          surface_color ?? null, font_display ?? null, font_body ?? null, tagline ?? null,
+          resolvedBusinessType, resolvedCodePrefix, typeof show_menu === 'boolean' ? show_menu : null,
+          hasCashierMax, hasCashierMax ? (cashier_max_invoice_egp ?? null) : null,
+          point_value_egp ?? null,
+          welcome_bonus_points ?? null,
+          hasExcluded,
+          hasExcluded ? excluded_item_keywords : null,
+          tenantId,
+        ]
       );
 
       if (result.rows.length === 0) {

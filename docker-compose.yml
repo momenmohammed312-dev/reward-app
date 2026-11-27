@@ -31,6 +31,8 @@ services:
       - ./DB/migrations/016_network_points_ledger.sql:/docker-entrypoint-initdb.d/17-migration-016.sql
       - ./DB/migrations/017_network_settlements.sql:/docker-entrypoint-initdb.d/18-migration-017.sql
       - ./DB/migrations/018_network_customers.sql:/docker-entrypoint-initdb.d/19-migration-018.sql
+      - ./DB/migrations/019_supermarket_support.sql:/docker-entrypoint-initdb.d/20-migration-019.sql
+      - ./DB/migrations/020_manager_suite_and_growth.sql:/docker-entrypoint-initdb.d/21-migration-020.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

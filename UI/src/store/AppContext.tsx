@@ -55,20 +55,29 @@ interface AppContextType {
   refetchData: () => Promise<void>;
 }
 
-const mapPublicTenant = (raw: any): Tenant => ({
-  id: raw.slug || raw.id,
-  name: raw.name || 'MO2 Loyalty',
-  logo: raw.logo_url || '',
-  primaryColor: raw.primary_color || '#4F46E5',
-  primaryColorSoft: 'rgba(79, 70, 229, 0.10)',
-  accentColor: raw.accent_color || '#059669',
-  accentColorSoft: 'rgba(5, 150, 105, 0.14)',
-  bgColor: raw.bg_color || '#F4F6FA',
-  surfaceColor: raw.surface_color || '#FFFFFF',
-  fontDisplay: raw.font_display || 'Rubik',
-  fontBody: raw.font_body || 'Rubik',
-  tagline: raw.tagline || 'برنامج الولاء الذكي',
-});
+const mapPublicTenant = (raw: any): Tenant => {
+  const primaryColor = raw.primary_color || '#4F46E5';
+  const accentColor = raw.accent_color || '#059669';
+  return {
+    id: raw.slug || raw.id,
+    name: raw.name || 'MO2 Loyalty',
+    logo: raw.logo_url || '',
+    primaryColor,
+    primaryColorSoft: `${primaryColor}1a`,
+    accentColor,
+    accentColorSoft: `${accentColor}22`,
+    bgColor: raw.bg_color || '#F4F6FA',
+    surfaceColor: raw.surface_color || '#FFFFFF',
+    fontDisplay: raw.font_display || 'Rubik',
+    fontBody: raw.font_body || 'Rubik',
+    tagline: raw.tagline || 'برنامج الولاء الذكي',
+    businessType: raw.business_type || 'cafe',
+    codePrefix: raw.code_prefix || 'MO2',
+    showMenu: typeof raw.show_menu === 'boolean' ? raw.show_menu : raw.business_type !== 'supermarket',
+    pointsPerEgp: raw.points_per_egp !== undefined ? Number(raw.points_per_egp) : undefined,
+    minPurchaseEgp: raw.min_purchase_egp !== undefined ? Number(raw.min_purchase_egp) : undefined,
+  };
+};
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -125,7 +134,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // 1. Initial configuration loader: Apply Tenant CSS Theme
   useEffect(() => {
     applyTenantTheme(currentTenant);
-  }, [currentTenant]);
+    if (currentTenant.showMenu === false && activeTab === 'menu') {
+      setActiveTab('home');
+    }
+  }, [currentTenant, activeTab]);
 
   // Helper function to load wallet data from the API
   const loadWalletData = async (phoneToUse?: string) => {
@@ -138,7 +150,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const savedPhone = phoneToUse || localStorage.getItem('loyalty_user_phone') || '';
       setUser({
         phone: savedPhone,
-        name: profile.name || 'عميل كافيه',
+        name: profile.name || 'عميل مميز',
         joinDate: '٢٠٢٦/٠٥/٢٨',
         loyaltyTier: profile.tier || 'bronze',
         totalPoints: Number(profile.points_balance || 0),
@@ -292,8 +304,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const sendOtp = async (phone: string): Promise<boolean> => {
     setLoadingAuth(true);
     setAuthError(null);
+    const qrBranchId = localStorage.getItem('loyalty_branch_id') || undefined;
+    const qrStation = localStorage.getItem('loyalty_table_number') || undefined;
     try {
-      await api.sendOtp(currentTenant.id, phone);
+      await api.sendOtp(currentTenant.id, phone, { branchId: qrBranchId, station: qrStation });
       setOtpSentPhone(phone);
       return true;
     } catch (e: any) {
@@ -312,14 +326,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const verifyOtp = async (code: string): Promise<boolean> => {
     setLoadingAuth(true);
     setAuthError(null);
+    const qrBranchId = localStorage.getItem('loyalty_branch_id') || undefined;
+    const qrStation = localStorage.getItem('loyalty_table_number') || undefined;
     try {
       if (!otpSentPhone) return false;
-      const data = await api.verifyOtp(currentTenant.id, otpSentPhone, code);
+      const data = await api.verifyOtp(currentTenant.id, otpSentPhone, code, { branchId: qrBranchId, station: qrStation });
       localStorage.setItem('loyalty_user_phone', data.customer.phone || otpSentPhone);
 
       setUser({
         phone: data.customer.phone,
-        name: data.customer.name || 'عميل كافيه',
+        name: data.customer.name || 'عميل مميز',
         joinDate: '٢٠٢٦/٠٥/٢٨',
         loyaltyTier: data.customer.tier || 'bronze',
         totalPoints: 0,
@@ -496,9 +512,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Load rewards from API when authenticated
   useEffect(() => {
+    const mapReward = (r: any): Reward => ({
+      ...r,
+      rewardType: r.rewardType || r.reward_type,
+      discountValue: r.discountValue !== undefined ? r.discountValue : r.discount_value,
+      minOrderEgp: r.minOrderEgp !== undefined ? r.minOrderEgp : r.min_order_egp,
+      maxRedemptions: r.maxRedemptions !== undefined ? r.maxRedemptions : r.max_redemptions,
+    });
+
     if (isAuthenticated && currentTenant) {
       api.getRewards(currentTenant.id)
-        .then(setRewards)
+        .then((list) => setRewards(Array.isArray(list) ? list.map(mapReward) : []))
         .catch(() => {
           setRewards(import.meta.env.DEV ? (mockRewards[currentTenant.id] || []) : []);
         });

@@ -27,7 +27,7 @@ const tierStyles: Record<string, string> = {
 };
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
-  const { user, logout, updateProfileName, language, setLanguage, t } = useApp();
+  const { user, currentTenant, logout, updateProfileName, language, setLanguage, t } = useApp();
   const [name, setName] = useState(user?.name || '');
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -79,11 +79,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onShowToast }) => {
 
       {/* Visual profile cover branding banner */}
       <div className="relative h-28 rounded-[var(--radius-lg)] overflow-hidden select-none shadow-sm flex items-end">
-        <div 
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: 'url("https://picsum.photos/seed/cafe-cover/500/200")' }}
-        />
-        <div className="absolute inset-0 bg-slate-950/60 z-10" />
+        {currentTenant.coverImage ? (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${currentTenant.coverImage})` }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark, var(--color-primary)) 100%)',
+            }}
+          />
+        )}
+        <div className="absolute inset-0 bg-slate-950/45 z-10" />
 
         {/* User initials inside ring inside banner bottom */}
         <div className="relative z-20 flex px-4 pb-3 items-center gap-3 w-full justify-start text-white">

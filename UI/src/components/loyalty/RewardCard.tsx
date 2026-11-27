@@ -34,10 +34,19 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover outline-1 -outline-offset-1 outline-black/10 group-hover:scale-[1.02] transition-transform duration-300"
         />
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
           <span className="bg-white/95 backdrop-blur-sm text-[var(--color-text)] text-[11px] font-bold px-2.5 py-1 rounded-full shadow-xs border border-black/5 leading-none">
             {reward.category}
           </span>
+          {reward.rewardType === 'discount_fixed' && reward.discountValue ? (
+            <span className="bg-[var(--color-primary)] text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow-xs leading-none">
+              خصم {reward.discountValue} ج.م
+            </span>
+          ) : reward.rewardType === 'discount_percent' && reward.discountValue ? (
+            <span className="bg-[var(--color-primary)] text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow-xs leading-none">
+              خصم {reward.discountValue}%
+            </span>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -54,6 +63,11 @@ export const RewardCard: React.FC<RewardCardProps> = ({ reward, onRedeemClick })
           <p className="text-[12.5px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed font-medium">
             {reward.description}
           </p>
+          {reward.minOrderEgp ? (
+            <span className="text-[11px] font-bold text-[var(--color-primary)] mt-0.5">
+              {t('reward.minOrder', { amount: reward.minOrderEgp })}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-[var(--color-border)]">

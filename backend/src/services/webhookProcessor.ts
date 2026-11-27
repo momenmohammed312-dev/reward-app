@@ -5,14 +5,18 @@ import db from '../config/db.js';
 import { getBullMQConnection, isRedisReady } from '../config/redis.js';
 import { logger } from './logger.js';
 import { getAdapter } from './pos/adapterRegistry.js';
+import { CustomApiAdapter } from './pos/customApiAdapter.js';
 
 // Define the Webhook Job interface
 interface WebhookJobPayload {
   tenantId: string;
+  provider?: string;
   eventType: string; // e.g., 'order.paid', 'order.closed'
   payload: any;
   logId: string;
 }
+
+const VALID_POS_ENUMS = new Set(['foodics', 'square', 'toast', 'custom_api', 'manual']);
 
 let webhookQueueInstance: Queue<WebhookJobPayload, any, string> | null = null;
 let webhookWorkerInstance: Worker<WebhookJobPayload> | null = null;
@@ -69,13 +73,25 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
   webhookWorkerInstance = new Worker<WebhookJobPayload>(
     'foodics-webhooks',
     async (job) => {
-      const { tenantId, eventType, payload, logId } = job.data;
-      logger.info(`Processing webhook job`, { jobId: job.id, eventType, tenantId });
+      const { tenantId, provider, eventType, payload, logId } = job.data;
+      const effectiveProvider = (provider || payload?.pos_type || 'foodics').toLowerCase();
+      logger.info(`Processing webhook job`, { jobId: job.id, eventType, tenantId, provider: effectiveProvider });
 
       try {
         if (eventType === 'order.paid' || eventType === 'order.closed') {
-          const adapter = getAdapter(payload.pos_type);
-        const order = adapter.parseOrder(payload);
+          const adapter = getAdapter(effectiveProvider);
+          let excludedKeywords: string[] | undefined;
+          if (adapter instanceof CustomApiAdapter) {
+            const kwRes = await db.query(
+              'SELECT excluded_item_keywords FROM tenants WHERE id = $1::uuid',
+              [tenantId]
+            );
+            excludedKeywords = kwRes.rows[0]?.excluded_item_keywords;
+          }
+          const order =
+            adapter instanceof CustomApiAdapter
+              ? adapter.parseOrder(payload, excludedKeywords)
+              : adapter.parseOrder(payload);
 
         if (!order.customerPhone) {
           throw new Error('Customer phone number is missing in POS order payload');
@@ -111,12 +127,13 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
 
         let branchId: string;
         if (branchRes.rows.length === 0) {
+          const fallbackPosType = VALID_POS_ENUMS.has(effectiveProvider) ? effectiveProvider : 'custom_api';
           // Create default fallback branch if not registered
           const newBranchRes = await db.query(
             `INSERT INTO branches (tenant_id, name, pos_type, pos_location_id, is_active)
-             VALUES ($1::uuid, $2, 'foodics', $3, true)
+             VALUES ($1::uuid, $2, $3::pos_type, $4, true)
              RETURNING id`,
-            [tenantId, order.branchName || `Branch ${branchLocationId}`, branchLocationId]
+            [tenantId, order.branchName || `Branch ${branchLocationId || 'Main'}`, fallbackPosType, branchLocationId || null]
           );
           branchId = newBranchRes.rows[0].id;
         } else {
@@ -133,7 +150,7 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
           `Points earned from POS Order #${invoiceId}`
         );
       } else if (eventType === 'order.refunded') {
-        const adapter = getAdapter(payload.pos_type);
+        const adapter = getAdapter(effectiveProvider);
         const order = adapter.parseOrder(payload);
 
         if (!order.invoiceId) {

@@ -3,9 +3,21 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 import { OTPService } from '../services/otp.js';
+import { LedgerService } from '../services/ledger.js';
 import { logger } from '../services/logger.js';
 import { resolveTenantId } from '../helpers/resolveTenant.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function resolveValidBranchId(tenantId: string, rawBranchId?: string | null): Promise<string | null> {
+  if (!rawBranchId || !UUID_REGEX.test(rawBranchId)) return null;
+  const res = await db.query(
+    'SELECT id FROM branches WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL',
+    [rawBranchId, tenantId]
+  );
+  return res.rows[0]?.id || null;
+}
 
 const JWT_SECRET: string = process.env.JWT_SECRET || (() => { throw new Error('FATAL: JWT_SECRET environment variable is not set'); })();
 const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || (() => { throw new Error('FATAL: JWT_REFRESH_SECRET environment variable is not set'); })();
@@ -161,7 +173,7 @@ export class AuthController {
    */
   static async requestCustomerOTP(req: Request, res: Response) {
     try {
-      const { tenant_id, phone } = req.body;
+      const { tenant_id, phone, branch_id, station } = req.body;
 
       if (!tenant_id || !phone) {
         return res.status(400).json({ error: 'Missing fields', message: 'tenant_id and phone are required' });
@@ -173,23 +185,37 @@ export class AuthController {
         return res.status(404).json({ error: 'Not Found', message: 'Tenant not found' });
       }
 
+      const validBranchId = await resolveValidBranchId(resolvedTenantId, branch_id);
+      const cleanStation = station ? String(station).trim().slice(0, 80) : null;
+
       // Find or create customer (resurrects a soft-deleted customer if one
       // exists with the same phone, since the phone is unique per tenant)
       let customerResult = await db.query(
-        'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+        'SELECT id, signup_branch_id, signup_station FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
         [resolvedTenantId, phone]
       );
 
       if (customerResult.rows.length === 0) {
         // Create new customer (or resurrect a soft-deleted one)
         customerResult = await db.query(
-          `INSERT INTO customers (tenant_id, phone)
-           VALUES ($1::uuid, $2)
+          `INSERT INTO customers (tenant_id, phone, signup_branch_id, signup_station)
+           VALUES ($1::uuid, $2, $3::uuid, $4)
            ON CONFLICT (tenant_id, phone) DO UPDATE SET
              deleted_at = NULL,
+             signup_branch_id = COALESCE(customers.signup_branch_id, EXCLUDED.signup_branch_id),
+             signup_station = COALESCE(customers.signup_station, EXCLUDED.signup_station),
              updated_at = NOW()
            RETURNING id`,
-          [resolvedTenantId, phone]
+          [resolvedTenantId, phone, validBranchId, cleanStation]
+        );
+      } else if ((validBranchId && !customerResult.rows[0].signup_branch_id) || (cleanStation && !customerResult.rows[0].signup_station)) {
+        await db.query(
+          `UPDATE customers
+           SET signup_branch_id = COALESCE(signup_branch_id, $3::uuid),
+               signup_station = COALESCE(signup_station, $4),
+               updated_at = NOW()
+           WHERE id = $1::uuid AND tenant_id = $2::uuid`,
+          [customerResult.rows[0].id, resolvedTenantId, validBranchId, cleanStation]
         );
       }
 
@@ -208,7 +234,7 @@ export class AuthController {
    */
   static async verifyCustomerOTP(req: Request, res: Response) {
     try {
-      const { tenant_id, phone, code } = req.body;
+      const { tenant_id, phone, code, branch_id, station } = req.body;
 
       if (!tenant_id || !phone || !code) {
         return res.status(400).json({ error: 'Missing fields', message: 'tenant_id, phone, and code are required' });
@@ -235,13 +261,28 @@ export class AuthController {
         return res.status(400).json({ error: 'Invalid OTP', message: 'The OTP code is invalid, expired, or has exceeded attempts' });
       }
 
-      // Update customer verification status & last visit
+      const preCheck = await db.query(
+        'SELECT id, is_verified FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+        [resolvedTenantId, phone]
+      );
+      if (preCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Not Found', message: 'Customer not found' });
+      }
+      const wasVerified = Boolean(preCheck.rows[0].is_verified);
+
+      const validBranchId = await resolveValidBranchId(resolvedTenantId, branch_id);
+      const cleanStation = station ? String(station).trim().slice(0, 80) : null;
+
+      // Update customer verification status, QR attribution & last visit
       const customerResult = await db.query(
         `UPDATE customers
-         SET is_verified = true, last_visit = NOW()
+         SET is_verified = true,
+             last_visit = NOW(),
+             signup_branch_id = COALESCE(signup_branch_id, $3::uuid),
+             signup_station = COALESCE(signup_station, $4)
          WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL
          RETURNING id, name, phone, tier`,
-        [resolvedTenantId, phone]
+        [resolvedTenantId, phone, validBranchId, cleanStation]
       );
 
       if (customerResult.rows.length === 0) {
@@ -249,6 +290,36 @@ export class AuthController {
       }
 
       const customer = customerResult.rows[0];
+
+      // Award one-time welcome bonus points when a customer completes first OTP verification
+      if (!wasVerified) {
+        const tenantBonusRes = await db.query(
+          'SELECT welcome_bonus_points FROM tenants WHERE id = $1::uuid',
+          [resolvedTenantId]
+        );
+        const welcomeBonus = Number(tenantBonusRes.rows[0]?.welcome_bonus_points || 0);
+        if (welcomeBonus > 0) {
+          const client = await db.pool.connect();
+          try {
+            await client.query('BEGIN');
+            await LedgerService.insert(client, {
+              tenantId: resolvedTenantId,
+              customerId: customer.id,
+              type: 'bonus',
+              points: welcomeBonus,
+              referenceType: 'welcome_bonus',
+              note: 'مكافأة الترحيب لأول تسجيل',
+              idempotencyKey: `welcome:${resolvedTenantId}:${customer.id}`,
+            });
+            await client.query('COMMIT');
+          } catch (bonusErr) {
+            await client.query('ROLLBACK');
+            logger.error('Welcome bonus error', { error: (bonusErr as Error).message });
+          } finally {
+            client.release();
+          }
+        }
+      }
 
       // Generate short-lived access token (1h)
       const token = jwt.sign(

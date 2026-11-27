@@ -9,7 +9,7 @@ export class SuperAdminController {
   static async getAllTenants(req: AuthenticatedRequest, res: Response) {
     try {
       const result = await db.query(`
-        SELECT id, name, slug, plan, is_active, points_per_egp, created_at,
+        SELECT id, name, slug, plan, business_type, is_active, points_per_egp, created_at,
                COALESCE((SELECT COUNT(*) FROM customers WHERE tenant_id = t.id), 0) AS customer_count,
                COALESCE((SELECT COUNT(*) FROM branches WHERE tenant_id = t.id), 0) AS branch_count
         FROM tenants t

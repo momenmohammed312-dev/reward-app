@@ -21,24 +21,31 @@ interface BranchQrModalProps {
   branch: QrBranchInfo | null;
   tenantSlug: string;
   tenantName: string;
+  businessType?: 'cafe' | 'supermarket' | 'retail';
   onClose: () => void;
 }
 
-const TABLE_PRESETS = ['', '1', '2', '3', '4', '5'];
+const CAFE_TABLE_PRESETS = ['', '1', '2', '3', '4', '5'];
+const RETAIL_STATION_PRESETS = ['', 'كاشير 1', 'كاشير 2', 'كاشير 3', 'المدخل', 'الإيصال'];
 
 export const BranchQrModal: React.FC<BranchQrModalProps> = ({
   branch,
   tenantSlug,
   tenantName,
+  businessType = 'cafe',
   onClose,
 }) => {
   const [tableNumber, setTableNumber] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
+  const isRetail = businessType === 'supermarket' || businessType === 'retail';
+  const presets = isRetail ? RETAIL_STATION_PRESETS : CAFE_TABLE_PRESETS;
+  const stationParamKey = isRetail ? 'station' : 'table';
+
   const trimmedTable = tableNumber.trim();
   const qrUrl = branch
-    ? `${window.location.origin}/?tenant=${encodeURIComponent(tenantSlug)}&branch=${encodeURIComponent(branch.id)}${trimmedTable ? `&table=${encodeURIComponent(trimmedTable)}` : ''}`
+    ? `${window.location.origin}/?tenant=${encodeURIComponent(tenantSlug)}&branch=${encodeURIComponent(branch.id)}${trimmedTable ? `&${stationParamKey}=${encodeURIComponent(trimmedTable)}` : ''}`
     : '';
 
   useEffect(() => {
@@ -109,7 +116,11 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
     if (!qrDataUrl || !branch || !qrDataUrl.startsWith('data:image/png;base64,')) return;
     const printWin = window.open('', '_blank', 'width=480,height=640');
     if (!printWin) return;
-    const tableLabel = trimmedTable ? `طاولة رقم #${trimmedTable}` : 'مسح سريع للفرع';
+    const tableLabel = trimmedTable
+      ? isRetail
+        ? trimmedTable
+        : `طاولة رقم #${trimmedTable}`
+      : 'مسح سريع للفرع';
     const doc = printWin.document;
     doc.open();
     doc.write(`<!DOCTYPE html>
@@ -187,7 +198,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                 </div>
                 <div>
                   <h2 id="qr-modal-title" className="text-sm font-black text-[var(--color-admin-text)]">
-                    استوديو QR للطاولات والفروع
+                    {isRetail ? 'استوديو QR للكاشير والمدخل والفروع' : 'استوديو QR للطاولات والفروع'}
                   </h2>
                   <p className="text-[11px] text-[var(--color-admin-text-muted)] flex items-center gap-1 mt-0.5">
                     <Storefront size={12} weight="duotone" />
@@ -208,13 +219,13 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
 
             {/* Body */}
             <div className="p-6 max-h-[80vh] overflow-y-auto overscroll-contain flex flex-col gap-5">
-              {/* Table Number Controls */}
+              {/* Table / Station Controls */}
               <div className="flex flex-col gap-2.5">
                 <label htmlFor="qr-table-input" className="text-xs font-bold text-[var(--color-admin-text-muted)]">
-                  تخصيص رقم الطاولة (اختياري)
+                  {isRetail ? 'تخصيص نقطة المسح / الكاشير (اختياري)' : 'تخصيص رقم الطاولة (اختياري)'}
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {TABLE_PRESETS.map((preset) => {
+                  {presets.map((preset) => {
                     const active = trimmedTable === preset;
                     return (
                       <button
@@ -227,7 +238,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                             : 'bg-[var(--color-admin-bg)] text-[var(--color-admin-text-muted)] border-[var(--color-admin-border)] hover:text-[var(--color-admin-text)]'
                         }`}
                       >
-                        {preset ? `طاولة ${preset}` : 'فرع عام'}
+                        {preset ? (isRetail ? preset : `طاولة ${preset}`) : 'فرع عام'}
                       </button>
                     );
                   })}
@@ -237,7 +248,11 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                   type="text"
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}
-                  placeholder="أو اكتب رقم/اسم الطاولة (مثال: A4 أو 12)..."
+                  placeholder={
+                    isRetail
+                      ? 'أو اكتب اسم نقطة المسح (مثال: كاشير 4 أو ممر العروض)...'
+                      : 'أو اكتب رقم/اسم الطاولة (مثال: A4 أو 12)...'
+                  }
                   className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] focus:border-[var(--color-admin-primary)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--color-admin-text)] outline-none transition-colors"
                 />
               </div>
@@ -247,7 +262,7 @@ export const BranchQrModal: React.FC<BranchQrModalProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-[var(--color-admin-text)]">{tenantName}</span>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-admin-primary-soft)] text-[var(--color-admin-primary)] border border-[var(--color-admin-primary)]/30">
-                    {trimmedTable ? `طاولة #${trimmedTable}` : branch.name}
+                    {trimmedTable ? (isRetail ? trimmedTable : `طاولة #${trimmedTable}`) : branch.name}
                   </span>
                 </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useApp } from '../store/AppContext';
+import { api } from '../services/api';
 import { Coffee, Drop, Hamburger, Cake, Star, CurrencyCircleDollar, Info, ShoppingBag } from '@phosphor-icons/react';
 import { BottomSheet } from '../components/ui/BottomSheet';
 
@@ -9,6 +10,8 @@ interface MenuItem {
   name: string;
   description: string;
   price: number;
+  originalPrice?: number | null;
+  endsAt?: string | null;
   category: string;
   image?: string;
   popular?: boolean;
@@ -25,8 +28,6 @@ const menuItems: MenuItem[] = [
   { id: 'm8', name: 'سبانش لاتيه', description: 'حليب مكثف مع اسبريسو وقليل من القرفة', price: 48, category: 'مشروبات ساخنة', image: 'https://picsum.photos/seed/spanish-latte/400/300' },
 ];
 
-const categories = Array.from(new Set(menuItems.map(i => i.category)));
-
 const containerVariants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
@@ -37,28 +38,77 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100, damping: 20 } },
 };
 
+const supermarketOfferItems: MenuItem[] = [
+  { id: 's1', name: 'باقة الألبان الأسبوعية', description: 'حليب طازج + زبادي + جبنة بيضاء بخصم فوري ونقاط مضاعفة', price: 185, category: 'ألبان وطازج', image: 'https://picsum.photos/seed/dairy-pack/400/300', popular: true },
+  { id: 's2', name: 'سلة أساسيات المطبخ', description: 'أرز 5 كجم + مكرونة + زيت طعام 1 لتر + صلصة طماطم', price: 420, category: 'بقالة', image: 'https://picsum.photos/seed/grocery-basket/400/300', popular: true },
+  { id: 's3', name: 'عرض المنظفات العائلي', description: 'مسحوق غسيل أوتوماتيك + سائل أطباق + مطهر أرضيات', price: 310, category: 'منظفات', image: 'https://picsum.photos/seed/detergents/400/300' },
+  { id: 's4', name: 'مخبوزات طازجة يومياً', description: 'توست حبوب كاملة + عيش فينو + كرواسون عائلي', price: 95, category: 'مخبوزات', image: 'https://picsum.photos/seed/fresh-bakery/400/300', popular: true },
+];
+
 const categoryIcons: Record<string, React.ReactNode> = {
   'مشروبات ساخنة': <Coffee size={15} weight="regular" />,
   'مشروبات باردة': <Drop size={15} weight="regular" />,
   'مخبوزات': <Hamburger size={15} weight="regular" />,
   'حلويات': <Cake size={15} weight="regular" />,
   'وجبات خفيفة': <Hamburger size={15} weight="regular" />,
+  'ألبان وطازج': <ShoppingBag size={15} weight="regular" />,
+  'بقالة': <ShoppingBag size={15} weight="regular" />,
+  'منظفات': <Drop size={15} weight="regular" />,
 };
 
 export const MenuPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [liveOffers, setLiveOffers] = useState<MenuItem[] | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-  const { points, language, t } = useApp();
+  const { points, currentTenant, language, t } = useApp();
+
+  const isRetailStore =
+    currentTenant.businessType === 'supermarket' || currentTenant.businessType === 'retail';
+  const fallbackItems = isRetailStore ? supermarketOfferItems : menuItems;
+  const activeItems = liveOffers && liveOffers.length > 0 ? liveOffers : fallbackItems;
+  const activeCategories = Array.from(new Set(activeItems.map((i) => i.category)));
+  const pointsRate = currentTenant.pointsPerEgp ?? (isRetailStore ? 0.2 : 1);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
+    setActiveCategory('all');
+    let cancelled = false;
+    setLoading(true);
+    api.getPublicOffers(currentTenant.id)
+      .then((rows) => {
+        if (cancelled) return;
+        if (Array.isArray(rows) && rows.length > 0) {
+          setLiveOffers(
+            rows.map((r: any) => ({
+              id: r.id,
+              name: r.title,
+              description: r.description || '',
+              price: Number(r.offer_price),
+              originalPrice: r.original_price ? Number(r.original_price) : null,
+              endsAt: r.ends_at || null,
+              category: r.category || 'بقالة',
+              image: r.image_url || 'https://picsum.photos/seed/grocery-basket/400/300',
+              popular: Boolean(r.is_popular),
+            }))
+          );
+        } else {
+          setLiveOffers(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLiveOffers(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTenant.id]);
 
   const filtered = activeCategory === 'all'
-    ? menuItems
-    : menuItems.filter(i => i.category === activeCategory);
+    ? activeItems
+    : activeItems.filter(i => i.category === activeCategory);
 
   if (loading) {
     return (
@@ -86,10 +136,10 @@ export const MenuPage: React.FC = () => {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col gap-1 select-none">
         <h1 className="text-[24px] font-extrabold text-[var(--color-text)] tracking-tight leading-tight">
-          {t('menu.title')}
+          {isRetailStore ? t('offers.title') : t('menu.title')}
         </h1>
         <p className="text-[13px] font-medium text-[var(--color-text-muted)]">
-          {t('menu.subtitle')}
+          {isRetailStore ? t('offers.subtitle') : t('menu.subtitle')}
         </p>
       </motion.div>
 
@@ -113,7 +163,7 @@ export const MenuPage: React.FC = () => {
         >
           {t('menu.all')}
         </button>
-        {categories.map(cat => (
+        {activeCategories.map(cat => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
@@ -162,9 +212,16 @@ export const MenuPage: React.FC = () => {
                       <span className="text-[11px] font-semibold text-[var(--color-text-muted)]">
                         {item.category}
                       </span>
-                      <span className="text-[var(--text-md)] font-black text-[var(--color-primary)] number">
-                        {item.price} {language === 'ar' ? 'ج.م' : 'EGP'}
-                      </span>
+                      <div className="flex items-baseline gap-1.5">
+                        {item.originalPrice && item.originalPrice > item.price && (
+                          <span className="text-[11px] line-through text-[var(--color-text-muted)] number">
+                            {item.originalPrice}
+                          </span>
+                        )}
+                        <span className="text-[var(--text-md)] font-black text-[var(--color-primary)] number">
+                          {item.price} {language === 'ar' ? 'ج.م' : 'EGP'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -217,7 +274,7 @@ export const MenuPage: React.FC = () => {
               <ShoppingBag size={20} weight="regular" className="text-[var(--color-primary)] shrink-0" />
               <div>
                 <p className="text-[11px] font-bold text-[var(--color-text)]">
-                  {t('menu.youEarn', { points: Math.round(selectedItem.price * 1) })}
+                  {t('menu.youEarn', { points: Math.floor(selectedItem.price * pointsRate) })}
                 </p>
                 <p className="text-[10px] text-[var(--color-text-muted)]">{t('menu.whenBuy')}</p>
               </div>

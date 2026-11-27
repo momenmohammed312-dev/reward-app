@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../store/AppContext';
 import { Button } from '../ui/Button';
-import { QrCode, Gift, List, X } from '@phosphor-icons/react';
+import { QrCode, Gift, List, Receipt, X } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import QRCodeLib from 'qrcode';
+import { Barcode128 } from '../ui/Barcode128';
 
 const QRCanvas: React.FC<{ value: string; size?: number; fgColor?: string }> = ({
   value,
@@ -80,12 +81,16 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
 
             <div className="bg-white border-2 border-[var(--color-primary)] p-[var(--space-4)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] flex flex-col items-center gap-[var(--space-3)] w-full">
               <div className="p-1 bg-white">
-                <QRCanvas value={phoneValue} size={160} fgColor="var(--color-primary)" />
+                <QRCanvas value={phoneValue} size={150} fgColor="var(--color-primary)" />
+              </div>
+
+              <div className="w-full border-t border-stone-200 pt-2 flex flex-col items-center">
+                <Barcode128 value={phoneValue} height={42} showLabel={false} />
               </div>
 
               <div className="flex flex-col gap-0.5 select-all">
-                <span className="code-display text-[var(--text-md)] font-bold tracking-[0.2em] text-stone-800">
-                  {phoneValue ? phoneValue.slice(-7) : '0129482'}
+                <span className="code-display text-[var(--text-md)] font-bold tracking-[0.18em] text-stone-800">
+                  {phoneValue}
                 </span>
                 <span className="text-[11px] text-stone-400 font-medium">{t('home.validFor')}</span>
               </div>
@@ -262,14 +267,22 @@ export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode })
           whileHover={{ y: -3 }}
           whileTap={{ scale: 0.96 }}
           transition={{ duration: 0.2 }}
-          onClick={() => setActiveTab('menu')}
+          onClick={() => setActiveTab(currentTenant.showMenu === false ? 'history' : 'menu')}
           className="h-[92px] rounded-[20px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] hover:border-[var(--color-primary)] flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
         >
           <span className="w-11 h-11 rounded-[14px] bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center">
-            <List size={22} weight="bold" />
+            {currentTenant.showMenu === false ? (
+              <Receipt size={22} weight="bold" />
+            ) : (
+              <List size={22} weight="bold" />
+            )}
           </span>
           <span className="text-[14px] font-bold text-[var(--color-text)]">
-            {t('home.tileMenu')}
+            {currentTenant.showMenu === false
+              ? t('home.tileHistory')
+              : currentTenant.businessType === 'supermarket'
+              ? t('home.tileOffers')
+              : t('home.tileMenu')}
           </span>
         </motion.button>
       </div>

@@ -1,5 +1,7 @@
 import db from '../config/db.js';
-import { calculatePointsEarned } from '../helpers/points.js';
+import { normalizePhone } from '../helpers/phone.js';
+import { calculatePartialRefundPoints, calculatePointsEarned } from '../helpers/points.js';
+import { computeActiveCampaignMultiplier } from '../helpers/campaigns.js';
 import { LedgerService } from './ledger.js';
 
 export class LoyaltyService {
@@ -72,8 +74,17 @@ export class LoyaltyService {
         multiplier = Number(tbRes.rows[0].multiplier);
       }
 
+      const campaignsRes = await client.query(
+        `SELECT id, name, multiplier, days_of_week, start_hour, end_hour, starts_at, ends_at, is_active
+         FROM campaigns
+         WHERE tenant_id = $1::uuid AND is_active = true AND deleted_at IS NULL`,
+        [tenantId]
+      );
+      const campaignMatch = computeActiveCampaignMultiplier(campaignsRes.rows || []);
+      const effectiveMultiplier = multiplier * campaignMatch.multiplier;
+
       // Calculate final points
-      const pointsEarned = calculatePointsEarned(amount, Number(points_per_egp), multiplier, Number(min_purchase_egp));
+      const pointsEarned = calculatePointsEarned(amount, Number(points_per_egp), effectiveMultiplier, Number(min_purchase_egp));
 
       // 2. Record transaction (with ON CONFLICT DO NOTHING to ensure idempotency)
       const txRes = await client.query(
@@ -87,10 +98,16 @@ export class LoyaltyService {
       // If transaction already existed, idempotently return existing summary
       if (txRes.rows.length === 0) {
         await client.query('ROLLBACK');
-        return await this.getCustomerPointsSummary(customerId, tenantId);
+        const summary = await this.getCustomerPointsSummary(customerId, tenantId);
+        return { ...summary, points_earned: 0, duplicate: true };
       }
 
       const transactionId = txRes.rows[0].id;
+
+      const campaignTag =
+        campaignMatch.matchedCampaignName && campaignMatch.multiplier > 1
+          ? ` [${campaignMatch.matchedCampaignName} ×${campaignMatch.multiplier}]`
+          : '';
 
       // 3. Record positive points in Wallet Ledger (idempotent per invoice)
       if (pointsEarned > 0) {
@@ -101,7 +118,7 @@ export class LoyaltyService {
           points: pointsEarned,
           referenceId: transactionId,
           referenceType: 'transaction',
-          note: notes || `Earned from invoice ${invoiceId}`,
+          note: `${notes || `Earned from invoice ${invoiceId}`}${campaignTag}`,
           idempotencyKey: `earn:${tenantId}:${invoiceId}`,
         });
       }
@@ -113,13 +130,117 @@ export class LoyaltyService {
       );
 
       await client.query('COMMIT');
-      return await this.getCustomerPointsSummary(customerId, tenantId);
+      const summary = await this.getCustomerPointsSummary(customerId, tenantId);
+      return { ...summary, points_earned: pointsEarned, duplicate: false };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Cashier checkout flow for supermarkets & retail without live POS webhooks:
+   * resolves or auto-registers the customer by phone, resolves branch, generates
+   * or enforces an invoice id, and delegates point calculation to earnPoints().
+   */
+  static async earnFromCashierInvoice(params: {
+    tenantId: string;
+    customerPhone: string;
+    amountEgp: number;
+    invoiceId?: string;
+    branchId?: string;
+    note?: string;
+    actorRole?: string;
+  }) {
+    const normalizedPhone = normalizePhone(params.customerPhone);
+    if (!normalizedPhone) {
+      throw new Error('Invalid Egyptian phone number');
+    }
+
+    if (params.actorRole === 'cashier') {
+      const capRes = await db.query(
+        'SELECT cashier_max_invoice_egp FROM tenants WHERE id = $1::uuid',
+        [params.tenantId]
+      );
+      const maxCap = capRes.rows[0]?.cashier_max_invoice_egp;
+      if (maxCap !== null && maxCap !== undefined && Number(maxCap) > 0 && params.amountEgp > Number(maxCap)) {
+        throw new Error(`Invoice amount exceeds cashier limit (${Number(maxCap)} EGP); manager approval required`);
+      }
+    }
+
+    let resolvedBranchId = params.branchId;
+    if (resolvedBranchId) {
+      const branchCheck = await db.query(
+        'SELECT id FROM branches WHERE id = $1::uuid AND tenant_id = $2::uuid AND deleted_at IS NULL',
+        [resolvedBranchId, params.tenantId]
+      );
+      if (branchCheck.rows.length === 0) {
+        throw new Error('Branch not found');
+      }
+    } else {
+      const defaultBranchRes = await db.query(
+        `SELECT id FROM branches
+         WHERE tenant_id = $1::uuid AND is_active = true AND deleted_at IS NULL
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [params.tenantId]
+      );
+      if (defaultBranchRes.rows.length === 0) {
+        throw new Error('No active branch configured for this store');
+      }
+      resolvedBranchId = defaultBranchRes.rows[0].id;
+    }
+
+    const existingCust = await db.query(
+      'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+      [params.tenantId, normalizedPhone]
+    );
+
+    let customerId: string;
+    let customerCreated = false;
+
+    if (existingCust.rows.length > 0) {
+      customerId = existingCust.rows[0].id;
+    } else {
+      // Auto-register walk-in shopper as POS-identified; OTP verification is required before redemption.
+      const inserted = await db.query(
+        `INSERT INTO customers (tenant_id, phone, name, is_verified, pos_identified_at)
+         VALUES ($1::uuid, $2, $3, false, NOW())
+         ON CONFLICT (tenant_id, phone) DO UPDATE SET
+           deleted_at = NULL,
+           pos_identified_at = NOW(),
+           updated_at = NOW()
+         RETURNING id`,
+        [params.tenantId, normalizedPhone, 'عميل جديد']
+      );
+      customerId = inserted.rows[0].id;
+      customerCreated = true;
+    }
+
+    const finalInvoiceId =
+      params.invoiceId?.trim() ||
+      `POS-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const summary = await LoyaltyService.earnPoints(
+      params.tenantId,
+      customerId,
+      resolvedBranchId!,
+      finalInvoiceId,
+      params.amountEgp,
+      params.note || `فاتورة كاشير #${finalInvoiceId} (${params.amountEgp} ج.م)`
+    );
+
+    return {
+      customerId,
+      customerCreated,
+      invoiceId: finalInvoiceId,
+      amountEgp: params.amountEgp,
+      pointsEarned: Number((summary as any).points_earned || 0),
+      duplicate: Boolean((summary as any).duplicate),
+      summary,
+    };
   }
 
   /**
@@ -189,8 +310,13 @@ export class LoyaltyService {
         }
       }
 
-      // 3. Generate unique redemption code (calling Postgres function)
-      const codeRes = await client.query('SELECT generate_redemption_code() as code');
+      // 3. Generate unique redemption code using tenant's configured prefix (fallback 'MO2')
+      const prefixRes = await client.query(
+        'SELECT code_prefix FROM tenants WHERE id = $1::uuid',
+        [tenantId]
+      );
+      const codePrefix = prefixRes.rows?.[0]?.code_prefix || 'MO2';
+      const codeRes = await client.query('SELECT generate_redemption_code($1) as code', [codePrefix]);
       const redemptionCode = codeRes.rows[0].code;
 
       const validityHours = Number(reward.code_validity_hours ?? 24);
@@ -239,13 +365,57 @@ export class LoyaltyService {
   }
 
   /**
-   * Claws back points for a refunded transaction using 'reversal' debit type.
+   * Claws back points for a full or partial refunded transaction using 'reversal' debit type.
    */
-  static async refundPoints(tenantId: string, invoiceId: string, notes?: string) {
+  static async refundPoints(tenantId: string, invoiceId: string, notes?: string, partialAmount?: number) {
     const client = await db.pool.connect();
 
     try {
       await client.query('BEGIN');
+
+      if (partialAmount !== undefined) {
+        const txRes = await client.query(
+          'SELECT id, customer_id, amount, points_earned FROM transactions WHERE tenant_id = $1 AND invoice_id = $2',
+          [tenantId, invoiceId]
+        );
+
+        if (txRes.rows.length === 0) {
+          throw new Error('Original transaction for refund not found');
+        }
+
+        const { id: transactionId, customer_id: customerId, amount, points_earned: pointsEarned } = txRes.rows[0];
+        const totalEarned = Number(pointsEarned);
+
+        const reversedRes = await client.query(
+          `SELECT COALESCE(SUM(points), 0)::int AS reversed_points
+           FROM wallet_ledger
+           WHERE tenant_id = $1 AND customer_id = $2 AND reference_id = $3 AND type = 'reversal'`,
+          [tenantId, customerId, transactionId]
+        );
+        const alreadyReversed = Number(reversedRes.rows[0]?.reversed_points || 0);
+        const pointsToReverse = calculatePartialRefundPoints(Number(amount), totalEarned, partialAmount);
+
+        if (pointsToReverse <= 0) {
+          throw new Error('Partial refund amount results in 0 points');
+        }
+        if (alreadyReversed + pointsToReverse > totalEarned) {
+          throw new Error('Partial refund exceeds remaining refundable points for this invoice');
+        }
+
+        await LedgerService.insert(client, {
+          tenantId,
+          customerId,
+          type: 'reversal',
+          points: pointsToReverse,
+          referenceId: transactionId,
+          referenceType: 'transaction',
+          note: notes || `Partial refund (${partialAmount} EGP) for invoice ${invoiceId}`,
+          idempotencyKey: `reversal:${tenantId}:${invoiceId}:partial:${partialAmount}:${alreadyReversed}`,
+        });
+
+        await client.query('COMMIT');
+        return await this.getCustomerPointsSummary(customerId, tenantId);
+      }
 
       const txRes = await client.query(
         'SELECT id, customer_id, points_earned FROM transactions WHERE tenant_id = $1 AND invoice_id = $2',
@@ -308,7 +478,7 @@ export class LoyaltyService {
          FROM customers c
          LEFT JOIN customer_balances cb ON c.id = cb.customer_id
          WHERE c.id = $1 AND c.tenant_id = $2 AND c.deleted_at IS NULL
-         FOR UPDATE`,
+         FOR UPDATE OF c`,
         [customerId, tenantId]
       );
       if (balanceRes.rows.length === 0) {
