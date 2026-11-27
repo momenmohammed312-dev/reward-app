@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AdminController } from '../controllers/adminController.js';
 import { OffersController } from '../controllers/offersController.js';
 import { CampaignsController } from '../controllers/campaignsController.js';
+import { EarningRulesController } from '../controllers/earningRulesController.js';
 import { authenticateJWT, requireRole, requireSubscription } from '../middlewares/auth.js';
 import { validate, schemas } from '../middlewares/validate.js';
 
@@ -23,6 +24,20 @@ router.get('/stats', AdminController.getStats);
  */
 router.get('/customers/export', AdminController.exportCustomers);
 router.get('/customers', AdminController.getCustomers);
+
+/**
+ * @swagger
+ * /api/admin/customers:
+ *   post:
+ *     summary: Create a new tenant customer from Admin Dashboard (with optional initial bonus points)
+ *     tags: [Admin]
+ *     responses:
+ *       201:
+ *         description: Customer created
+ *       409:
+ *         description: Customer phone already exists for this tenant
+ */
+router.post('/customers', validate(schemas.createCustomer), AdminController.createCustomer);
 
 /**
  * @swagger
@@ -156,6 +171,21 @@ router.delete('/campaigns/:id', CampaignsController.remove);
 
 router.get('/reminders/targets', CampaignsController.getReminderTargets);
 router.post('/reminders/log', validate(schemas.logReminder), CampaignsController.logReminder);
+
+/**
+ * @swagger
+ * /api/admin/earning-rules:
+ *   get:
+ *     summary: List supermarket earning rules (exclusions, category multipliers, basket bonuses)
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Earning rules list
+ */
+router.get('/earning-rules', EarningRulesController.list);
+router.post('/earning-rules', validate(schemas.createEarningRule), EarningRulesController.create);
+router.patch('/earning-rules/:id', validate(schemas.updateEarningRule), EarningRulesController.update);
+router.delete('/earning-rules/:id', EarningRulesController.remove);
 
 router.get('/stats/chart', AdminController.getStatsChart);
 router.get('/analytics/retention', AdminController.getRetentionAnalytics);

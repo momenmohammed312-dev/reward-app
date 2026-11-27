@@ -1,9 +1,31 @@
+export interface PointsEvaluationResult {
+  points: number;
+  belowMinimum: boolean;
+}
+
+/**
+ * Evaluates points awarded for a purchase without throwing below minimum threshold,
+ * so supermarket micro-invoices record cleanly with 0 points instead of failing retries.
+ */
+export function evaluatePointsEarned(
+  amount: number,
+  pointsPerEgp: number,
+  multiplier: number,
+  minPurchaseEgp: number
+): PointsEvaluationResult {
+  if (!Number.isFinite(amount) || amount < Number(minPurchaseEgp || 0)) {
+    return { points: 0, belowMinimum: true };
+  }
+
+  const pts = Math.max(0, Math.floor(amount * Number(pointsPerEgp) * multiplier));
+  return { points: pts, belowMinimum: false };
+}
+
 /**
  * Calculates the points awarded for a purchase.
  *
  * Points = floor(amount * points_per_egp * tier_multiplier), subject to the
- * tenant's minimum purchase threshold. Extracted as a pure function so the
- * core loyalty math is unit-testable.
+ * tenant's minimum purchase threshold. Returns 0 when below minimum purchase.
  */
 export function calculatePointsEarned(
   amount: number,
@@ -11,11 +33,7 @@ export function calculatePointsEarned(
   multiplier: number,
   minPurchaseEgp: number
 ): number {
-  if (amount < Number(minPurchaseEgp)) {
-    throw new Error(`Amount is less than minimum purchase threshold (${minPurchaseEgp} EGP)`);
-  }
-
-  return Math.floor(amount * Number(pointsPerEgp) * multiplier);
+  return evaluatePointsEarned(amount, pointsPerEgp, multiplier, minPurchaseEgp).points;
 }
 
 export interface OrderLineItem {

@@ -62,6 +62,24 @@ export class AdminController {
     }
   }
 
+  // POST /api/admin/customers
+  static async createCustomer(req: AuthenticatedRequest, res: Response) {
+    try {
+      const created = await AdminOpsService.createCustomer(
+        req.user!.tenant_id,
+        req.user?.id,
+        req.body
+      );
+      return res.status(201).json(created);
+    } catch (err: any) {
+      if (err instanceof AdminOpsError && err.code === 'CONFLICT') {
+        return res.status(409).json({ error: 'Conflict', message: err.message });
+      }
+      logger.error('Create customer error:', { error: (err as Error).message });
+      return res.status(500).json({ error: 'Failed to create customer' });
+    }
+  }
+
   // GET /api/admin/customers/export
   static async exportCustomers(req: AuthenticatedRequest, res: Response) {
     try {

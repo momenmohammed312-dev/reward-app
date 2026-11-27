@@ -19,7 +19,7 @@ describe('LedgerService', () => {
       idempotencyKey: 'earn:tenant-1:101',
     });
 
-    expect(mockClient.query).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledTimes(2);
     const [sql, params] = mockClient.query.mock.calls[0];
     expect(sql).toContain('INSERT INTO wallet_ledger');
     expect(sql).toContain('ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING');
@@ -33,7 +33,13 @@ describe('LedgerService', () => {
       'Order #101',
       'webhook',
       'earn:tenant-1:101',
+      '{}',
     ]);
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('UPDATE customers'),
+      ['cust-1', 'tenant-1', 75, 75, 0]
+    );
   });
 
   it('should default optional fields to null and createdBy to system', async () => {
@@ -59,6 +65,7 @@ describe('LedgerService', () => {
       null,
       'system',
       null,
+      '{}',
     ]);
   });
 });

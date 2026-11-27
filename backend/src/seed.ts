@@ -7,6 +7,9 @@ async function seed() {
   console.log('🌱 Seeding database...');
 
   // 1. Clean existing data
+  await db.query('DELETE FROM expiry_notifications_log');
+  await db.query('DELETE FROM transaction_items');
+  await db.query('DELETE FROM earning_rules');
   await db.query('DELETE FROM webhook_logs');
   await db.query('DELETE FROM weekly_offers');
   await db.query('DELETE FROM campaigns');
@@ -268,7 +271,36 @@ async function seed() {
      VALUES ($1, $2, $3, 'happy_hour', 2.00, $4::integer[], 9, 14, true)`,
     [albarakaMarket.id, 'ساعات الصباح السعيدة ×2', 'مضاعفة النقاط صباحاً من الأحد للأربعاء لتحريك الساعات الهادئة', [0, 1, 2, 3]]
   );
-  console.log('  ✅ Weekly offers & Happy Hour campaign created');
+
+  // 12. Seed sample earning rules for Albaraka Market & sync O(1) customer counters
+  await db.query(
+    `INSERT INTO earning_rules (tenant_id, name, rule_type, target_value, multiplier, priority, is_active)
+     VALUES
+       ($1, 'استثناء السجائر والتبغ', 'exclude_category', 'تبغ', NULL, 10, true),
+       ($1, 'ضعف نقاط الألبان ×2', 'category_multiplier', 'ألبان', 2.00, 20, true)`,
+    [albarakaMarket.id]
+  );
+
+  await db.query(`
+    UPDATE customers c
+    SET cached_balance = COALESCE(cb.current_balance, 0),
+        cached_total_earned = COALESCE(cb.total_earned, 0),
+        cached_total_redeemed = COALESCE(cb.total_redeemed, 0)
+    FROM customer_balances cb
+    WHERE c.id = cb.customer_id AND c.tenant_id = cb.tenant_id
+  `);
+
+  await db.query(`
+    UPDATE customers c
+    SET total_spent_egp = COALESCE(tx_agg.total_spent, 0)
+    FROM (
+      SELECT tenant_id, customer_id, COALESCE(SUM(amount), 0) AS total_spent
+      FROM transactions
+      GROUP BY tenant_id, customer_id
+    ) tx_agg
+    WHERE c.id = tx_agg.customer_id AND c.tenant_id = tx_agg.tenant_id
+  `);
+  console.log('  ✅ Weekly offers, Happy Hour campaign, earning rules & cached balances synced');
 
   console.log('');
   console.log('🎉 Seed complete!');

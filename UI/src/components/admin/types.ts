@@ -2,9 +2,11 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  cardNumber?: string | null;
   tier: string;
   balance: number;
   totalEarned: number;
+  totalSpentEgp?: number;
   status: string;
   lastVisit: string | null;
   signupStation?: string | null;
@@ -74,6 +76,10 @@ export interface TenantSettingsForm {
   point_value_egp: string;
   welcome_bonus_points: string;
   excluded_item_keywords: string[];
+  tier_basis: 'points' | 'spend';
+  refund_policy: 'cap_zero' | 'reject';
+  cashier_daily_manual_limit: string;
+  expiry_sms_days_before: string;
 }
 
 export interface TierSetting {

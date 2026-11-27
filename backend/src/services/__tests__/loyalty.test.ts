@@ -134,7 +134,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
       const invoiceId = 'inv-500';
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '1', min_purchase_egp: '20' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -169,19 +169,19 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
         })
       );
       expect(mockClient.query).toHaveBeenCalledWith(
-        'UPDATE customers SET last_visit = NOW() WHERE id = $1 AND tenant_id = $2',
-        [customerId, tenantId]
+        expect.stringContaining('total_spent_egp'),
+        [customerId, tenantId, 100]
       );
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
       expect(summary.points_balance).toBe(150);
     });
 
-    it('should reject and rollback when amount is below min_purchase_egp threshold', async () => {
+    it('records transaction with 0 points cleanly when amount is below min_purchase_egp threshold', async () => {
       const tenantId = 'tenant-123';
       const customerId = 'cust-1';
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '1', min_purchase_egp: '50' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -190,15 +190,21 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
         if (sql.includes('SELECT multiplier FROM tier_benefits')) {
           return Promise.resolve({ rows: [{ multiplier: '1.0' }] });
         }
+        if (sql.includes('INSERT INTO transactions')) {
+          return Promise.resolve({ rows: [{ id: 'tx-small' }] });
+        }
         return Promise.resolve({ rows: [] });
       });
+      (db.query as any).mockResolvedValue({
+        rows: [{ id: customerId, tenant_id: tenantId, points_balance: 0 }],
+      });
 
-      await expect(
-        LoyaltyService.earnPoints(tenantId, customerId, 'branch-1', 'inv-small', 15)
-      ).rejects.toThrow('Amount is less than minimum purchase threshold (50 EGP)');
+      const res = await LoyaltyService.earnPoints(tenantId, customerId, 'branch-1', 'inv-small', 15);
 
+      expect(res.points_earned).toBe(0);
+      expect(res.below_minimum).toBe(true);
       expect(LedgerService.insert).not.toHaveBeenCalled();
-      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
     it('should skip LedgerService.insert when calculated points floor to 0 above threshold', async () => {
@@ -206,7 +212,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
       const customerId = 'cust-1';
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '0.1', min_purchase_egp: '0' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -236,7 +242,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
       const customerId = 'cust-1';
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '1', min_purchase_egp: '0' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -266,7 +272,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
   describe('1.3 adjustPoints Validation & Signed Entries', () => {
     it('should insert adjustment credit for positive points', async () => {
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT COALESCE(cb.current_balance, 0) AS balance')) {
+        if (sql.includes('cached_balance') && sql.includes('AS balance')) {
           return Promise.resolve({ rows: [{ balance: 100 }] });
         }
         return Promise.resolve({ rows: [] });
@@ -291,7 +297,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
 
     it('should insert reversal debit for negative points within balance', async () => {
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT COALESCE(cb.current_balance, 0) AS balance')) {
+        if (sql.includes('cached_balance') && sql.includes('AS balance')) {
           return Promise.resolve({ rows: [{ balance: 100 }] });
         }
         return Promise.resolve({ rows: [] });
@@ -313,7 +319,7 @@ describe('LoyaltyService — Acceptance & Regression Tests', () => {
 
     it('should reject negative adjustment that would make balance negative', async () => {
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT COALESCE(cb.current_balance, 0) AS balance')) {
+        if (sql.includes('cached_balance') && sql.includes('AS balance')) {
           return Promise.resolve({ rows: [{ balance: 100 }] });
         }
         return Promise.resolve({ rows: [] });

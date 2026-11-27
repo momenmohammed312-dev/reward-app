@@ -274,6 +274,45 @@ export const HistoryPage: React.FC = () => {
                 <span className="text-[var(--text-xs)] text-[var(--color-text-muted)] number">{Math.abs(selectedTx.points)} {t('pointsLabel')}</span>
                 <span className="text-[var(--text-xs)] font-bold text-[var(--color-text)]">{selectedTx.type === 'earn' ? t('history.pointsEarned') : t('history.pointsUsed')}</span>
               </div>
+
+              {selectedTx.items && selectedTx.items.length > 0 && (
+                <div className="pt-3 border-t border-[var(--color-border)] flex flex-col gap-2">
+                  <span className="text-[var(--text-xs)] font-extrabold text-[var(--color-text)] text-right">
+                    {t('history.itemsTitle')} ({selectedTx.items.length})
+                  </span>
+                  <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                    {selectedTx.items.map((item, idx) => (
+                      <div
+                        key={item.id || `${item.product_name}-${idx}`}
+                        className="p-2.5 rounded-xl bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-between gap-2 text-right"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12px] font-bold text-[var(--color-text)] truncate">
+                            {item.product_name}
+                          </div>
+                          <div className="text-[10.5px] text-[var(--color-text-muted)] flex items-center gap-2">
+                            <span className="number">{item.quantity} {item.unit || ''}</span>
+                            {item.category && <span>· {item.category}</span>}
+                            {item.is_excluded && (
+                              <span className="text-rose-600 font-bold">· {t('history.itemExcluded')}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-left shrink-0">
+                          <div className="text-[12px] font-bold text-[var(--color-text)] number">
+                            {Number(item.net_amount).toLocaleString('en-US')} {t('sr')}
+                          </div>
+                          {!item.is_excluded && Number(item.points_earned || 0) > 0 && (
+                            <div className="text-[10.5px] font-bold text-emerald-600 number">
+                              +{item.points_earned} {t('pointsLabel')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

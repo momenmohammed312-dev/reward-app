@@ -14,7 +14,7 @@ export class TenantController {
       const result = await db.query(
         `SELECT id, name, slug, logo_url, primary_color, accent_color, bg_color, surface_color,
                 font_display, font_body, tagline, points_per_egp, min_purchase_egp,
-                business_type, code_prefix, show_menu
+                business_type, code_prefix, show_menu, point_value_egp, tier_basis, refund_policy
          FROM tenants WHERE slug = $1 AND is_active = true`,
         [slug]
       );
@@ -111,6 +111,7 @@ export class TenantController {
         font_display, font_body, tagline,
         business_type, code_prefix, show_menu,
         cashier_max_invoice_egp, point_value_egp, welcome_bonus_points, excluded_item_keywords,
+        tier_basis, refund_policy, cashier_daily_manual_limit, expiry_sms_days_before,
       } = req.body;
 
       const resolvedBusinessType = business_type && ['cafe', 'supermarket', 'retail'].includes(business_type)
@@ -120,6 +121,7 @@ export class TenantController {
         ? (String(code_prefix).trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || null)
         : null;
       const hasCashierMax = Object.prototype.hasOwnProperty.call(req.body, 'cashier_max_invoice_egp');
+      const hasDailyManualLimit = Object.prototype.hasOwnProperty.call(req.body, 'cashier_daily_manual_limit');
       const hasExcluded = Array.isArray(excluded_item_keywords);
 
       const result = await db.query(
@@ -142,8 +144,12 @@ export class TenantController {
           cashier_max_invoice_egp = CASE WHEN $16::boolean THEN $17::numeric ELSE cashier_max_invoice_egp END,
           point_value_egp = COALESCE($18, point_value_egp),
           welcome_bonus_points = COALESCE($19, welcome_bonus_points),
-          excluded_item_keywords = CASE WHEN $20::boolean THEN $21::text[] ELSE excluded_item_keywords END
-         WHERE id = $22::uuid
+          excluded_item_keywords = CASE WHEN $20::boolean THEN $21::text[] ELSE excluded_item_keywords END,
+          tier_basis = COALESCE($22, tier_basis),
+          refund_policy = COALESCE($23, refund_policy),
+          cashier_daily_manual_limit = CASE WHEN $24::boolean THEN $25::integer ELSE cashier_daily_manual_limit END,
+          expiry_sms_days_before = COALESCE($26, expiry_sms_days_before)
+         WHERE id = $27::uuid
          RETURNING *`,
         [
           name ?? null, points_per_egp ?? null, min_purchase_egp ?? null, points_expiry_days ?? null,
@@ -155,6 +161,11 @@ export class TenantController {
           welcome_bonus_points ?? null,
           hasExcluded,
           hasExcluded ? excluded_item_keywords : null,
+          tier_basis ?? null,
+          refund_policy ?? null,
+          hasDailyManualLimit,
+          hasDailyManualLimit ? (cashier_daily_manual_limit ?? null) : null,
+          expiry_sms_days_before ?? null,
           tenantId,
         ]
       );

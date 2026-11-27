@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PencilSimple, TrashSimple, WarningCircle, DownloadSimple, Notebook } from '@phosphor-icons/react';
+import { PencilSimple, TrashSimple, WarningCircle, DownloadSimple, Notebook, UserPlus } from '@phosphor-icons/react';
 import { api } from '../../../services/api';
 import { Modal } from '../../ui/Modal';
 import { AdminMessage, Customer, statusStyle, tierBadge, tierDisplay } from '../types';
@@ -41,8 +41,47 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
 }) => {
   const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
   const [editForm, setEditForm] = useState({ name: '', phone: '', tier: 'bronze', is_verified: true });
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    phone: '',
+    tier: 'bronze',
+    initial_points: '0',
+    is_verified: true,
+  });
+  const [creating, setCreating] = useState(false);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedPhone = createForm.phone.replace(/\D/g, '');
+    if (!createForm.name.trim() || !/^01[0-9]{9}$/.test(cleanedPhone)) {
+      onMessage({ text: 'أدخل الاسم ورقم موبايل مصري صحيح (11 رقم يبدأ بـ 01)', type: 'error' });
+      return;
+    }
+    setCreating(true);
+    try {
+      const created = await api.createAdminCustomer({
+        name: createForm.name.trim(),
+        phone: cleanedPhone,
+        tier: createForm.tier,
+        initial_points: Math.max(0, parseInt(createForm.initial_points || '0', 10) || 0),
+        is_verified: createForm.is_verified,
+      });
+      onMessage({
+        text: `تمت إضافة العميل بنجاح${created.card_number ? ` · كارت ${created.card_number}` : ''}`,
+        type: 'success',
+      });
+      setCreateOpen(false);
+      setCreateForm({ name: '', phone: '', tier: 'bronze', initial_points: '0', is_verified: true });
+      await onCustomersUpdated();
+    } catch (err: any) {
+      onMessage({ text: err?.message || 'فشل إضافة العميل', type: 'error' });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const openEdit = (c: Customer) => {
     setEditCustomer(c);
@@ -114,15 +153,25 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
             <h2 className="text-sm font-bold">قاعدة بيانات العملاء</h2>
             <span className="text-xs text-[var(--color-admin-text-muted)]">({customerTotal} عميل)</span>
           </div>
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={handleExportCsv}
-            className="px-3 py-1.5 rounded-xl bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] hover:border-[var(--color-admin-primary)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <DownloadSimple size={15} weight="bold" />
-            {exporting ? 'جارٍ التصدير...' : 'تصدير CSV'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] text-xs font-black flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+            >
+              <UserPlus size={15} weight="bold" />
+              إضافة عميل جديد
+            </button>
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={handleExportCsv}
+              className="px-3 py-1.5 rounded-xl bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] hover:border-[var(--color-admin-primary)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <DownloadSimple size={15} weight="bold" />
+              {exporting ? 'جارٍ التصدير...' : 'تصدير CSV'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -198,7 +247,14 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
                 onClick={() => onOpenLedger(customer.id)}
                 className="hover:bg-[var(--color-admin-bg)] transition-all cursor-pointer"
               >
-                <td className="p-4 font-bold">{customer.name}</td>
+                <td className="p-4 font-bold">
+                  <div>{customer.name}</div>
+                  {customer.cardNumber && (
+                    <div className="text-[10px] font-mono text-[var(--color-admin-primary)]" dir="ltr">
+                      {customer.cardNumber}
+                    </div>
+                  )}
+                </td>
                 <td className="p-4 font-mono text-[var(--color-admin-text-muted)]" dir="ltr">
                   {customer.phone}
                 </td>
@@ -290,6 +346,86 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
           </button>
         </div>
       </div>
+
+      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="إضافة عميل جديد">
+        <form onSubmit={handleCreateCustomer} className="flex flex-col gap-3 text-xs">
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-[var(--color-admin-text-muted)]">الاسم الكامل</label>
+            <input
+              type="text"
+              required
+              placeholder="مثال: كريم محمد"
+              value={createForm.name}
+              onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+              className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none focus:border-[var(--color-admin-primary)]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-[var(--color-admin-text-muted)]">رقم الموبايل المصري</label>
+            <input
+              type="tel"
+              required
+              dir="ltr"
+              placeholder="01012345678"
+              maxLength={11}
+              value={createForm.phone}
+              onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
+              className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono focus:border-[var(--color-admin-primary)]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">الفئة</label>
+              <select
+                value={createForm.tier}
+                onChange={(e) => setCreateForm((p) => ({ ...p, tier: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              >
+                <option value="bronze">عادي</option>
+                <option value="silver">فضي</option>
+                <option value="gold">ذهبي</option>
+                <option value="platinum">بلاتيني</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">نقاط افتتاحية (اختياري)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={createForm.initial_points}
+                onChange={(e) => setCreateForm((p) => ({ ...p, initial_points: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono"
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 mt-1 font-bold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={createForm.is_verified}
+              onChange={(e) => setCreateForm((p) => ({ ...p, is_verified: e.target.checked }))}
+              className="rounded border-[var(--color-admin-border)]"
+            />
+            <span>حساب موثّق ومفعّل فوراً</span>
+          </label>
+          <div className="flex gap-2 mt-2">
+            <button
+              type="submit"
+              disabled={creating}
+              className="flex-1 bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] font-black py-2.5 rounded-xl cursor-pointer hover:opacity-90 disabled:opacity-50"
+            >
+              {creating ? 'جارٍ الإضافة...' : 'حفظ وإضافة العميل'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(false)}
+              className="px-4 py-2.5 rounded-xl border border-[var(--color-admin-border)] font-bold cursor-pointer"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal isOpen={!!editCustomer} onClose={() => setEditCustomer(null)} title="تعديل بيانات العميل">
         <div className="flex flex-col gap-3 text-xs">

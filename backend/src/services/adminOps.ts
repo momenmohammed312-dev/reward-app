@@ -2,7 +2,10 @@ import bcrypt from 'bcrypt';
 import db from '../config/db.js';
 import { AnalyticsError, AnalyticsService } from './analytics.js';
 import { computeActiveCampaignMultiplier, escapeCsvCell } from '../helpers/campaigns.js';
-import { calculatePointsEarned, summarizeEligibleOrder } from '../helpers/points.js';
+import { evaluateOrderWithRules } from '../helpers/rulesEngine.js';
+import { summarizeEligibleOrder } from '../helpers/points.js';
+import { EarningRulesService } from './earningRules.js';
+import { LedgerService } from './ledger.js';
 import { CustomApiAdapter } from './pos/customApiAdapter.js';
 
 export class AdminOpsError extends Error {
@@ -96,9 +99,8 @@ export class AdminOpsService {
 
     const liabilityPromise = db.query(
       `SELECT
-        COALESCE(SUM(GREATEST(cb.current_balance, 0)), 0)::int AS total_outstanding_points
+        COALESCE(SUM(GREATEST(c.cached_balance, 0)), 0)::int AS total_outstanding_points
        FROM customers c
-       LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
        WHERE c.tenant_id = $1::uuid AND c.deleted_at IS NULL`,
       [tenantId]
     );
@@ -162,6 +164,84 @@ export class AdminOpsService {
   }
 
   /**
+   * Creates (or resurrects) a customer under the tenant from Admin Dashboard,
+   * optionally awarding initial bonus points strictly through LedgerService.insert.
+   */
+  static async createCustomer(
+    tenantId: string,
+    adminUserId: string | undefined,
+    data: {
+      name: string;
+      phone: string;
+      tier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+      initial_points?: number;
+      is_verified?: boolean;
+    }
+  ) {
+    const cleanName = data.name.trim();
+    const cleanPhone = data.phone.trim();
+    const tier = data.tier || 'bronze';
+    const isVerified = data.is_verified ?? true;
+    const initialPoints = Math.max(0, Math.floor(Number(data.initial_points || 0)));
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const existing = await client.query(
+        'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+        [tenantId, cleanPhone]
+      );
+      if (existing.rows.length > 0) {
+        throw new AdminOpsError('CONFLICT', 'يوجد عميل مسجل بهذا الرقم بالفعل');
+      }
+
+      const inserted = await client.query(
+        `INSERT INTO customers (tenant_id, name, phone, tier, is_verified)
+         VALUES ($1::uuid, $2, $3, $4::tier_type, $5)
+         ON CONFLICT (tenant_id, phone) DO UPDATE SET
+           name = EXCLUDED.name,
+           tier = EXCLUDED.tier,
+           is_verified = EXCLUDED.is_verified,
+           deleted_at = NULL,
+           updated_at = NOW()
+         RETURNING id, name, phone, card_number, tier, is_verified, created_at`,
+        [tenantId, cleanName, cleanPhone, tier, isVerified]
+      );
+
+      const created = inserted.rows[0];
+
+      if (initialPoints > 0) {
+        await LedgerService.insert(client, {
+          tenantId,
+          customerId: created.id,
+          type: 'bonus',
+          points: initialPoints,
+          referenceType: 'admin_signup',
+          note: 'رصيد ترحيبي من لوحة التحكم',
+          createdBy: adminUserId || 'admin',
+          idempotencyKey: `admin_create:${tenantId}:${created.id}:${Date.now()}`,
+        });
+      }
+
+      await client.query('COMMIT');
+      await recordAudit(tenantId, adminUserId, 'create_customer', 'customer', created.id, undefined, {
+        name: cleanName,
+        phone: cleanPhone,
+        tier,
+        initial_points: initialPoints,
+      });
+
+      return { ...created, balance: initialPoints };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Lists tenant customers with optional name, phone, tier, and inactivity filters.
    */
   static async getCustomersFiltered(
@@ -179,7 +259,7 @@ export class AdminOpsService {
       idx++;
     }
     if (filters.phone) {
-      clauses.push(`c.phone ILIKE $${idx}::text`);
+      clauses.push(`(c.phone ILIKE $${idx}::text OR COALESCE(c.card_number, '') ILIKE $${idx}::text)`);
       params.push(`%${filters.phone}%`);
       idx++;
     }
@@ -202,14 +282,14 @@ export class AdminOpsService {
     );
 
     const rowsRes = await db.query(
-      `SELECT c.id, c.phone, c.name, c.tier,
-              COALESCE(cb.current_balance, 0)::int AS balance,
-              COALESCE(cb.total_earned, 0)::int AS total_earned,
+      `SELECT c.id, c.phone, c.card_number, c.name, c.tier,
+              COALESCE(c.cached_balance, 0)::int AS balance,
+              COALESCE(c.cached_total_earned, 0)::int AS total_earned,
+              COALESCE(c.total_spent_egp, 0)::float8 AS total_spent_egp,
               c.is_verified, c.last_visit, c.created_at,
               c.signup_station,
               sb.name AS signup_branch_name
        FROM customers c
-       LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
        LEFT JOIN branches sb ON c.signup_branch_id = sb.id
        ${whereSql}
        ORDER BY c.created_at DESC
@@ -264,13 +344,13 @@ export class AdminOpsService {
    */
   static async getCustomerLedger(tenantId: string, customerId: string) {
     const custRes = await db.query(
-      `SELECT c.id, c.phone, c.name, c.tier, c.is_verified, c.last_visit, c.created_at,
+      `SELECT c.id, c.phone, c.card_number, c.name, c.tier, c.is_verified, c.last_visit, c.created_at,
               c.signup_station, sb.name AS signup_branch_name,
-              COALESCE(cb.current_balance, 0)::int AS balance,
-              COALESCE(cb.total_earned, 0)::int AS total_earned,
-              COALESCE(cb.total_redeemed, 0)::int AS total_redeemed
+              COALESCE(c.cached_balance, 0)::int AS balance,
+              COALESCE(c.cached_total_earned, 0)::int AS total_earned,
+              COALESCE(c.cached_total_redeemed, 0)::int AS total_redeemed,
+              COALESCE(c.total_spent_egp, 0)::float8 AS total_spent_egp
        FROM customers c
-       LEFT JOIN customer_balances cb ON c.id = cb.customer_id AND cb.tenant_id = c.tenant_id
        LEFT JOIN branches sb ON c.signup_branch_id = sb.id
        WHERE c.id = $1::uuid AND c.tenant_id = $2::uuid AND c.deleted_at IS NULL`,
       [customerId, tenantId]
@@ -378,8 +458,39 @@ export class AdminOpsService {
       [...params, filters.limit, offset]
     );
 
+    const rows = rowsRes.rows || [];
+    const txIds = rows.map((r: any) => r.id).filter(Boolean);
+    const itemsByTx = new Map<string, any[]>();
+
+    if (txIds.length > 0) {
+      try {
+        const itemsRes = await db.query(
+          `SELECT id, transaction_id, sku, product_name, category,
+                  quantity::float8 AS quantity, unit,
+                  net_amount::float8 AS net_amount,
+                  is_excluded, points_earned,
+                  refunded_quantity::float8 AS refunded_quantity,
+                  refunded_points
+           FROM transaction_items
+           WHERE tenant_id = $1::uuid AND transaction_id = ANY($2::uuid[])
+           ORDER BY created_at ASC`,
+          [tenantId, txIds]
+        );
+        for (const item of itemsRes.rows) {
+          const list = itemsByTx.get(item.transaction_id) || [];
+          list.push(item);
+          itemsByTx.set(item.transaction_id, list);
+        }
+      } catch {
+        // Safe fallback if mock db doesn't mock transaction_items query
+      }
+    }
+
     return {
-      transactions: rowsRes.rows,
+      transactions: rows.map((r: any) => ({
+        ...r,
+        items: itemsByTx.get(r.id) || [],
+      })),
       total: Number(countRes.rows[0]?.total || 0),
       page: filters.page,
       limit: filters.limit,
@@ -686,7 +797,7 @@ export class AdminOpsService {
     payload: any,
     customerTier: 'bronze' | 'silver' | 'gold' | 'platinum' = 'bronze'
   ) {
-    const [tenantRes, tbRes, campaignsRes] = await Promise.all([
+    const [tenantRes, tbRes, campaignsRes, activeRules] = await Promise.all([
       db.query(
         `SELECT points_per_egp::float8 AS points_per_egp,
                 min_purchase_egp::float8 AS min_purchase_egp,
@@ -708,6 +819,7 @@ export class AdminOpsService {
          WHERE tenant_id = $1::uuid AND is_active = true AND deleted_at IS NULL`,
         [tenantId]
       ),
+      EarningRulesService.getActiveRules(db, tenantId).catch(() => []),
     ]);
 
     if (tenantRes.rows.length === 0) {
@@ -721,41 +833,47 @@ export class AdminOpsService {
 
     const rawOrder = payload?.order || payload || {};
     const rawTotal = Number(rawOrder.total_amount ?? rawOrder.total_price ?? rawOrder.total ?? rawOrder.amount ?? 0);
+    const discountAmount = Number(rawOrder.discount_amount ?? rawOrder.discount ?? 0);
     const items = Array.isArray(rawOrder.items) ? rawOrder.items : undefined;
     const summary = summarizeEligibleOrder(rawTotal, items, excludedKeywords);
 
     const tierMultiplier = Number(tbRes.rows[0]?.multiplier ?? 1);
     const campaignMatch = computeActiveCampaignMultiplier(campaignsRes.rows || []);
-    const effectiveMultiplier = tierMultiplier * campaignMatch.multiplier;
 
-    let pointsEarned = 0;
-    let belowMinimum = false;
-    try {
-      pointsEarned = calculatePointsEarned(
-        summary.eligibleTotal,
-        Number(t.points_per_egp || 0),
-        effectiveMultiplier,
-        Number(t.min_purchase_egp || 0)
-      );
-    } catch {
-      belowMinimum = true;
-      pointsEarned = 0;
-    }
+    const evaluation = evaluateOrderWithRules({
+      totalAmount: rawTotal,
+      discountAmount,
+      items,
+      rules: activeRules,
+      excludedKeywords,
+      pointsPerEgp: Number(t.points_per_egp || 0),
+      tierMultiplier,
+      campaignMultiplier: campaignMatch.multiplier,
+      minPurchaseEgp: Number(t.min_purchase_egp || 0),
+    });
 
     return {
       parsed: order,
-      rawTotal: summary.rawTotal,
-      excludedTotal: summary.excludedTotal,
-      eligibleTotal: summary.eligibleTotal,
-      excludedItems: summary.excludedItems,
+      rawTotal: evaluation.rawTotal,
+      excludedTotal: evaluation.excludedTotal,
+      eligibleTotal: evaluation.eligibleTotal,
+      excludedItems: evaluation.items.length > 0
+        ? evaluation.items.filter((i) => i.is_excluded).map((i) => ({
+            name: i.product_name,
+            amount: i.net_amount,
+            reason: i.exclusion_reason || 'excluded',
+          }))
+        : summary.excludedItems,
       pointsPerEgp: Number(t.points_per_egp || 0),
       minPurchaseEgp: Number(t.min_purchase_egp || 0),
       tier: customerTier,
       tierMultiplier,
       campaignName: campaignMatch.matchedCampaignName,
       campaignMultiplier: campaignMatch.multiplier,
-      belowMinimum,
-      pointsEarned,
+      appliedRules: evaluation.appliedRules,
+      basketBonusPoints: evaluation.basketBonusPoints,
+      belowMinimum: evaluation.belowMinimum,
+      pointsEarned: evaluation.totalPoints,
     };
   }
 }

@@ -29,6 +29,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'SuperAdmin', description: 'Platform infrastructure' },
       { name: 'Rewards', description: 'Public rewards catalog' },
       { name: 'Webhooks', description: 'POS integration webhooks' },
+      { name: 'POS', description: 'Synchronous POS terminal APIs (x-api-key)' },
     ],
   },
   apis: ['./src/routes/*.ts'],

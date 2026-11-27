@@ -13,6 +13,7 @@ import { CustomerLedgerDrawer } from '../components/admin/tabs/CustomerLedgerDra
 import { RewardsTab } from '../components/admin/tabs/RewardsTab';
 import { OffersTab } from '../components/admin/tabs/OffersTab';
 import { CampaignsTab } from '../components/admin/tabs/CampaignsTab';
+import { RulesTab } from '../components/admin/tabs/RulesTab';
 import { BranchesPosTab } from '../components/admin/tabs/BranchesPosTab';
 import { StaffAuditTab } from '../components/admin/tabs/StaffAuditTab';
 import { SettingsTab } from '../components/admin/tabs/SettingsTab';
@@ -73,6 +74,10 @@ export const AdminDashboard: React.FC = () => {
     point_value_egp: '0.05',
     welcome_bonus_points: '0',
     excluded_item_keywords: [],
+    tier_basis: 'points',
+    refund_policy: 'cap_zero',
+    cashier_daily_manual_limit: '',
+    expiry_sms_days_before: '7',
   });
 
   const [tierSettings, setTierSettings] = useState<TierSetting[]>([
@@ -106,8 +111,10 @@ export const AdminDashboard: React.FC = () => {
           id: c.id,
           name: c.name || 'عميل',
           phone: c.phone,
+          cardNumber: c.card_number || null,
           balance: Number(c.balance || 0),
           totalEarned: Number(c.total_earned || 0),
+          totalSpentEgp: c.total_spent_egp !== undefined ? Number(c.total_spent_egp) : undefined,
           tier: c.tier || 'bronze',
           status: c.is_verified ? 'نشط' : 'معلق',
           lastVisit: c.last_visit || null,
@@ -204,6 +211,10 @@ export const AdminDashboard: React.FC = () => {
           point_value_egp: String(t.point_value_egp ?? '0.05'),
           welcome_bonus_points: String(t.welcome_bonus_points ?? '0'),
           excluded_item_keywords: Array.isArray(t.excluded_item_keywords) ? t.excluded_item_keywords : [],
+          tier_basis: t.tier_basis === 'spend' ? 'spend' : 'points',
+          refund_policy: t.refund_policy === 'reject' ? 'reject' : 'cap_zero',
+          cashier_daily_manual_limit: t.cashier_daily_manual_limit ? String(t.cashier_daily_manual_limit) : '',
+          expiry_sms_days_before: String(t.expiry_sms_days_before ?? '7'),
         });
       } catch {
         // Ignore offline fallback
@@ -313,6 +324,8 @@ export const AdminDashboard: React.FC = () => {
               onMessage={setMessage}
             />
           )}
+
+          {activeSubTab === 'rules' && <RulesTab onMessage={setMessage} />}
 
           {activeSubTab === 'branches' && (
             <BranchesPosTab

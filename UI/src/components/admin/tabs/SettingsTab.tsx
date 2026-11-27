@@ -37,6 +37,14 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         welcome_bonus_points: settingsForm.welcome_bonus_points
           ? parseInt(settingsForm.welcome_bonus_points, 10)
           : 0,
+        tier_basis: settingsForm.tier_basis,
+        refund_policy: settingsForm.refund_policy,
+        cashier_daily_manual_limit: settingsForm.cashier_daily_manual_limit
+          ? parseInt(settingsForm.cashier_daily_manual_limit, 10)
+          : null,
+        expiry_sms_days_before: settingsForm.expiry_sms_days_before
+          ? parseInt(settingsForm.expiry_sms_days_before, 10)
+          : 7,
       });
       onMessage({ text: 'تم حفظ إعدادات الولاء والنشاط بنجاح', type: 'success' });
     } catch (err: any) {
@@ -179,19 +187,71 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-[var(--color-admin-text-muted)]">
-              سقف فاتورة الكاشير بالجنيه (اختياري — أي فاتورة أعلى تتطلب مدير)
-            </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              placeholder="مثال: 5000 (اتركه فارغاً لبلا حد)"
-              value={settingsForm.cashier_max_invoice_egp}
-              onChange={(e) => setSettingsForm((p) => ({ ...p, cashier_max_invoice_egp: e.target.value }))}
-              className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono"
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">
+                سقف فاتورة الكاشير (ج.م)
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="مثال: 5000 (اتركه فارغاً لبلا حد)"
+                value={settingsForm.cashier_max_invoice_egp}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, cashier_max_invoice_egp: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">
+                الحد اليومي للنقاط اليدوية (كاشير)
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="مثال: 500 (بلا حد)"
+                value={settingsForm.cashier_daily_manual_limit}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, cashier_daily_manual_limit: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">أساس ترقية الفئات</label>
+              <select
+                value={settingsForm.tier_basis}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, tier_basis: e.target.value as 'points' | 'spend' }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              >
+                <option value="points">النقاط المكتسبة</option>
+                <option value="spend">إجمالي الإنفاق (ج.م)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">سياسة عجز المرتجع</label>
+              <select
+                value={settingsForm.refund_policy}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, refund_policy: e.target.value as 'cap_zero' | 'reject' }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none"
+              >
+                <option value="cap_zero">خصم حتى 0 وتسجيل العجز</option>
+                <option value="reject">رفض المرتجع لو الرصيد غير كافٍ</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-bold text-[var(--color-admin-text-muted)]">SMS قبل الانتهاء (أيام)</label>
+              <input
+                type="number"
+                min="0"
+                max="90"
+                value={settingsForm.expiry_sms_days_before}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, expiry_sms_days_before: e.target.value }))}
+                className="bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] p-2.5 rounded-xl outline-none font-mono"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2 py-1">
@@ -234,7 +294,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               >
                 <span className="font-bold text-[var(--color-admin-text)]">{tierDisplay(tr.tier_name)}</span>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[9px] text-[var(--color-admin-text-muted)]">الحد الأدنى (نقطة)</span>
+                  <span className="text-[9px] text-[var(--color-admin-text-muted)]">
+                    {settingsForm.tier_basis === 'spend' ? 'الحد الأدنى (ج.م إنفاق)' : 'الحد الأدنى (نقطة)'}
+                  </span>
                   <input
                     type="number"
                     min="0"

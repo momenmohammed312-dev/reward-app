@@ -76,15 +76,30 @@ export const schemas = {
   refundTransaction: z.object({
     invoice_id: z.string().min(1, 'invoice_id is required'),
     partial_amount: z.number().positive('partial_amount must be positive').optional(),
+    items: z
+      .array(
+        z.object({
+          transaction_item_id: z.string().uuid().optional(),
+          sku: z.string().min(1).max(80).optional(),
+          quantity: z.number().positive('Item refund quantity must be positive'),
+        }).refine((i) => i.transaction_item_id || i.sku, {
+          message: 'Either transaction_item_id or sku is required per item',
+        })
+      )
+      .optional(),
     note: z.string().max(200).optional(),
   }),
 
   cashierEarn: z.object({
-    customer_phone: z.string().min(8, 'Customer phone is required'),
+    customer_phone: z.string().min(4).max(32).optional(),
+    customer_identifier: z.string().min(4).max(32).optional(),
     amount_egp: z.number().positive('Invoice amount must be positive'),
+    discount_amount: z.number().min(0).optional(),
     invoice_id: z.string().min(1).max(100).optional(),
     branch_id: z.string().uuid('Invalid branch ID').optional(),
     note: z.string().max(200).optional(),
+  }).refine((d) => d.customer_identifier || d.customer_phone, {
+    message: 'Customer phone or card number is required',
   }),
 
   updateTiers: z.object({
@@ -122,13 +137,17 @@ export const schemas = {
   manualEarn: z.object({
     customer_id: z.string().optional(),
     customer_phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number').optional(),
+    customer_identifier: z.string().min(4).max(32).optional(),
+    card_number: z.string().min(4).max(32).optional(),
     amount: z.number().int().positive('Amount must be positive').optional(),
     points: z.number().int().positive('Points must be positive').optional(),
     note: z.string().optional(),
     reason: z.string().optional(),
     branch_id: z.string().uuid().optional(),
   })
-    .refine(d => d.customer_id || d.customer_phone, { message: 'Either customer_id or customer_phone is required' })
+    .refine(d => d.customer_id || d.customer_phone || d.customer_identifier || d.card_number, {
+      message: 'Either customer_id, customer_phone, card_number, or customer_identifier is required',
+    })
     .refine(d => (d.points ?? d.amount) !== undefined, { message: 'Either amount or points is required' }),
 
   createBranch: z.object({
@@ -154,6 +173,14 @@ export const schemas = {
   checkPhone: z.object({
     tenant_id: z.string().min(1, 'tenant_id is required'),
     phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
+  }),
+
+  createCustomer: z.object({
+    name: z.string().min(1, 'Name is required').max(100),
+    phone: z.string().regex(/^01[0-9]{9}$/, 'Invalid Egyptian phone number'),
+    tier: z.enum(['bronze', 'silver', 'gold', 'platinum']).optional(),
+    initial_points: z.number().int().min(0).max(100000).optional(),
+    is_verified: z.boolean().optional(),
   }),
 
   updateCustomer: z.object({
@@ -313,5 +340,94 @@ export const schemas = {
     point_value_egp: z.number().positive().max(100).optional(),
     welcome_bonus_points: z.number().int().min(0).max(100000).optional(),
     excluded_item_keywords: z.array(z.string().min(1).max(60)).max(100).optional(),
+    tier_basis: z.enum(['points', 'spend']).optional(),
+    refund_policy: z.enum(['cap_zero', 'reject']).optional(),
+    cashier_daily_manual_limit: z.number().int().positive().nullable().optional(),
+    expiry_sms_days_before: z.number().int().min(0).max(90).optional(),
+  }),
+
+  // ─── Supermarket Earning Rules & Sync POS API ───────────────
+  createEarningRule: z.object({
+    name: z.string().min(1, 'Rule name is required').max(120),
+    rule_type: z.enum(['exclude_category', 'exclude_sku', 'category_multiplier', 'basket_bonus']),
+    target_value: z.string().max(120).nullable().optional(),
+    multiplier: z.number().min(0.1).max(20).nullable().optional(),
+    min_basket_egp: z.number().positive().nullable().optional(),
+    bonus_points: z.number().int().positive().nullable().optional(),
+    priority: z.number().int().min(1).max(1000).optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  updateEarningRule: z.object({
+    name: z.string().min(1).max(120).optional(),
+    rule_type: z.enum(['exclude_category', 'exclude_sku', 'category_multiplier', 'basket_bonus']).optional(),
+    target_value: z.string().max(120).nullable().optional(),
+    multiplier: z.number().min(0.1).max(20).nullable().optional(),
+    min_basket_egp: z.number().positive().nullable().optional(),
+    bonus_points: z.number().int().positive().nullable().optional(),
+    priority: z.number().int().min(1).max(1000).optional(),
+    starts_at: z.string().nullable().optional(),
+    ends_at: z.string().nullable().optional(),
+    is_active: z.boolean().optional(),
+  }),
+
+  posEarn: z.object({
+    customer_identifier: z.string().min(4).max(32).optional(),
+    customer_phone: z.string().min(4).max(32).optional(),
+    card_number: z.string().min(4).max(32).optional(),
+    customer_name: z.string().max(100).optional(),
+    invoice_id: z.string().min(1, 'invoice_id is required').max(100),
+    total_amount: z.number().positive('total_amount must be positive'),
+    discount_amount: z.number().min(0).optional(),
+    note: z.string().max(200).optional(),
+    items: z
+      .array(
+        z.object({
+          sku: z.string().max(80).optional(),
+          barcode: z.string().max(80).optional(),
+          name: z.string().max(200).optional(),
+          product_name: z.string().max(200).optional(),
+          category: z.string().max(80).optional(),
+          quantity: z.number().positive().optional(),
+          unit: z.string().max(20).optional(),
+          unit_price: z.number().min(0).optional(),
+          price: z.number().min(0).optional(),
+          discount_amount: z.number().min(0).optional(),
+          net_amount: z.number().min(0).optional(),
+          amount: z.number().min(0).optional(),
+          excluded: z.boolean().optional(),
+        })
+      )
+      .optional(),
+  }).refine((d) => d.customer_identifier || d.customer_phone || d.card_number, {
+    message: 'Customer identifier (card_number or phone) is required',
+  }),
+
+  posRedeem: z.object({
+    code: z.string().min(1).max(24).optional(),
+    customer_identifier: z.string().min(4).max(32).optional(),
+    reward_id: z.string().uuid().optional(),
+    idempotency_key: z.string().min(1).max(120).optional(),
+  }).refine((d) => Boolean(d.code) || Boolean(d.customer_identifier && d.reward_id), {
+    message: 'Either code or (customer_identifier + reward_id) is required',
+  }),
+
+  posRefund: z.object({
+    invoice_id: z.string().min(1, 'invoice_id is required').max(100),
+    partial_amount: z.number().positive().optional(),
+    items: z
+      .array(
+        z.object({
+          transaction_item_id: z.string().uuid().optional(),
+          sku: z.string().min(1).max(80).optional(),
+          quantity: z.number().positive(),
+        }).refine((i) => i.transaction_item_id || i.sku, {
+          message: 'Either transaction_item_id or sku is required per item',
+        })
+      )
+      .optional(),
+    note: z.string().max(200).optional(),
   }),
 };

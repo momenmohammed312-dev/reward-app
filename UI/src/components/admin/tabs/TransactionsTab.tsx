@@ -10,6 +10,20 @@ interface TransactionsTabProps {
   onDataChanged: () => Promise<void>;
 }
 
+interface TransactionLineItemRow {
+  id: string;
+  sku?: string | null;
+  product_name: string;
+  category?: string | null;
+  quantity: number;
+  unit?: string;
+  net_amount: number;
+  is_excluded: boolean;
+  points_earned: number;
+  refunded_quantity: number;
+  refunded_points: number;
+}
+
 interface TransactionRow {
   id: string;
   invoice_id: string;
@@ -20,6 +34,7 @@ interface TransactionRow {
   branch_name?: string;
   customer_name?: string;
   customer_phone?: string;
+  items?: TransactionLineItemRow[];
 }
 
 interface RedemptionRow {
@@ -56,8 +71,9 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
   const [loading, setLoading] = useState(true);
 
   const [refundTarget, setRefundTarget] = useState<TransactionRow | null>(null);
-  const [refundMode, setRefundMode] = useState<'full' | 'partial'>('partial');
+  const [refundMode, setRefundMode] = useState<'full' | 'partial' | 'items'>('partial');
   const [partialAmount, setPartialAmount] = useState('');
+  const [itemRefundQtys, setItemRefundQtys] = useState<Record<string, string>>({});
   const [refundNote, setRefundNote] = useState('استرجاع صنف من الفاتورة');
   const [refunding, setRefunding] = useState(false);
 
@@ -97,14 +113,27 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
   const openRefundModal = (tx: TransactionRow) => {
     setRefundTarget(tx);
-    setRefundMode('partial');
+    const hasRefundableItems =
+      Array.isArray(tx.items) &&
+      tx.items.some((i) => i.quantity - (i.refunded_quantity || 0) > 0 && i.points_earned - (i.refunded_points || 0) > 0);
+    setRefundMode(hasRefundableItems ? 'items' : 'partial');
     setPartialAmount('');
+    setItemRefundQtys({});
     setRefundNote('استرجاع صنف من الفاتورة');
   };
 
   const handleRefundSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!refundTarget) return;
+
+    const selectedItems = Object.entries(itemRefundQtys)
+      .map(([transaction_item_id, q]) => ({ transaction_item_id, quantity: Number(q) }))
+      .filter((entry) => Number.isFinite(entry.quantity) && entry.quantity > 0);
+
+    if (refundMode === 'items' && selectedItems.length === 0) {
+      onMessage({ text: 'اختر صنفاً واحداً على الأقل بكمية مرتجع أكبر من صفر', type: 'error' });
+      return;
+    }
 
     if (refundMode === 'partial' && (!Number(partialAmount) || Number(partialAmount) <= 0)) {
       onMessage({ text: 'أدخل قيمة المرتجع بالجنيه أكبر من صفر', type: 'error' });
@@ -113,13 +142,18 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
     setRefunding(true);
     try {
-      await api.adminRefundTransaction({
+      const res = await api.adminRefundTransaction({
         invoice_id: refundTarget.invoice_id,
         partial_amount: refundMode === 'partial' ? Number(partialAmount) : undefined,
+        items: refundMode === 'items' ? selectedItems : undefined,
         note: refundNote.trim() || undefined,
       });
+      const shortfallMsg =
+        res?.shortfall_points && Number(res.shortfall_points) > 0
+          ? ` (تم الوقوف عند رصيد 0 وتسجيل عجز ${res.shortfall_points} نقطة)`
+          : '';
       onMessage({
-        text: `تم تنفيذ ${refundMode === 'partial' ? 'الاسترجاع الجزئي' : 'الاسترجاع الكلي'} للفاتورة ${refundTarget.invoice_id}`,
+        text: `تم تنفيذ الاسترجاع للفاتورة ${refundTarget.invoice_id}${shortfallMsg}`,
         type: 'success',
       });
       setRefundTarget(null);
@@ -389,7 +423,20 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              {Array.isArray(refundTarget.items) && refundTarget.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRefundMode('items')}
+                  className={`py-2 rounded-xl border font-bold cursor-pointer ${
+                    refundMode === 'items'
+                      ? 'bg-[var(--color-admin-primary)] text-[var(--color-admin-bg)] border-transparent'
+                      : 'bg-[var(--color-admin-bg)] border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)]'
+                  }`}
+                >
+                  استرجاع بالأصناف
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setRefundMode('partial')}
@@ -399,7 +446,7 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     : 'bg-[var(--color-admin-bg)] border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)]'
                 }`}
               >
-                استرجاع جزئي (صنف)
+                جزئي بالمبلغ
               </button>
               <button
                 type="button"
@@ -410,9 +457,44 @@ export const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     : 'bg-[var(--color-admin-bg)] border-[var(--color-admin-border)] text-[var(--color-admin-text-muted)]'
                 }`}
               >
-                استرجاع الفاتورة كاملة
+                الفاتورة كاملة
               </button>
             </div>
+
+            {refundMode === 'items' && Array.isArray(refundTarget.items) && (
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                {refundTarget.items.map((item) => {
+                  const remQty = Math.max(0, Math.round((item.quantity - (item.refunded_quantity || 0)) * 1000) / 1000);
+                  const remPts = Math.max(0, item.points_earned - (item.refunded_points || 0));
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-xl bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold truncate">{item.product_name}</div>
+                        <div className="text-[10px] text-[var(--color-admin-text-muted)]">
+                          متاح: {remQty} {item.unit || ''} · {remPts} نقطة
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        max={remQty}
+                        disabled={remQty <= 0 || remPts <= 0}
+                        placeholder="0"
+                        value={itemRefundQtys[item.id] || ''}
+                        onChange={(e) =>
+                          setItemRefundQtys((prev) => ({ ...prev, [item.id]: e.target.value }))
+                        }
+                        className="w-20 bg-[var(--color-admin-surface)] border border-[var(--color-admin-border)] px-2 py-1 rounded-lg text-center font-mono"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {refundMode === 'partial' && (
               <div className="flex flex-col gap-1">

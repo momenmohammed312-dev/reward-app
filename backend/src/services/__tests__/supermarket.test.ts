@@ -53,6 +53,11 @@ describe('Supermarket & Multi-Vertical Support', () => {
         customerPhone: '01012345678',
         customerName: 'محمود سعيد',
         totalAmount: 500,
+        rawTotal: 650,
+        items: [
+          { amount: 500, excluded: false },
+          { amount: 150, excluded: true },
+        ],
         invoiceId: 'MKT-5510',
         branchLocationId: 'nasr-city-1',
         branchName: 'فرع مدينة نصر',
@@ -203,7 +208,7 @@ describe('Supermarket & Multi-Vertical Support', () => {
       });
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '0.2', min_purchase_egp: '50' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -406,7 +411,7 @@ describe('Supermarket & Multi-Vertical Support', () => {
       ).rejects.toThrow('exceeds cashier limit');
 
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '0.2', min_purchase_egp: '50' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {
@@ -433,7 +438,7 @@ describe('Supermarket & Multi-Vertical Support', () => {
 
     it('applies active Happy Hour campaign multiplier (x2) in earnPoints', async () => {
       mockClient.query.mockImplementation((sql: string) => {
-        if (sql.includes('SELECT points_per_egp, min_purchase_egp FROM tenants')) {
+        if (sql.includes('SELECT points_per_egp, min_purchase_egp')) {
           return Promise.resolve({ rows: [{ points_per_egp: '0.2', min_purchase_egp: '50' }] });
         }
         if (sql.includes('SELECT tier FROM customers')) {

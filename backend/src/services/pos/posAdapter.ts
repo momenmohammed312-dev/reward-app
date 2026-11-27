@@ -1,3 +1,5 @@
+import { RawOrderItem } from '../../helpers/rulesEngine.js';
+
 /**
  * Normalized order shape produced by any POS adapter. Adapters translate the
  * vendor-specific webhook payload into this canonical structure so the rest of
@@ -5,8 +7,12 @@
  */
 export interface PosOrder {
   customerPhone: string;
+  customerCardNumber?: string;
   customerName?: string;
   totalAmount: number;
+  rawTotal?: number;
+  discountAmount?: number;
+  items?: RawOrderItem[];
   invoiceId?: string;
   branchLocationId?: string;
   branchName?: string;

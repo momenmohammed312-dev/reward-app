@@ -3,6 +3,7 @@ import {
   calculateEligibleAmount,
   calculatePartialRefundPoints,
   calculatePointsEarned,
+  evaluatePointsEarned,
   summarizeEligibleOrder,
 } from '../points.js';
 
@@ -18,8 +19,10 @@ describe('calculatePointsEarned', () => {
     expect(calculatePointsEarned(100, 0.1, 2, 0)).toBe(20);
   });
 
-  it('throws below the minimum purchase threshold', () => {
-    expect(() => calculatePointsEarned(50, 0.1, 1, 100)).toThrow('minimum purchase threshold');
+  it('returns 0 points without throwing below the minimum purchase threshold', () => {
+    expect(calculatePointsEarned(50, 0.1, 1, 100)).toBe(0);
+    expect(evaluatePointsEarned(50, 0.1, 1, 100)).toEqual({ points: 0, belowMinimum: true });
+    expect(evaluatePointsEarned(100, 0.1, 1, 100)).toEqual({ points: 10, belowMinimum: false });
   });
 
   it('returns 0 points at exactly the minimum threshold with 0 earning rate', () => {

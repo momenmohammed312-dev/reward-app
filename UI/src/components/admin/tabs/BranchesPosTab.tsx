@@ -275,7 +275,7 @@ export const BranchesPosTab: React.FC<BranchesPosTabProps> = ({
 
             <div className="flex flex-col gap-1.5 text-xs">
               <label className="text-[11px] font-bold text-[var(--color-admin-text-muted)]">
-                رابط Webhook المخصص للسوبر ماركت (POST)
+                رابط Webhook المخصص للسوبر ماركت (POST Async)
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -294,6 +294,18 @@ export const BranchesPosTab: React.FC<BranchesPosTabProps> = ({
                 >
                   <Copy size={14} />
                 </button>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] flex flex-col gap-1 text-[11px]">
+              <span className="font-bold text-[var(--color-admin-primary)]">
+                نقاط الربط اللحظي المتزامنة للكاشير (Sync POS API عبر Header: x-api-key)
+              </span>
+              <div className="font-mono text-[10px] text-[var(--color-admin-text-muted)] space-y-0.5" dir="ltr">
+                <div>GET  {apiRoot}/pos/customer/:identifier</div>
+                <div>POST {apiRoot}/pos/earn</div>
+                <div>POST {apiRoot}/pos/redeem</div>
+                <div>POST {apiRoot}/pos/refund</div>
               </div>
             </div>
 

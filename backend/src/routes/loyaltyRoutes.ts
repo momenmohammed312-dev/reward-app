@@ -14,6 +14,25 @@ router.post('/redeem', authenticateJWT, validate(schemas.redeemReward), LoyaltyC
 // Admin / Cashier specific loyalty routes
 /**
  * @swagger
+ * /api/loyalty/customer-lookup:
+ *   get:
+ *     summary: Instant lookup of a customer by membership card_number or Egyptian phone
+ *     tags: [Loyalty]
+ *     responses:
+ *       200:
+ *         description: Customer summary
+ *       404:
+ *         description: Customer not found
+ */
+router.get(
+  '/customer-lookup',
+  authenticateJWT,
+  requireRole(['owner', 'manager', 'cashier']),
+  LoyaltyController.cashierLookupCustomer
+);
+
+/**
+ * @swagger
  * /api/loyalty/cashier-earn:
  *   post:
  *     summary: Calculate and award points at checkout from invoice total (EGP)

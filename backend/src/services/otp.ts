@@ -59,6 +59,13 @@ async function sendVictoryLinkSMS(phone: string, message: string) {
   }
 }
 
+/**
+ * Dispatches an arbitrary SMS notification (e.g., expiry warning) through the configured SMS provider.
+ */
+export async function sendSmsMessage(phone: string, message: string): Promise<void> {
+  await sendVictoryLinkSMS(phone, message);
+}
+
 const sendSMS = async (phone: string, code: string) => {
   try {
     const message = `كود التحقق الخاص بك هو: ${code}\nصالح لمدة ${OTP_EXPIRY_MINUTES} دقائق.`;

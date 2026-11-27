@@ -95,15 +95,49 @@ export class LoyaltyController {
       const total = countRes.rows[0].total;
 
       const result = await db.query(
-        `SELECT type, points, reference_type, note, created_at
-         FROM wallet_ledger
-         WHERE tenant_id = $1::uuid AND customer_id = $2
-         ORDER BY created_at DESC
+        `SELECT wl.id, wl.type, wl.points, wl.reference_id, wl.reference_type, wl.note, wl.created_at,
+                t.invoice_id, t.amount::float8 AS amount
+         FROM wallet_ledger wl
+         LEFT JOIN transactions t ON wl.reference_type = 'transaction' AND wl.reference_id = t.id
+         WHERE wl.tenant_id = $1::uuid AND wl.customer_id = $2
+         ORDER BY wl.created_at DESC
          LIMIT $3 OFFSET $4`,
         [tenantId, customerId, limit, offset]
       );
 
-      res.json({ rows: result.rows, total, page, limit });
+      const txIds = result.rows
+        .filter((r: any) => r.reference_type === 'transaction' && r.reference_id)
+        .map((r: any) => r.reference_id);
+
+      const itemsByTxId = new Map<string, any[]>();
+      if (txIds.length > 0) {
+        const itemsRes = await db.query(
+          `SELECT id, transaction_id, sku, product_name, category,
+                  quantity::float8 AS quantity, unit,
+                  unit_price::float8 AS unit_price,
+                  discount_amount::float8 AS discount_amount,
+                  net_amount::float8 AS net_amount,
+                  is_excluded, exclusion_reason,
+                  applied_multiplier::float8 AS applied_multiplier,
+                  points_earned
+           FROM transaction_items
+           WHERE tenant_id = $1::uuid AND transaction_id = ANY($2::uuid[])
+           ORDER BY created_at ASC`,
+          [tenantId, txIds]
+        );
+        for (const item of itemsRes.rows) {
+          const list = itemsByTxId.get(item.transaction_id) || [];
+          list.push(item);
+          itemsByTxId.set(item.transaction_id, list);
+        }
+      }
+
+      const rows = result.rows.map((r: any) => ({
+        ...r,
+        items: r.reference_id ? itemsByTxId.get(r.reference_id) || [] : [],
+      }));
+
+      res.json({ rows, total, page, limit });
     } catch (error) {
       logger.error('Ledger history error', { error: (error as Error).message });
       res.status(500).json({ error: 'Internal Server Error' });
@@ -111,48 +145,123 @@ export class LoyaltyController {
   }
 
   /**
+   * Instant customer lookup by membership card_number or Egyptian phone for Cashier UI.
+   * GET /api/loyalty/customer-lookup?q=...
+   */
+  static async cashierLookupCustomer(req: AuthenticatedRequest, res: Response) {
+    try {
+      const tenantId = req.user?.tenant_id;
+      const q = String(req.query.q || '').trim();
+      if (!tenantId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      if (!q) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Query parameter q is required' });
+      }
+
+      const customer = await LoyaltyService.lookupCustomerByIdentifier(tenantId, q);
+      if (!customer) {
+        return res.status(404).json({ error: 'Not Found', message: 'لم يتم العثور على عميل بهذا الرقم أو الكارت' });
+      }
+
+      return res.json({ customer });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('Cashier lookup error', { error: msg });
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  /**
    * Allows admins/cashiers to manually award bonus points to a customer via LedgerService.insert.
+   * Enforces per-tenant cashier_daily_manual_limit when caller role is 'cashier'.
    */
   static async adminEarnPointsManual(req: AuthenticatedRequest, res: Response) {
     const tenantId = req.user?.tenant_id;
     const adminUserId = req.user?.id;
-    const { customer_id, customer_phone, points, amount, reason, note, branch_id } = req.body;
+    const {
+      customer_id,
+      customer_phone,
+      customer_identifier,
+      card_number,
+      points,
+      amount,
+      reason,
+      note,
+      branch_id,
+    } = req.body;
 
     if (!tenantId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 2.6 Branch-level authorization: cashier cannot grant points across different branches
     if (req.user?.role === 'cashier' && req.user?.branch_id && branch_id && req.user.branch_id !== branch_id) {
       return res.status(403).json({ error: 'Cashier cannot perform actions for a different branch' });
     }
 
     const pointsToAdd = points ?? amount;
-    if ((!customer_id && !customer_phone) || typeof pointsToAdd !== 'number' || pointsToAdd <= 0) {
-      return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or customer_phone) and positive points/amount are required' });
+    const rawIdentifier = customer_identifier || card_number || customer_phone;
+    if ((!customer_id && !rawIdentifier) || typeof pointsToAdd !== 'number' || pointsToAdd <= 0) {
+      return res.status(400).json({ error: 'Missing fields', message: 'customer_id (or phone/card_number) and positive points/amount are required' });
     }
 
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
 
+      if (req.user?.role === 'cashier') {
+        const limitRes = await client.query(
+          'SELECT cashier_daily_manual_limit FROM tenants WHERE id = $1::uuid',
+          [tenantId]
+        );
+        const dailyLimit = limitRes.rows[0]?.cashier_daily_manual_limit;
+        if (dailyLimit !== null && dailyLimit !== undefined && Number(dailyLimit) > 0) {
+          const actorKey = adminUserId || req.user?.email || 'cashier';
+          const usedTodayRes = await client.query(
+            `SELECT COALESCE(SUM(points), 0)::int AS granted_today
+             FROM wallet_ledger
+             WHERE tenant_id = $1::uuid
+               AND type = 'bonus'
+               AND created_by = $2
+               AND created_at >= date_trunc('day', NOW())`,
+            [tenantId, actorKey]
+          );
+          const grantedToday = Number(usedTodayRes.rows[0]?.granted_today || 0);
+          if (grantedToday + pointsToAdd > Number(dailyLimit)) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({
+              error: 'Forbidden',
+              message: `تجاوزت الحد اليومي للنقاط اليدوية للكاشير (${dailyLimit} نقطة/يوم — المتاح اليوم: ${Math.max(0, Number(dailyLimit) - grantedToday)})`,
+            });
+          }
+        }
+      }
+
       let resolvedCustomerId = customer_id;
 
-      if (!resolvedCustomerId && customer_phone) {
-        const normalizedPhone = normalizePhone(String(customer_phone));
-        if (!normalizedPhone) {
-          await client.query('ROLLBACK');
-          return res.status(400).json({ error: 'Invalid phone', message: 'Invalid Egyptian phone number' });
-        }
-        const custRes = await client.query(
-          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
-          [tenantId, normalizedPhone]
+      if (!resolvedCustomerId && rawIdentifier) {
+        const cleaned = String(rawIdentifier).trim();
+        const normalizedPhone = normalizePhone(cleaned);
+        const byCardRes = await client.query(
+          'SELECT id FROM customers WHERE tenant_id = $1::uuid AND UPPER(card_number) = $2 AND deleted_at IS NULL LIMIT 1',
+          [tenantId, cleaned.toUpperCase()]
         );
-        if (custRes.rows.length === 0) {
+        if (byCardRes.rows.length > 0) {
+          resolvedCustomerId = byCardRes.rows[0].id;
+        } else if (normalizedPhone) {
+          const custRes = await client.query(
+            'SELECT id FROM customers WHERE tenant_id = $1::uuid AND phone = $2 AND deleted_at IS NULL',
+            [tenantId, normalizedPhone]
+          );
+          if (custRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone or card number' });
+          }
+          resolvedCustomerId = custRes.rows[0].id;
+        } else {
           await client.query('ROLLBACK');
-          return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that phone' });
+          return res.status(404).json({ error: 'Not Found', message: 'Customer not found with that card number' });
         }
-        resolvedCustomerId = custRes.rows[0].id;
       }
 
       if (!resolvedCustomerId) {
@@ -214,12 +323,13 @@ export class LoyaltyController {
 
   /**
    * Cashier checkout endpoint: calculates points from invoice total in EGP,
-   * auto-registers walk-in customers by phone, and prevents duplicate invoices.
+   * looks up by membership card_number OR phone, auto-registers walk-ins by phone,
+   * and records below-minimum invoices cleanly with 0 points.
    */
   static async cashierEarnByInvoice(req: AuthenticatedRequest, res: Response) {
     const tenantId = req.user?.tenant_id;
     const adminUserId = req.user?.id;
-    const { customer_phone, amount_egp, invoice_id, branch_id, note } = req.body;
+    const { customer_phone, customer_identifier, amount_egp, discount_amount, invoice_id, branch_id, note } = req.body;
 
     if (!tenantId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -230,12 +340,15 @@ export class LoyaltyController {
     }
 
     const effectiveBranchId = branch_id || req.user?.branch_id || undefined;
+    const identifier = String(customer_identifier || customer_phone || '').trim();
 
     try {
       const result = await LoyaltyService.earnFromCashierInvoice({
         tenantId,
-        customerPhone: String(customer_phone),
+        customerPhone: customer_phone ? String(customer_phone) : undefined,
+        customerIdentifier: identifier,
         amountEgp: Number(amount_egp),
+        discountAmount: discount_amount !== undefined ? Number(discount_amount) : undefined,
         invoiceId: invoice_id,
         branchId: effectiveBranchId,
         note,
@@ -254,11 +367,14 @@ export class LoyaltyController {
         invoiceId: result.invoiceId,
         amountEgp: result.amountEgp,
         pointsEarned: result.pointsEarned,
+        belowMinimum: result.belowMinimum,
       });
 
       return res.json({
         success: true,
-        message: 'Points calculated and awarded',
+        message: result.belowMinimum
+          ? 'Invoice recorded below minimum purchase threshold (0 points)'
+          : 'Points calculated and awarded',
         ...result,
       });
     } catch (error: unknown) {
@@ -268,7 +384,8 @@ export class LoyaltyController {
       }
       const isClientError =
         msg.includes('Invalid Egyptian') ||
-        msg.includes('minimum purchase') ||
+        msg.includes('unknown membership card') ||
+        msg.includes('Customer phone or card') ||
         msg.includes('Branch not found') ||
         msg.includes('No active branch');
       if (isClientError) {
@@ -280,17 +397,20 @@ export class LoyaltyController {
   }
 
   /**
-   * Allows admins to refund a transaction (full or partial) and claw back the awarded points.
+   * Allows admins to refund a transaction (full, amount-partial, or item-level) and claw back points.
    */
   static async adminRefundTransaction(req: AuthenticatedRequest, res: Response) {
     try {
       const tenantId = req.user?.tenant_id;
-      const { invoice_id, partial_amount, note } = req.body;
+      const { invoice_id, partial_amount, items, note } = req.body;
 
-      const result = await LoyaltyService.refundPoints(tenantId!, invoice_id, note, partial_amount);
+      const result = await LoyaltyService.refundPoints(tenantId!, invoice_id, note, partial_amount, items);
       await logAdminAction(tenantId!, req.user?.id, 'refund_transaction', 'transaction', undefined, {
         invoice_id,
         partial_amount: partial_amount ?? null,
+        items: items ?? null,
+        reversed_points: (result as any).reversed_points ?? null,
+        shortfall_points: (result as any).shortfall_points ?? 0,
         note: note ?? null,
       });
       res.json(result);

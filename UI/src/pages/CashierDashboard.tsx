@@ -16,6 +16,8 @@ import {
   Barcode,
   Tag,
   Camera,
+  MagnifyingGlass,
+  IdentificationCard,
 } from '@phosphor-icons/react';
 import { api } from '../services/api';
 import { CameraScannerModal } from '../components/ui/CameraScannerModal';
@@ -58,8 +60,36 @@ export const CashierDashboard: React.FC = () => {
   const [result, setResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
   const [approvedBanner, setApprovedBanner] = useState<ApprovedRedemptionBanner | null>(null);
   const [loading, setLoading] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookedUpCustomer, setLookedUpCustomer] = useState<{
+    id: string;
+    name?: string;
+    phone?: string;
+    card_number?: string;
+    tier?: string;
+    points_balance: number;
+    wallet_value_egp?: number;
+    is_verified?: boolean;
+  } | null>(null);
   const [recentVerifications, setRecentVerifications] = useState<CashierVerificationEntry[]>([]);
   const [scannerTarget, setScannerTarget] = useState<'code' | 'phone' | null>(null);
+
+  const handleLookupCustomer = async (overrideQuery?: string) => {
+    const q = (overrideQuery ?? earnPhone).trim();
+    if (q.length < 4) {
+      setLookedUpCustomer(null);
+      return;
+    }
+    setLookingUp(true);
+    try {
+      const res = await api.cashierLookupCustomer(q);
+      setLookedUpCustomer(res.customer || null);
+    } catch {
+      setLookedUpCustomer(null);
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('loyalty_admin_token');
@@ -128,10 +158,15 @@ export const CashierDashboard: React.FC = () => {
 
   const handleEarnByInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanedPhone = earnPhone.replace(/\D/g, '');
+    const rawIdentifier = earnPhone.trim();
+    const digitsOnly = rawIdentifier.replace(/\D/g, '');
+    const isEgyptianPhone = /^01[0-9]{9}$/.test(digitsOnly);
+    const isCardIdentifier = rawIdentifier.length >= 4 && /[A-Za-z]/.test(rawIdentifier);
+    const normalizedIdentifier = isEgyptianPhone ? digitsOnly : rawIdentifier.toUpperCase();
     const amountNum = Number(invoiceAmount);
-    if (!/^01[0-9]{9}$/.test(cleanedPhone)) {
-      setResult({ status: 'error', message: 'أدخل رقم موبايل مصري صحيح (11 رقم يبدأ بـ 01)' });
+
+    if (!isEgyptianPhone && !isCardIdentifier) {
+      setResult({ status: 'error', message: 'أدخل رقم موبايل مصري صحيح (11 رقم) أو رقم كارت العضوية' });
       return;
     }
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -150,21 +185,35 @@ export const CashierDashboard: React.FC = () => {
 
     try {
       const data = await api.cashierEarnByInvoice({
-        customer_phone: cleanedPhone,
+        customer_identifier: normalizedIdentifier,
         amount_egp: amountNum,
         invoice_id: invoiceId.trim() || undefined,
         note: earnNote.trim() || undefined,
       });
       const pts = Number(data.pointsEarned || 0);
       const newBadge = data.customerCreated ? ' (عميل جديد تم تسجيله تلقائياً)' : '';
-      const msg = `تمت إضافة +${pts} نقطة لفاتورة ${amountNum} ج.م${newBadge}`;
+      const msg = data.belowMinimum
+        ? `تم تسجيل الفاتورة (${amountNum} ج.م) — أقل من الحد الأدنى للنقاط (0 نقطة)`
+        : `تمت إضافة +${pts} نقطة لفاتورة ${amountNum} ج.م${newBadge}`;
       setResult({ status: 'success', message: msg });
+      if (data.summary) {
+        setLookedUpCustomer({
+          id: data.customerId,
+          name: data.summary.name,
+          phone: data.summary.phone,
+          card_number: data.summary.card_number,
+          tier: data.summary.tier,
+          points_balance: Number(data.summary.points_balance || 0),
+          wallet_value_egp: Number(data.summary.wallet_value_egp || 0),
+          is_verified: Boolean(data.summary.is_verified),
+        });
+      }
       setRecentVerifications((prev) => [
         {
           id: `${Date.now()}`,
-          code: `+${pts} نقطة`,
+          code: data.belowMinimum ? '0 نقطة' : `+${pts} نقطة`,
           status: 'success',
-          message: `${cleanedPhone} · ${amountNum} ج.م (#${data.invoiceId})`,
+          message: `${normalizedIdentifier} · ${amountNum} ج.م (#${data.invoiceId})`,
           time: timeLabel,
         },
         ...prev.slice(0, 9),
@@ -178,7 +227,7 @@ export const CashierDashboard: React.FC = () => {
       const msg = err?.message || 'تعذر احتساب نقاط الفاتورة';
       setResult({ status: 'error', message: msg });
       setRecentVerifications((prev) => [
-        { id: `${Date.now()}`, code: cleanedPhone, status: 'error', message: msg, time: timeLabel },
+        { id: `${Date.now()}`, code: normalizedIdentifier, status: 'error', message: msg, time: timeLabel },
         ...prev.slice(0, 9),
       ]);
     } finally {
@@ -188,10 +237,14 @@ export const CashierDashboard: React.FC = () => {
 
   const handleEarnPointsManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanedPhone = earnPhone.replace(/\D/g, '');
+    const rawIdentifier = earnPhone.trim();
+    const digitsOnly = rawIdentifier.replace(/\D/g, '');
+    const isEgyptianPhone = /^01[0-9]{9}$/.test(digitsOnly);
+    const isCardIdentifier = rawIdentifier.length >= 4 && /[A-Za-z]/.test(rawIdentifier);
+    const normalizedIdentifier = isEgyptianPhone ? digitsOnly : rawIdentifier.toUpperCase();
     const numericPoints = parseInt(earnPoints, 10);
-    if (!/^01[0-9]{9}$/.test(cleanedPhone)) {
-      setResult({ status: 'error', message: 'أدخل رقم موبايل مصري صحيح (11 رقم يبدأ بـ 01)' });
+    if (!isEgyptianPhone && !isCardIdentifier) {
+      setResult({ status: 'error', message: 'أدخل رقم موبايل مصري صحيح أو رقم كارت العضوية' });
       return;
     }
     if (!numericPoints || numericPoints <= 0) {
@@ -218,7 +271,8 @@ export const CashierDashboard: React.FC = () => {
             Authorization: `Bearer ${localStorage.getItem('loyalty_admin_token') || ''}`,
           },
           body: JSON.stringify({
-            customer_phone: cleanedPhone,
+            customer_identifier: normalizedIdentifier,
+            ...(isEgyptianPhone ? { customer_phone: digitsOnly } : {}),
             points: numericPoints,
             note: earnNote.trim() || 'نقاط بونص من نقطة الكاشير',
           }),
@@ -230,12 +284,12 @@ export const CashierDashboard: React.FC = () => {
         const msg = err.message || 'تعذر إضافة النقاط — تأكد من تسجيل العميل أولاً';
         setResult({ status: 'error', message: msg });
         setRecentVerifications((prev) => [
-          { id: `${Date.now()}`, code: cleanedPhone, status: 'error', message: msg, time: timeLabel },
+          { id: `${Date.now()}`, code: normalizedIdentifier, status: 'error', message: msg, time: timeLabel },
           ...prev.slice(0, 9),
         ]);
       } else {
         const data = await res.json();
-        const customerLabel = data.summary?.name || cleanedPhone;
+        const customerLabel = data.summary?.name || normalizedIdentifier;
         const msg = `تمت إضافة +${numericPoints} نقطة للعميل ${customerLabel}`;
         setResult({ status: 'success', message: msg });
         setRecentVerifications((prev) => [
@@ -243,7 +297,7 @@ export const CashierDashboard: React.FC = () => {
             id: `${Date.now()}`,
             code: `+${numericPoints} نقطة`,
             status: 'success',
-            message: `${customerLabel} (${cleanedPhone})`,
+            message: `${customerLabel} (${normalizedIdentifier})`,
             time: timeLabel,
           },
           ...prev.slice(0, 9),
@@ -469,7 +523,7 @@ export const CashierDashboard: React.FC = () => {
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <DeviceMobile size={14} />
-                        رقم موبايل العميل (أو امسح باركود البطاقة)
+                        رقم الكارت أو الموبايل (امسح QR/باركود البطاقة)
                       </span>
                       <button
                         type="button"
@@ -480,18 +534,56 @@ export const CashierDashboard: React.FC = () => {
                         مسح بالكاميرا
                       </button>
                     </label>
-                    <input
-                      ref={phoneInputRef}
-                      id={phoneInputId}
-                      type="tel"
-                      dir="ltr"
-                      placeholder="01012345678"
-                      value={earnPhone}
-                      onChange={(e) => setEarnPhone(e.target.value)}
-                      className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] px-4 py-3 rounded-xl text-sm text-[var(--color-admin-text)] font-mono tracking-wider outline-none focus:border-[var(--color-admin-primary)] focus:ring-2 focus:ring-[var(--color-admin-primary)]/20 transition-colors"
-                      maxLength={14}
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        ref={phoneInputRef}
+                        id={phoneInputId}
+                        type="text"
+                        dir="ltr"
+                        placeholder="MKT-12345678 / 01012345678"
+                        value={earnPhone}
+                        onChange={(e) => setEarnPhone(e.target.value)}
+                        onBlur={() => handleLookupCustomer()}
+                        className="flex-1 bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] px-4 py-3 rounded-xl text-sm text-[var(--color-admin-text)] font-mono tracking-wider outline-none focus:border-[var(--color-admin-primary)] focus:ring-2 focus:ring-[var(--color-admin-primary)]/20 transition-colors"
+                        maxLength={32}
+                        required
+                      />
+                      <button
+                        type="button"
+                        disabled={lookingUp || earnPhone.trim().length < 4}
+                        onClick={() => handleLookupCustomer()}
+                        className="px-3.5 py-2 rounded-xl bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] hover:border-[var(--color-admin-primary)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                      >
+                        <MagnifyingGlass size={14} weight="bold" />
+                        {lookingUp ? '...' : 'استعلام'}
+                      </button>
+                    </div>
+                    {lookedUpCustomer && (
+                      <div className="p-3 rounded-xl bg-emerald-950/35 border border-emerald-700/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <IdentificationCard size={18} className="text-emerald-400 shrink-0" weight="duotone" />
+                          <div className="min-w-0">
+                            <div className="font-black text-white truncate">
+                              {lookedUpCustomer.name || 'عميل مسجل'} ·{' '}
+                              <span className="text-emerald-300">{lookedUpCustomer.tier || 'bronze'}</span>
+                            </div>
+                            <div className="text-[10.5px] font-mono text-emerald-200/80" dir="ltr">
+                              {lookedUpCustomer.card_number || lookedUpCustomer.phone}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-left">
+                          <div className="font-black text-emerald-300 tabular-nums">
+                            {lookedUpCustomer.points_balance.toLocaleString()} نقطة
+                          </div>
+                          {lookedUpCustomer.wallet_value_egp !== undefined && (
+                            <div className="text-[10px] text-emerald-200/80 tabular-nums">
+                              ≈ {lookedUpCustomer.wallet_value_egp} ج.م
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -592,17 +684,18 @@ export const CashierDashboard: React.FC = () => {
                       className="text-xs text-[var(--color-admin-text-muted)] font-bold flex items-center gap-1.5"
                     >
                       <DeviceMobile size={14} />
-                      رقم موبايل العميل
+                      رقم كارت العضوية أو موبايل العميل
                     </label>
                     <input
                       id={phoneInputId}
-                      type="tel"
+                      type="text"
                       dir="ltr"
-                      placeholder="01012345678"
+                      placeholder="MKT-12345678 / 01012345678"
                       value={earnPhone}
                       onChange={(e) => setEarnPhone(e.target.value)}
+                      onBlur={() => handleLookupCustomer()}
                       className="w-full bg-[var(--color-admin-bg)] border border-[var(--color-admin-border)] px-4 py-3 rounded-xl text-sm text-[var(--color-admin-text)] font-mono tracking-wider outline-none focus:border-[var(--color-admin-primary)] focus:ring-2 focus:ring-[var(--color-admin-primary)]/20 transition-colors"
-                      maxLength={14}
+                      maxLength={32}
                       required
                     />
                   </div>
@@ -764,7 +857,9 @@ export const CashierDashboard: React.FC = () => {
         title={scannerTarget === 'phone' ? 'مسح باركود بطاقة العميل' : 'مسح باركود قسيمة الخصم'}
         onDetected={(val) => {
           if (scannerTarget === 'phone') {
-            setEarnPhone(val.replace(/\D/g, ''));
+            const cleaned = val.trim().toUpperCase();
+            setEarnPhone(cleaned);
+            handleLookupCustomer(cleaned);
           } else if (scannerTarget === 'code') {
             setCode(val.toUpperCase());
           }

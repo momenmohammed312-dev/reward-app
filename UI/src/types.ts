@@ -22,15 +22,21 @@ export interface Tenant {
   showMenu?: boolean;
   pointsPerEgp?: number;
   minPurchaseEgp?: number;
+  pointValueEgp?: number;
+  tierBasis?: 'points' | 'spend';
 }
 
 export interface User {
   phone: string;
+  cardNumber?: string;
   name: string;
   email?: string;
   joinDate: string;
   loyaltyTier: 'Silver' | 'Gold' | 'Platinum' | 'Bronze' | 'العادي' | 'الذهبي' | 'البلاتيني';
   totalPoints: number;
+  totalSpentEgp?: number;
+  walletValueEgp?: number;
+  totalSavedEgp?: number;
 }
 
 export interface Reward {
@@ -59,6 +65,22 @@ export interface RedeemedReward {
   status: 'active' | 'used' | 'expired';
 }
 
+export interface TransactionItem {
+  id?: string;
+  sku?: string | null;
+  product_name: string;
+  category?: string | null;
+  quantity: number;
+  unit?: string;
+  unit_price?: number;
+  discount_amount?: number;
+  net_amount: number;
+  is_excluded?: boolean;
+  exclusion_reason?: string | null;
+  applied_multiplier?: number;
+  points_earned?: number;
+}
+
 export interface Transaction {
   id: string;
   amount?: number;
@@ -67,6 +89,7 @@ export interface Transaction {
   type: 'earn' | 'redeem' | 'refund';
   description: string;
   invoiceNumber?: string;
+  items?: TransactionItem[];
 }
 
 export interface AppState {

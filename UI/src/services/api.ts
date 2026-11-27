@@ -310,6 +310,25 @@ class ApiService {
     return response.json();
   }
 
+  async createAdminCustomer(data: {
+    name: string;
+    phone: string;
+    tier?: string;
+    initial_points?: number;
+    is_verified?: boolean;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/admin/customers`, {
+      method: 'POST',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'فشل إضافة العميل');
+    }
+    return response.json();
+  }
+
   async deleteCustomer(id: string) {
     const response = await fetch(`${API_BASE_URL}/admin/customers/${id}`, {
       method: 'DELETE',
@@ -403,8 +422,24 @@ class ApiService {
     return response.json();
   }
 
+  async cashierLookupCustomer(query: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/loyalty/customer-lookup?q=${encodeURIComponent(query.trim())}`,
+      {
+        method: 'GET',
+        headers: this.getAdminHeaders(),
+      }
+    );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'لم يتم العثور على العميل');
+    }
+    return response.json();
+  }
+
   async cashierEarnByInvoice(data: {
-    customer_phone: string;
+    customer_phone?: string;
+    customer_identifier?: string;
     amount_egp: number;
     invoice_id?: string;
     note?: string;
@@ -471,7 +506,12 @@ class ApiService {
     return response.json();
   }
 
-  async adminRefundTransaction(data: { invoice_id: string; partial_amount?: number; note?: string }) {
+  async adminRefundTransaction(data: {
+    invoice_id: string;
+    partial_amount?: number;
+    items?: Array<{ transaction_item_id?: string; sku?: string; quantity: number }>;
+    note?: string;
+  }) {
     const response = await fetch(`${API_BASE_URL}/loyalty/refund`, {
       method: 'POST',
       headers: this.getAdminHeaders(),
@@ -654,6 +694,50 @@ class ApiService {
       headers: this.getAdminHeaders(),
     });
     if (!response.ok) throw new Error('فشل حذف الحملة');
+    return response.json();
+  }
+
+  async getAdminEarningRules() {
+    const response = await fetch(`${API_BASE_URL}/admin/earning-rules`, {
+      method: 'GET',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch earning rules');
+    return response.json();
+  }
+
+  async createAdminEarningRule(data: Record<string, any>) {
+    const response = await fetch(`${API_BASE_URL}/admin/earning-rules`, {
+      method: 'POST',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'فشل إنشاء القاعدة');
+    }
+    return response.json();
+  }
+
+  async updateAdminEarningRule(id: string, data: Record<string, any>) {
+    const response = await fetch(`${API_BASE_URL}/admin/earning-rules/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: this.getAdminHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'فشل تحديث القاعدة');
+    }
+    return response.json();
+  }
+
+  async deleteAdminEarningRule(id: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/earning-rules/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: this.getAdminHeaders(),
+    });
+    if (!response.ok) throw new Error('فشل حذف القاعدة');
     return response.json();
   }
 

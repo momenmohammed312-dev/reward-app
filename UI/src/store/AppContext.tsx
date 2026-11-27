@@ -76,6 +76,8 @@ const mapPublicTenant = (raw: any): Tenant => {
     showMenu: typeof raw.show_menu === 'boolean' ? raw.show_menu : raw.business_type !== 'supermarket',
     pointsPerEgp: raw.points_per_egp !== undefined ? Number(raw.points_per_egp) : undefined,
     minPurchaseEgp: raw.min_purchase_egp !== undefined ? Number(raw.min_purchase_egp) : undefined,
+    pointValueEgp: raw.point_value_egp !== undefined ? Number(raw.point_value_egp) : undefined,
+    tierBasis: raw.tier_basis || 'points',
   };
 };
 
@@ -150,10 +152,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const savedPhone = phoneToUse || localStorage.getItem('loyalty_user_phone') || '';
       setUser({
         phone: savedPhone,
+        cardNumber: profile.card_number || undefined,
         name: profile.name || 'عميل مميز',
         joinDate: '٢٠٢٦/٠٥/٢٨',
         loyaltyTier: profile.tier || 'bronze',
         totalPoints: Number(profile.points_balance || 0),
+        totalSpentEgp: profile.total_spent_egp !== undefined ? Number(profile.total_spent_egp) : undefined,
+        walletValueEgp: profile.wallet_value_egp !== undefined ? Number(profile.wallet_value_egp) : undefined,
+        totalSavedEgp: profile.total_saved_egp !== undefined ? Number(profile.total_saved_egp) : undefined,
       });
 
       const historyRes = await api.getHistory();
@@ -161,10 +167,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const mappedHistory = historyRows.map((h: any, idx: number) => ({
         id: h.id || `tx_${idx}`,
         date: h.created_at,
+        amount: h.amount !== undefined && h.amount !== null ? Number(h.amount) : undefined,
         points: Number(h.points),
-        type: h.type === 'earned' || h.type === 'bonus' ? 'earn' : (h.type === 'refund' ? 'refund' : 'redeem'),
+        type:
+          h.type === 'earned' || h.type === 'bonus' || h.type === 'adjustment'
+            ? 'earn'
+            : h.type === 'refund'
+            ? 'refund'
+            : 'redeem',
         description: h.note || 'عملية ولاء',
-        invoiceNumber: h.reference_id ? `INV-${h.reference_id.substring(0, 8)}` : undefined,
+        invoiceNumber: h.invoice_id || (h.reference_id ? `INV-${h.reference_id.substring(0, 8)}` : undefined),
+        items: Array.isArray(h.items) ? h.items : undefined,
       }));
       setTransactions(mappedHistory);
     } catch (err: any) {

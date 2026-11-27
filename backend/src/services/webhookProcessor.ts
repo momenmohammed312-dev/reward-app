@@ -93,31 +93,57 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
               ? adapter.parseOrder(payload, excludedKeywords)
               : adapter.parseOrder(payload);
 
-        if (!order.customerPhone) {
-          throw new Error('Customer phone number is missing in POS order payload');
+        if (!order.customerPhone && !order.customerCardNumber) {
+          throw new Error('Customer phone or card_number is missing in POS order payload');
         }
         if (!order.invoiceId) {
           throw new Error('Invoice id is missing in POS order payload');
         }
 
         const customerPhone = order.customerPhone;
-        const totalAmount = order.totalAmount;
+        const totalAmount = order.rawTotal ?? order.totalAmount;
         const invoiceId = order.invoiceId;
         const branchLocationId = order.branchLocationId;
 
-        // 1. Resolve or create customer (marks pos_identified_at; never auto-verifies OTP flag)
-        const custRes = await db.query(
-          `INSERT INTO customers (tenant_id, phone, name, is_verified, pos_identified_at)
-           VALUES ($1::uuid, $2, $3, false, NOW())
-           ON CONFLICT (tenant_id, phone) DO UPDATE SET
-             name = COALESCE(NULLIF(customers.name, 'POS Customer'), EXCLUDED.name, customers.name),
-             pos_identified_at = NOW(),
-             deleted_at = NULL,
-             updated_at = NOW()
-           RETURNING id`,
-          [tenantId, customerPhone, order.customerName || 'POS Customer']
-        );
-        const customerId: string = custRes.rows[0].id;
+        // 1. Resolve by card_number first or upsert walk-in customer by phone
+        let customerId: string;
+        if (order.customerCardNumber) {
+          const cardCustRes = await db.query(
+            'SELECT id FROM customers WHERE tenant_id = $1::uuid AND UPPER(card_number) = $2 AND deleted_at IS NULL LIMIT 1',
+            [tenantId, order.customerCardNumber.toUpperCase()]
+          );
+          if (cardCustRes.rows.length > 0) {
+            customerId = cardCustRes.rows[0].id;
+          } else if (customerPhone) {
+            const custRes = await db.query(
+              `INSERT INTO customers (tenant_id, phone, name, is_verified, pos_identified_at)
+               VALUES ($1::uuid, $2, $3, false, NOW())
+               ON CONFLICT (tenant_id, phone) DO UPDATE SET
+                 name = COALESCE(NULLIF(customers.name, 'POS Customer'), EXCLUDED.name, customers.name),
+                 pos_identified_at = NOW(),
+                 deleted_at = NULL,
+                 updated_at = NOW()
+               RETURNING id`,
+              [tenantId, customerPhone, order.customerName || 'POS Customer']
+            );
+            customerId = custRes.rows[0].id;
+          } else {
+            throw new Error(`Customer card ${order.customerCardNumber} not found`);
+          }
+        } else {
+          const custRes = await db.query(
+            `INSERT INTO customers (tenant_id, phone, name, is_verified, pos_identified_at)
+             VALUES ($1::uuid, $2, $3, false, NOW())
+             ON CONFLICT (tenant_id, phone) DO UPDATE SET
+               name = COALESCE(NULLIF(customers.name, 'POS Customer'), EXCLUDED.name, customers.name),
+               pos_identified_at = NOW(),
+               deleted_at = NULL,
+               updated_at = NOW()
+             RETURNING id`,
+            [tenantId, customerPhone, order.customerName || 'POS Customer']
+          );
+          customerId = custRes.rows[0].id;
+        }
 
         // 2. Resolve Branch by location ID
         const branchRes = await db.query(
@@ -140,15 +166,26 @@ export function startWebhookWorker(): Worker<WebhookJobPayload> | null {
           branchId = branchRes.rows[0].id;
         }
 
-        // 3. Award Points
-        await LoyaltyService.earnPoints(
+        // 3. Award Points (0 points below min_purchase records cleanly without failing job)
+        const earnRes = await LoyaltyService.earnPoints(
           tenantId,
           customerId,
           branchId,
           invoiceId,
           totalAmount,
-          `Points earned from POS Order #${invoiceId}`
+          `Points earned from POS Order #${invoiceId}`,
+          {
+            items: order.items,
+            discountAmount: order.discountAmount,
+            posPayload: payload,
+          }
         );
+        if ((earnRes as any).below_minimum) {
+          logger.info('POS invoice below minimum purchase; recorded with 0 points', {
+            tenantId,
+            invoiceId,
+          });
+        }
       } else if (eventType === 'order.refunded') {
         const adapter = getAdapter(effectiveProvider);
         const order = adapter.parseOrder(payload);

@@ -41,7 +41,7 @@ interface ScannerModalProps {
 
 export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) => {
   const { user, t } = useApp();
-  const phoneValue = user?.phone || '01012345678';
+  const cardCodeValue = user?.cardNumber || user?.phone || 'MO2-00000000';
 
   return (
     <AnimatePresence>
@@ -81,16 +81,17 @@ export const ScannerModal: React.FC<ScannerModalProps> = ({ isOpen, onClose }) =
 
             <div className="bg-white border-2 border-[var(--color-primary)] p-[var(--space-4)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] flex flex-col items-center gap-[var(--space-3)] w-full">
               <div className="p-1 bg-white">
-                <QRCanvas value={phoneValue} size={150} fgColor="var(--color-primary)" />
+                <QRCanvas value={cardCodeValue} size={150} fgColor="var(--color-primary)" />
               </div>
 
               <div className="w-full border-t border-stone-200 pt-2 flex flex-col items-center">
-                <Barcode128 value={phoneValue} height={42} showLabel={false} />
+                <Barcode128 value={cardCodeValue} height={42} showLabel={false} />
               </div>
 
               <div className="flex flex-col gap-0.5 select-all">
-                <span className="code-display text-[var(--text-md)] font-bold tracking-[0.18em] text-stone-800">
-                  {phoneValue}
+                <span className="text-[10px] font-bold text-stone-400">{t('home.cardNumberLabel')}</span>
+                <span className="code-display text-[var(--text-md)] font-bold tracking-[0.14em] text-stone-800">
+                  {cardCodeValue}
                 </span>
                 <span className="text-[11px] text-stone-400 font-medium">{t('home.validFor')}</span>
               </div>
@@ -225,6 +226,20 @@ export const PointsWallet: React.FC<PointsWalletProps> = ({ onShowScannerCode })
                 })
               : t('home.unlockedNext', { reward: targetTitle })}
           </p>
+          {((user?.walletValueEgp && user.walletValueEgp > 0) || (user?.totalSavedEgp && user.totalSavedEgp > 0)) ? (
+            <div className="mt-2.5 flex items-center justify-center gap-2 flex-wrap">
+              {user?.walletValueEgp !== undefined && user.walletValueEgp > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-white/15 border border-white/20 text-[11.5px] font-bold text-white number">
+                  {t('home.walletValue', { amount: user.walletValueEgp.toLocaleString('en-US') })}
+                </span>
+              )}
+              {user?.totalSavedEgp !== undefined && user.totalSavedEgp > 0 && (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-400/20 border border-emerald-200/35 text-[11.5px] font-bold text-white number">
+                  {t('home.totalSaved', { amount: user.totalSavedEgp.toLocaleString('en-US') })}
+                </span>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
